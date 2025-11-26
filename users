@@ -1,0 +1,4 @@
+git config --global user.email "takmahesap1@gmail.com"
+git config --global user.name "Aquamarin" 
+
+git remote add origin https://github.com/aquamarin97/sequence_viewer.git

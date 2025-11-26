@@ -1,0 +1,9 @@
+# Değişiklikleri görmek için
+git status
+
+# Tüm değişiklikleri eklemek için (.gitignore'dakiler hariç)
+git add .
+
+# Commit ve push
+git commit -m "zoom out update"
+git push origin main
