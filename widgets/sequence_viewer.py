@@ -125,7 +125,12 @@ class SequenceViewerWidget(QGraphicsView):
         viewport_width = self.viewport().width()
         if viewport_width <= 0:
             return self.char_width
-        trailing_padding = self._current_trailing_padding()
+        # LINE modunda padding daha geniş; zoom-out sırasında mod değişirse
+        # sahne genişliği hesaplaması beklenenden büyük çıkıp scroll bar
+        # görünmesin diye en geniş padding'i baz al.
+        trailing_padding = max(
+            self.trailing_padding_line_px, self._current_trailing_padding()
+        )
 
         # Spacer'ı nt yerine sabit piksel olarak ekle
         available_width = viewport_width - trailing_padding
@@ -280,7 +285,7 @@ class SequenceViewerWidget(QGraphicsView):
             return
 
         # ---------------- Zoom streak takibi (hızlandırma) ----------------
-        steps = delta / 90.0
+        steps = delta / 120.0
         direction = 1 if steps > 0 else -1
         if self._wheel_zoom_streak_dir == direction:
             self._wheel_zoom_streak_len += 1
