@@ -6,4 +6,6 @@ git add .
 
 # Commit ve push
 git commit -m "zoom out update"
-git push origin main
+git push origin master
+
+git remote add origin https://github.com/aquamarin97/sequence_viewer

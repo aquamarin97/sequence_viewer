@@ -1,26 +1,23 @@
-# msa_viewer/widgets/navigation_ruler.py
+# msa_viewer/navigation_ruler/navigation_ruler_widget.py
 
 from typing import Optional
-import math
 
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont, QPixmap
 from PyQt5.QtWidgets import QWidget, QScrollBar
 
-from .sequence_viewer import SequenceViewerWidget
+from sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
+from .navigation_ruler_model import NavigationRulerModel
 
 
 class RulerWidget(QWidget):
     """
     En uzun diziye göre ölçeklenmiş, zoom/minimap benzeri cetvel (Navigation Ruler).
 
-    Performans için:
-    - Tick + label'lar bir QPixmap'e cache'lenir
-    - Pixmap sadece:
-        * en uzun dizi değiştiğinde
-        * veya widget yeniden boyutlandığında
-      yeniden üretilir.
-    - Scroll/zoom sırasında sadece yeşil viewport dikdörtgeni yeniden çizilir.
+    CMV:
+    - Model : NavigationRulerModel (max_len cache, tick layout, x→nt mapping)
+    - View  : Bu QWidget (QPainter + pixmap cache)
+    - Control: Mouse event'leri (drag-select, tıklamayla merkezleme) yine bu sınıfta.
     """
 
     def __init__(
@@ -36,6 +33,9 @@ class RulerWidget(QWidget):
 
         self.font = QFont("Arial", 8)
 
+        # Model
+        self._model = NavigationRulerModel()
+
         # Viewer'ın scroll hareketlerini dinleyerek pencereyi güncelle
         hbar: QScrollBar = self.viewer.horizontalScrollBar()
         hbar.valueChanged.connect(self._on_view_changed)
@@ -49,103 +49,37 @@ class RulerWidget(QWidget):
         self._drag_threshold_px = 3  # 3px üstü hareketi drag kabul et
 
         # ---- Performans cache'leri ----
-        self._cached_max_len: int = 0
-        self._last_seq_count: int = 0
-
         self._ruler_pixmap: Optional[QPixmap] = None
+        self._pixmap_max_len: int = 0  # pixmap üretilirken kullanılan max_len
 
     # ------------------------------------------------------------------ #
     # Yardımcı fonksiyonlar
-    # ------------------------------------------------------------------ 
-
-    def _recompute_max_len_if_needed(self) -> int:
-        """
-        En uzun dizi uzunluğunu cache'ler.
-        Sadece sequence satır sayısı değiştiğinde yeniden hesaplanır.
-        En uzun diziyi cache'ler.
-        Satır sayısı veya dizi uzunlukları değiştiğinde cache invalid edilir.
-        """
-        seq_count = len(self.viewer.sequence_items)
-        new_max_len = max(
-            (len(it.sequence) for it in self.viewer.sequence_items),
-            default=0,
-        )
-
-        if seq_count != self._last_seq_count or new_max_len != self._cached_max_len:
-            self._last_seq_count = seq_count
-            self._cached_max_len = new_max_len
-            self._invalidate_ruler_pixmap()
-
-        return self._cached_max_len
-
-
-
-    @staticmethod
-    def _nice_tick_step(max_nt: int, pixel_width: int, target_px: int = 60) -> int:
-        """
-        Ölçeklenen cetvel için "güzel" (1,2,5 x 10^k) aralıklı tick step seçer.
-        """
-        if max_nt <= 0 or pixel_width <= 0:
-            return max_nt if max_nt > 0 else 1
-
-        raw_step = (max_nt * target_px) / float(pixel_width)
-        if raw_step <= 0:
-            return 1
-
-        power = 10 ** int(math.floor(math.log10(raw_step)))
-        base = raw_step / power
-
-        if base <= 1:
-            nice = 1
-        elif base <= 2:
-            nice = 2
-        elif base <= 5:
-            nice = 5
-        else:
-            nice = 10
-
-        return int(nice * power)
-
-    def _x_to_nt(self, x: int) -> float:
-        """
-        Cetvel üzerindeki piksel konumunu nt indeksine dönüştür.
-        """
-        max_len = self._recompute_max_len_if_needed()
-        width = float(self.rect().width())
-        if max_len <= 0 or width <= 0:
-            return 0.0
-        ratio = min(max(x / width, 0.0), 1.0)
-        return ratio * max_len
-
-    def _format_label(self, value: int, max_len: int) -> str:
-        """
-        Cetvel üzerindeki sayıları yazarken kullanılacak format.
-        - max_len <= 1_000_000: normal sayı (örn. 5050)
-        - max_len  > 1_000_000: K'li gösterim (örn. 10K, 250K)
-        İlk label 1 ise her zaman '1' yazılır.
-        """
-        if value == 1:
-            return "1"
-
-        if max_len > 1_000_000:
-            k_val = int(round(value / 1000.0))
-            return f"{k_val}K"
-
-        return str(value)
+    # ------------------------------------------------------------------ #
 
     def _invalidate_ruler_pixmap(self) -> None:
-        """Tick/label pixmap'ini geçersiz kılar (bir sonraki paint'te yeniden üretilecek)."""
+        """
+        Tick/label pixmap'ini geçersiz kılar (bir sonraki paint'te yeniden üretilecek).
+        """
         self._ruler_pixmap = None
+        self._pixmap_max_len = 0
         self.update()
 
-    def _rebuild_ruler_pixmap(self, width: int, height: int, max_len: int) -> None:
+    def _rebuild_ruler_pixmap(self, width: int, height: int) -> None:
         """
         Tüm tick'leri ve label'ları bir QPixmap'e çizer.
         Yeşil viewport dikdörtgeni bu pixmap'e dahil edilmez; overlay olarak çizilir.
         """
+        max_len = self._model.cached_max_len
         if width <= 0 or height <= 0 or max_len <= 0:
             self._ruler_pixmap = None
             return
+
+        layout = self._model.compute_tick_layout(width)
+        if layout is None or layout.max_len <= 0:
+            self._ruler_pixmap = None
+            return
+
+        max_len = layout.max_len
 
         pm = QPixmap(width, height)
         pm.fill(Qt.white)
@@ -160,9 +94,6 @@ class RulerWidget(QWidget):
         p.setPen(QPen(Qt.black))
         p.drawRect(rect.adjusted(0, 0, -1, -1))
 
-        # Tick step
-        tick_step = self._nice_tick_step(max_len, width)
-
         p.setFont(self.font)
         tick_pen = QPen(Qt.black)
         p.setPen(tick_pen)
@@ -172,44 +103,31 @@ class RulerWidget(QWidget):
         tick_height_minor = 4
 
         # Minor ticks
-        minor_step = max(tick_step // 5, 1)
-        nt = 0
-        while nt <= max_len:
+        for nt in layout.minor_ticks:
             x = int(nt / max_len * width)
             p.drawLine(
-                x, baseline_y,
-                x, baseline_y - tick_height_minor
+                x,
+                baseline_y,
+                x,
+                baseline_y - tick_height_minor,
             )
-            nt += minor_step
 
-        # Major ticks listesi
-        ticks = []
-        nt = 0
-        while nt <= max_len:
-            ticks.append(nt)
-            nt += tick_step
-
-        last_nt = ticks[-1]
-        delta = max_len - last_nt
-        if delta != 0:
-            if delta < tick_step * 0.5:
-                ticks[-1] = max_len
-            else:
-                ticks.append(max_len)
-
+        # Major ticks
         label_box_width = 60.0
 
-        for t in ticks:
+        for t in layout.major_ticks:
             x = int(t / max_len * width)
 
             # Tick çizgisi
             p.drawLine(
-                x, baseline_y,
-                x, baseline_y - tick_height_major
+                x,
+                baseline_y,
+                x,
+                baseline_y - tick_height_major,
             )
 
             display_value = 1 if t == 0 else t
-            text = self._format_label(display_value, max_len)
+            text = self._model.format_label(display_value)
 
             if t == 0:
                 text_rect = QRectF(
@@ -245,6 +163,15 @@ class RulerWidget(QWidget):
         # Scroll/zoom değişti → sadece viewport overlay'i güncelle
         self.update()
 
+    def _x_to_nt(self, x: int) -> float:
+        """
+        Mevcut viewer state'ine göre x pikselini nt değerine çevir.
+        (Model'in cache'ini güncel tutarak)
+        """
+        self._model.recompute_max_len_if_needed(self.viewer.sequence_items)
+        width = self.rect().width()
+        return self._model.x_to_nt(x, width)
+
     # ------------------------------------------------------------------ #
     # Olaylar
     # ------------------------------------------------------------------ #
@@ -263,7 +190,7 @@ class RulerWidget(QWidget):
         width = rect.width()
         height = self.height()
 
-        max_len = self._recompute_max_len_if_needed()
+        max_len = self._model.recompute_max_len_if_needed(self.viewer.sequence_items)
         if max_len <= 0 or width <= 0:
             painter.fillRect(rect, QBrush(Qt.white))
             painter.setPen(QPen(Qt.black))
@@ -276,8 +203,10 @@ class RulerWidget(QWidget):
             self._ruler_pixmap is None
             or self._ruler_pixmap.width() != width
             or self._ruler_pixmap.height() != height
+            or self._pixmap_max_len != max_len
         ):
-            self._rebuild_ruler_pixmap(width, height, max_len)
+            self._rebuild_ruler_pixmap(width, height)
+            self._pixmap_max_len = max_len
 
         # Arkaplan + tick + label'lar: pixmap
         if self._ruler_pixmap is not None:
@@ -326,7 +255,7 @@ class RulerWidget(QWidget):
         painter.end()
 
     # ------------------------------------------------------------------ #
-    # Mouse interaction (değişmedi)
+    # Mouse interaction
     # ------------------------------------------------------------------ #
 
     def mousePressEvent(self, event) -> None:
@@ -359,7 +288,6 @@ class RulerWidget(QWidget):
         else:
             super().mouseMoveEvent(event)
 
-
     def mouseReleaseEvent(self, event) -> None:
         if event.button() == Qt.LeftButton:
             x = event.pos().x()
@@ -369,7 +297,7 @@ class RulerWidget(QWidget):
                 current_nt = self._x_to_nt(x)
                 self._drag_last_nt = current_nt
 
-                # start ve end aynı ise, tek noktaya yakın zoom yapılır (senin zoom_to_nt_range zaten handle ediyor)
+                # start ve end aynı ise, tek noktaya yakın zoom yapılır
                 self.viewer.zoom_to_nt_range(
                     self._drag_start_nt,
                     self._drag_last_nt,
