@@ -11,14 +11,12 @@ from PyQt5.QtWidgets import (
     QScrollBar,
 )
 
-from sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
-from position_ruler.position_ruler_widget import SequencePositionRulerWidget
-from navigation_ruler_model.navigation_ruler_widget import RulerWidget
-from .header_viewer import (
-    HeaderViewerWidget,
-    HeaderTopWidget,
-    HeaderPositionSpacerWidget,
-)
+from features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
+from features.navigation_ruler.navigation_ruler_widget import RulerWidget
+from features.position_ruler.position_ruler_widget import SequencePositionRulerWidget
+from features.header_viewer.header_viewer_widget import HeaderViewerWidget
+from features.header_viewer.header_spacer_widgets import HeaderPositionSpacerWidget, HeaderTopWidget
+
 
 
 class SequenceWorkspaceWidget(QWidget):

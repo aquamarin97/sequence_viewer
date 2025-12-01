@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont, QFontMetrics
 from PyQt5.QtWidgets import QWidget, QScrollBar
 
-from sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
+from features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 from .position_ruler_model import PositionRulerModel, PositionRulerLayout
 
 

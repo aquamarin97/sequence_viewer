@@ -5,8 +5,8 @@ from typing import List, Optional, Tuple, Any
 from PyQt5.QtCore import Qt, QPointF, QEasingCurve, QVariantAnimation
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QScrollBar
+from graphics.sequence_item.sequence_item import SequenceGraphicsItem
 
-from graphics.sequence_item import SequenceGraphicsItem
 
 
 class SequenceViewerView(QGraphicsView):
@@ -190,9 +190,9 @@ class SequenceViewerView(QGraphicsView):
         if hasattr(self, "_update_lod_for_all_items"):
             # type: ignore[attr-defined]
             self._update_lod_for_all_items()
-
+        self.scene.invalidate()
         self.viewport().update()
-
+        
     def start_zoom_animation(
         self,
         target_char_width: float,
@@ -266,6 +266,8 @@ class SequenceViewerView(QGraphicsView):
 
         # Aynı yeniden merkezleme mantığını kullan
         self._recenter_horizontally(center_nt, viewport_width_px)
+        self.scene.invalidate()
+
         self.viewport().update()
 
     # ---------------------------------------------------------------------
@@ -279,6 +281,8 @@ class SequenceViewerView(QGraphicsView):
         """
         for item in self.sequence_items:
             item.clear_selection()
+        self.scene.invalidate()
+
         self.viewport().update()
 
     def set_visual_selection(
@@ -297,6 +301,8 @@ class SequenceViewerView(QGraphicsView):
                 item.set_selection(col_start, col_end)
             else:
                 item.clear_selection()
+        self.scene.invalidate()
+
         self.viewport().update()
 
     # ---------------------------------------------------------------------

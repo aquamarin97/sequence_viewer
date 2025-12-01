@@ -10,7 +10,7 @@ from model.sequence_data_model import SequenceDataModel
 from widgets.workspace import SequenceWorkspaceWidget
 
 
-TARGETDIRECTORY = r"C:\Users\user\Desktop\RepeatedSequenceFinder_R3-hiv\inputs\prepared_genomes"
+TARGETDIRECTORY = r"C:\Users\gül\Desktop\CMV\RepeatedSequenceFinder_R3-hiv\inputs\test"
 
 def load_fasta_files(fasta_paths):
     """
