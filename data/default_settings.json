@@ -1,0 +1,54 @@
+{
+  "color_palette": {
+    "background": "#0B0C10",
+    "foreground": "#C5C6C7",
+    "highlights": {
+      "feature_gene": "#45A29E",
+      "feature_exon": "#66FCF1",
+      "selection": "#1F2833"
+    }
+  },
+  "showing_modes": {
+    "alignment": {
+      "name": "alignment",
+      "visible_components": {
+        "consensus": true,
+        "position_numbers": true,
+        "gaps": true
+      },
+      "line_thickness": 2,
+      "additional_params": {
+        "show_mismatches": true
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "visible_components": {
+        "coverage_plot": true,
+        "depth_labels": false
+      },
+      "line_thickness": 1,
+      "additional_params": {
+        "smoothing_window": 5
+      }
+    },
+    "variant": {
+      "name": "variant",
+      "visible_components": {
+        "variants": true,
+        "reference": true
+      },
+      "line_thickness": 1,
+      "additional_params": {
+        "show_indels": true
+      }
+    }
+  },
+  "data_source": {
+    "type": "file",
+    "config": {
+      "fasta_path": "./data/sequences",
+      "feature_path": "./data/features"
+    }
+  }
+}
