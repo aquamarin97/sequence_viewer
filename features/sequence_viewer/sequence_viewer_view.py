@@ -330,18 +330,24 @@ class SequenceViewerView(QGraphicsView):
     def _current_trailing_padding(self) -> float:
         """
         Display moduna göre sağdaki boşluk miktarını belirler.
+ 
+        BUG FIX: Eski kod sadece sequence_items[0].display_mode'a bakıyordu.
+        Mixed-mode durumunda (örn. zoom animasyonu sırasında bazı item'lar
+        henüz LINE_MODE'dayken diğerleri TEXT_MODE'a geçmişse) yanlış
+        padding hesaplanıyordu.
+ 
+        Düzeltme: tüm item'lar arasında en büyük padding'i (en "geniş" modu)
+        seçiyoruz — bu her zaman güvenli taraftadır.
         """
         if not self.sequence_items:
             return self.trailing_padding_text_px
-
-        # Tüm satırlar aynı display_mode'u kullanıyor varsayımıyla ilk item yeterli
-        first_item_mode = self.sequence_items[0].display_mode
-        if first_item_mode == SequenceGraphicsItem.LINE_MODE:
-            return self.trailing_padding_line_px
-
-        # TEXT ve BOX modunda daha küçük padding
+ 
+        # Herhangi bir item LINE_MODE'daysa geniş padding kullan.
+        for item in self.sequence_items:
+            if item.display_mode == SequenceGraphicsItem.LINE_MODE:
+                return self.trailing_padding_line_px
+ 
         return self.trailing_padding_text_px
-
     def _effective_char_width(self) -> float:
         """
         Zoom animasyonu sırasında ara değer, değilse gerçek uygulanan char_width.

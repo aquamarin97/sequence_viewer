@@ -28,14 +28,12 @@ class HeaderRowModel:
     def compute_font_point_size(self) -> float:
         """
         Satır yüksekliğine göre font point size hesaplar.
-        Şimdilik basit bir ölçek: row_height * 0.5
         """
         return self.row_height * 0.5
 
     def compute_available_width(self, total_width: int) -> int:
         """
-        Verilen toplam genişlik için, metnin gerçekten kullanabileceği alanı hesaplar.
-        (paddingler çıkarılmış hali)
+        Padding'ler çıkarılmış kullanılabilir genişlik.
         """
         return max(0, total_width - self.left_padding - self.right_padding)
 
@@ -46,13 +44,15 @@ class HeaderRowModel:
     ) -> str:
         """
         - Metnin tam hali sığıyorsa full_text
-        - Sığmıyorsa Qt elideText ile '...' kısaltılmış hali
-        döner.
+        - Sığmıyorsa Qt elideText ile '...' kısaltılmış hali döner.
+
+        FIX: metrics.width() Qt5'te de deprecated — horizontalAdvance() kullanılıyor.
         """
         if available_width <= 0:
             return ""
 
-        full_width = metrics.width(self.full_text)  # Qt5 için; Qt6'da horizontalAdvance
+        # BUG FIX: metrics.width(text) → metrics.horizontalAdvance(text)
+        full_width = metrics.horizontalAdvance(self.full_text)
         if full_width <= available_width:
             return self.full_text
 
