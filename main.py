@@ -3,9 +3,8 @@
 import sys
 from pathlib import Path
 
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu
 
-from model.annotation import Annotation, AnnotationType
 from widgets.workspace import SequenceWorkspaceWidget
 
 
@@ -34,69 +33,92 @@ def load_fasta_files(fasta_paths):
             print(f"  → {count} sekans yüklendi")
         except Exception as e:
             print(f"Hata ({path.name}): {e}")
-
     return sequences
 
 
 def find_fasta_files(directory_path):
     directory = Path(directory_path)
     if not directory.exists() or not directory.is_dir():
-        print(f"Hata: Klasör bulunamadı veya geçersiz - {directory_path}")
+        print(f"Hata: Klasör bulunamadı - {directory_path}")
         return []
-
-    exts = {".fasta", ".fa", ".fna", ".ffn", ".faa", ".frn"}
+    exts  = {".fasta", ".fa", ".fna", ".ffn", ".faa", ".frn"}
     files = sorted({p for p in directory.iterdir() if p.suffix.lower() in exts})
     return files
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, workspace: SequenceWorkspaceWidget) -> None:
+        super().__init__()
+        self.workspace = workspace
+        self.setWindowTitle("MSA Viewer")
+        self.setCentralWidget(workspace)
+        self._build_menu()
+
+    def _build_menu(self) -> None:
+        menubar = self.menuBar()
+
+        # ---- Annotate menüsü ----
+        annotate_menu: QMenu = menubar.addMenu("Annotate")
+
+        find_motifs_action = QAction("Find Motifs…", self)
+        find_motifs_action.setShortcut("Ctrl+F")
+        find_motifs_action.triggered.connect(self.workspace.open_find_motifs_dialog)
+        annotate_menu.addAction(find_motifs_action)
+
+        annotate_menu.addSeparator()
+
+        clear_ann_action = QAction("Clear All Annotations", self)
+        clear_ann_action.triggered.connect(self.workspace.clear_annotations)
+        annotate_menu.addAction(clear_ann_action)
+
+        # ---- View menüsü (placeholder) ----
+        view_menu: QMenu = menubar.addMenu("View")
+
+        toggle_dark_action = QAction("Toggle Dark Mode", self)
+        toggle_dark_action.setShortcut("Ctrl+D")
+        toggle_dark_action.triggered.connect(self._toggle_dark_mode)
+        view_menu.addAction(toggle_dark_action)
+
+    def _toggle_dark_mode(self) -> None:
+        from settings.theme import theme_manager
+        theme_manager.toggle()
 
 
 def main():
     app = QApplication(sys.argv)
 
     workspace = SequenceWorkspaceWidget()
-    workspace.setWindowTitle("MSA Viewer")
-    workspace.resize(1200, 500)
+    workspace.resize(1200, 600)
 
-    # FASTA yükle → modele ekle → workspace otomatik güncellenir
+    window = MainWindow(workspace)
+    window.resize(1200, 650)
+
+    # FASTA yükle
     print(f"FASTA taranıyor: {TARGETDIRECTORY}")
     fasta_files = find_fasta_files(TARGETDIRECTORY)
 
     if not fasta_files:
         print("Hiç FASTA dosyası bulunamadı.")
-        return 1
+    else:
+        print(f"{len(fasta_files)} dosya bulundu.")
+        sequences = load_fasta_files([str(p) for p in fasta_files])
 
-    print(f"{len(fasta_files)} dosya bulundu.")
-    sequences = load_fasta_files([str(p) for p in fasta_files])
+        if not sequences:
+            print("Hiç sekans yüklenemedi.")
+        else:
+            print(f"\nToplam {len(sequences)} sekans yükleniyor...")
+            for header, sequence in sequences:
+                workspace.add_sequence(header, sequence)
 
-    if not sequences:
-        print("Hata: Hiç sekans yüklenemedi.")
-        return 1
+            lengths = [len(seq) for _, seq in sequences]
+            print(
+                f"Uzunluk: min={min(lengths)}, max={max(lengths)}, "
+                f"ort={sum(lengths)/len(lengths):.0f}"
+            )
 
-    print(f"\nToplam {len(sequences)} sekans yükleniyor...")
-
-    # Tek giriş noktası: workspace.add_sequence()
-    # Bu; model → sinyal → view zincirini tetikler.
-    for header, sequence in sequences:
-        workspace.add_sequence(header, sequence)
-
-    # İstatistik
-    lengths = [len(seq) for _, seq in sequences]
-    print(f"Uzunluk: min={min(lengths)}, max={max(lengths)}, "
-          f"ort={sum(lengths)/len(lengths):.0f}")
-    workspace.add_annotation(Annotation(
-        type=AnnotationType.REGION,
-        start=50, end=72,
-        label="FP-1",
-        strand="+",
-        tm=62.4,
-        gc_percent=52.1,
-        notes="16S universal forward primer",
-    ))
-    workspace.show()
+    window.show()
     return app.exec_()
-    # FORWARD_PRIMER = auto()
-    # REVERSE_PRIMER = auto()
-    # PROBE          = auto()
-    # REGION         = auto()
+
 
 if __name__ == "__main__":
     sys.exit(main())

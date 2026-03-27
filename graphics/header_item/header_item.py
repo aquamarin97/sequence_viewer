@@ -1,4 +1,15 @@
 # graphics/header_item/header_item.py
+"""
+Header satır item'ı — v3 hizalama düzeltmesi.
+
+Yükseklik artık row_stride (per_row_annot_h + char_height) olabilir.
+Metin ve seçim rengi SADECE alt char_height kısmında çizilir.
+Üst per_row_annot_h kısım annotation şeridine karşılık gelen boş/tonlu alan.
+
+Bu sayede:
+- Header font boyutu değişmez — profesyonel görünüm korunur.
+- Header ve sequence satırları annotation varlığında da piksel-piksel hizalı.
+"""
 
 from __future__ import annotations
 
@@ -6,8 +17,7 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import (
-    QPainter, QFont, QPen, QBrush,
-    QFontMetrics, QColor,
+    QPainter, QFont, QPen, QBrush, QFontMetrics, QColor,
 )
 from PyQt5.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem
 
@@ -19,27 +29,22 @@ class HeaderRowItem(QGraphicsItem):
     """
     Header viewer içindeki tek satırlık item.
 
-    Görsel özellikler
-    -----------------
-    * Zebra striping : çift/tek satır farklı arkaplan (tema token'ı)
-    * Hover          : fare üzerinde highlight
-    * Selected       : Windows tarzı seçim rengi
-    * Dragging       : sürükleniyor göstergesi
-    * Dark Mode      : theme_manager.themeChanged sinyaline bağlı
-
-    Parametre
-    ---------
-    row_index : int
-        Zebra ve seçim mantığı için satır indeksi.
-        Sıra değişince HeaderViewerView tarafından güncellenir.
+    Parametreler
+    ------------
+    text        : görüntülenecek metin
+    width       : item genişliği (px)
+    row_height  : char_height — metnin çizildiği gerçek satır yüksekliği
+    annot_height: annotation şerid yüksekliği (üst boşluk). 0 ise yok.
+    row_index   : zebra ve seçim için
     """
 
     def __init__(
         self,
-        text: str,
-        width: float,
-        row_height: float,
-        row_index: int = 0,
+        text:         str,
+        width:        float,
+        row_height:   float,
+        annot_height: int   = 0,
+        row_index:    int   = 0,
         parent: Optional[QGraphicsItem] = None,
     ) -> None:
         super().__init__(parent)
@@ -49,10 +54,12 @@ class HeaderRowItem(QGraphicsItem):
             row_height=int(round(row_height)),
         )
 
-        self.width      = float(width)
-        self.row_height = int(round(row_height))
-        self.row_index  = row_index
+        self.width        = float(width)
+        self.row_height   = int(round(row_height))   # metin bölgesi yüksekliği
+        self.annot_height = int(annot_height)         # üst boşluk yüksekliği
+        self.row_index    = row_index
 
+        # Font — char_height bazlı, değişmez
         self.font = QFont("Arial")
         self.font.setPointSizeF(self._model.compute_font_point_size())
 
@@ -61,9 +68,16 @@ class HeaderRowItem(QGraphicsItem):
         self._selected: bool = False
         self._dragging: bool = False
 
-        # Tema değişince yeniden çiz
-        theme_manager.themeChanged.connect(self._on_theme_changed)
         self.setAcceptHoverEvents(True)
+        theme_manager.themeChanged.connect(self._on_theme_changed)
+
+    # ------------------------------------------------------------------
+    # Toplam item yüksekliği (annot_height + row_height)
+    # ------------------------------------------------------------------
+
+    @property
+    def total_height(self) -> int:
+        return self.annot_height + self.row_height
 
     # ------------------------------------------------------------------
     # Eski API uyumluluğu
@@ -76,6 +90,14 @@ class HeaderRowItem(QGraphicsItem):
     # ------------------------------------------------------------------
     # Durum güncelleme
     # ------------------------------------------------------------------
+
+    def set_annot_height(self, h: int) -> None:
+        """Workspace per_row_annot_height değişince çağrılır."""
+        if self.annot_height == h:
+            return
+        self.prepareGeometryChange()
+        self.annot_height = h
+        self.update()
 
     def set_hovered(self, hovered: bool) -> None:
         if self._hovered == hovered:
@@ -96,7 +118,6 @@ class HeaderRowItem(QGraphicsItem):
         self.update()
 
     def set_row_index(self, index: int) -> None:
-        """Sıra değişince zebra rengini güncellemek için çağrılır."""
         if self.row_index == index:
             return
         self.row_index = index
@@ -118,36 +139,24 @@ class HeaderRowItem(QGraphicsItem):
 
     def _resolve_bg_color(self) -> QColor:
         t = theme_manager.current
-
         if self._dragging:
             return t.row_bg_dragging
-
         if self._selected:
             return t.row_bg_selected_hover if self._hovered else t.row_bg_selected
-
         if self._hovered:
             return t.row_bg_hover
-
-        # Zebra
         return t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
 
     def _resolve_text_color(self) -> QColor:
         t = theme_manager.current
         return t.text_selected if self._selected else t.text_primary
 
-    def _resolve_border_pen(self) -> QPen:
-        t = theme_manager.current
-        if self._dragging:
-            return QPen(t.border_drag, 1, Qt.DashLine)
-        # Alt sınır çizgisi — cosmetic
-        return QPen(t.border_normal, 0)
-
     # ------------------------------------------------------------------
     # QGraphicsItem
     # ------------------------------------------------------------------
 
     def boundingRect(self) -> QRectF:
-        return QRectF(0, 0, self.width, self.row_height)
+        return QRectF(0, 0, self.width, self.total_height)
 
     def hoverEnterEvent(self, event) -> None:
         self.set_hovered(True)
@@ -164,45 +173,67 @@ class HeaderRowItem(QGraphicsItem):
         widget=None,
     ) -> None:
         painter.save()
-        painter.setFont(self.font)
+        t = theme_manager.current
 
-        rect = self.boundingRect()
+        total_w = self.width
+        total_h = float(self.total_height)
+        ann_h   = float(self.annot_height)
+        row_h   = float(self.row_height)
 
-        # --- Arkaplan ---
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(self._resolve_bg_color()))
-        painter.drawRect(rect)
+        # ---- Üst bölge: annotation şeridine karşılık gelen boş alan ----
+        if ann_h > 0:
+            # Sequence viewer'daki annotation şerit arkaplanıyla uyumlu ton
+            ann_bg = QColor(t.row_bg_odd)
+            painter.fillRect(QRectF(0, 0, total_w, ann_h), QBrush(ann_bg))
 
-        # --- Alt kenarlık çizgisi (drag değilse ince gri; drag ise dashed mavi) ---
-        painter.setPen(self._resolve_border_pen())
-        if self._dragging:
-            painter.drawRect(rect.adjusted(0, 0, -1, -1))
-        else:
-            # Sadece alt çizgi — daha temiz görünüm
+            # Alt çizgi (annotation şeridini ayıran ince çizgi)
+            painter.setPen(QPen(t.border_normal, 0))
             painter.drawLine(
-                int(rect.left()),  int(rect.bottom()) - 1,
-                int(rect.right()), int(rect.bottom()) - 1,
+                int(0), int(ann_h) - 1,
+                int(total_w), int(ann_h) - 1,
             )
 
-        # --- Seçim göstergesi: sol kenar çubuğu (2 px) ---
-        if self._selected:
-            t = theme_manager.current
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(t.drop_indicator))   # aynı mavi
-            painter.drawRect(QRectF(0, 0, 2, self.row_height))
+        # ---- Alt bölge: gerçek header satırı ----
+        text_top = ann_h
+        text_rect_full = QRectF(0, text_top, total_w, row_h)
 
-        # --- Metin ---
-        metrics      = QFontMetrics(self.font)
-        avail_width  = self._model.compute_available_width(int(rect.width()))
-        display_text = self._model.choose_display_text(metrics, avail_width)
+        bg = self._resolve_bg_color()
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(bg))
+        painter.drawRect(text_rect_full)
+
+        # Drag kenarlığı
+        if self._dragging:
+            painter.setPen(QPen(t.border_drag, 1, Qt.DashLine))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(text_rect_full.adjusted(0, 0, -1, -1))
+        else:
+            # Sadece alt çizgi
+            painter.setPen(QPen(t.border_normal, 0))
+            painter.drawLine(
+                int(0),      int(text_top + row_h) - 1,
+                int(total_w), int(text_top + row_h) - 1,
+            )
+
+        # Seçim göstergesi: sol kenar çubuğu 2px
+        if self._selected:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(t.drop_indicator))
+            painter.drawRect(QRectF(0, text_top, 2, row_h))
+
+        # Metin
+        painter.setFont(self.font)
+        metrics     = QFontMetrics(self.font)
+        avail_width = self._model.compute_available_width(int(total_w))
+        display_txt = self._model.choose_display_text(metrics, avail_width)
 
         painter.setPen(QPen(self._resolve_text_color()))
-        text_rect = rect.adjusted(
+        draw_rect = QRectF(
             self._model.left_padding + (3 if self._selected else 0),
-            0,
-            -self._model.right_padding,
-            0,
+            text_top,
+            total_w - self._model.left_padding - self._model.right_padding,
+            row_h,
         )
-        painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, display_text)
+        painter.drawText(draw_rect, Qt.AlignVCenter | Qt.AlignLeft, display_txt)
 
         painter.restore()

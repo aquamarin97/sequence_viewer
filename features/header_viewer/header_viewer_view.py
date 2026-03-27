@@ -13,35 +13,21 @@ from graphics.header_item.header_item import HeaderRowItem
 from model.row_selection_model import RowSelectionModel
 from settings.theme import theme_manager
 
-
 _DRAG_THRESHOLD_PX = 6
 _DROP_LINE_WIDTH   = 2
 
 
 class HeaderViewerView(QGraphicsView):
     """
-    Header satırlarını çizen view.
+    Header satırlarını çizen view — v3.
 
-    Özellikler
-    ----------
-    * Zebra striping (tema token'ları ile)
-    * Windows tarzı satır seçimi:
-        - Click          → tek satır seç
-        - Ctrl+Click     → toggle
-        - Shift+Click    → aralık seç
-        - Ctrl+A         → tümünü seç
-        - Escape         → seçimi temizle
-        - Delete/Backspace → seçili satırları sil
-    * Double-click → inline QLineEdit düzenleme
-    * Drag & drop  → satır sıralama + drop indicator
-    * Dark Mode    → theme_manager.themeChanged ile otomatik
-
-    Hook'lar (alt sınıf override eder)
-    -----------------------------------
-    _on_edit_committed(row_index, new_text)
-    _on_row_move_requested(from_index, to_index)
-    _on_selection_changed(selected_rows)
-    _on_rows_delete_requested(rows)
+    Hizalama düzeltmesi
+    -------------------
+    set_annot_height(h) çağrıldığında:
+    - Her item'ın annot_height'ı güncellenir (üst boşluk)
+    - Item'ların Y pozisyonu row_index * (annot_height + char_height) olur
+    - Item yüksekliği = annot_height + char_height (total_height)
+    - Font boyutu DEĞİŞMEZ → profesyonel görünüm korunur
     """
 
     def __init__(
@@ -56,8 +42,13 @@ class HeaderViewerView(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
-        self.row_height:   int   = int(round(row_height))
-        self.header_width: float = float(initial_width)
+        # char_height — asla değişmez
+        self._char_height:   int   = int(round(row_height))
+        # annotation strip yüksekliği — dışarıdan güncellenir
+        self._annot_height:  int   = 0
+
+        self.row_height:     int   = self._char_height   # eski API uyumluluğu
+        self.header_width:   float = float(initial_width)
 
         self.header_items: List[HeaderRowItem] = []
 
@@ -67,29 +58,78 @@ class HeaderViewerView(QGraphicsView):
         self.setMinimumWidth(60)
         self.setMaximumWidth(400)
         self.setMouseTracking(True)
-
-        # Klavye kısayolları için focus gerekli
         self.setFocusPolicy(Qt.StrongFocus)
 
-        # Seçim modeli
         self._selection = RowSelectionModel()
 
-        # Inline edit
         self._edit_widget: Optional[QLineEdit] = None
         self._editing_row: Optional[int]       = None
 
-        # Drag & drop
         self._press_pos:       Optional[QPoint] = None
         self._drag_source_row: Optional[int]    = None
         self._drag_insert_pos: Optional[int]    = None
         self._dragging:        bool             = False
 
-        # Tema değişince tüm item'ları yeniden çiz
         theme_manager.themeChanged.connect(self._on_theme_changed)
 
-    # ==================================================================
+    # ------------------------------------------------------------------
+    # Annotation yüksekliği senkronizasyonu (FIX 1)
+    # ------------------------------------------------------------------
+
+    def set_annot_height(self, h: int) -> None:
+        """
+        Workspace per_row_annot_height değişince çağrılır.
+        Her item'ın üst boşluğunu ve Y pozisyonunu günceller.
+        Font boyutuna DOKUNMAZ.
+        """
+        if self._annot_height == h:
+            return
+        self._annot_height = h
+        self.row_height    = h + self._char_height  # eski API uyumluluğu
+
+        stride = h + self._char_height
+        for i, item in enumerate(self.header_items):
+            item.set_annot_height(h)
+            item.setPos(0, i * stride)
+
+        self._update_scene_rect()
+
+    @property
+    def _row_stride(self) -> int:
+        return self._annot_height + self._char_height
+
+    # ------------------------------------------------------------------
+    # Row index → Y
+    # ------------------------------------------------------------------
+
+    def _row_at_viewport_y(self, y: int) -> int:
+        scene_y = self.mapToScene(0, y).y()
+        stride  = self._row_stride
+        if stride <= 0:
+            return 0
+        return int(math.floor(scene_y / stride))
+
+    def _insert_pos_at_viewport_y(self, y: int) -> int:
+        scene_y = self.mapToScene(0, y).y()
+        stride  = self._row_stride
+        if stride <= 0:
+            return 0
+        insert  = int(round(scene_y / stride))
+        return max(0, min(insert, len(self.header_items)))
+
+    def _item_viewport_rect(self, row_index: int) -> QRectF:
+        stride = self._row_stride
+        scene_rect = QRectF(
+            0, row_index * stride,
+            self.viewport().width(), stride,
+        )
+        tl = self.mapFromScene(scene_rect.topLeft())
+        br = self.mapFromScene(scene_rect.bottomRight())
+        return QRectF(tl, br)
+
+    # ------------------------------------------------------------------
     # Public API: item yönetimi
-    # ==================================================================
+    # ------------------------------------------------------------------
 
     def add_header_item(self, display_text: str) -> HeaderRowItem:
         row_index  = len(self.header_items)
@@ -98,10 +138,11 @@ class HeaderViewerView(QGraphicsView):
         item = HeaderRowItem(
             text=display_text,
             width=item_width,
-            row_height=self.row_height,
+            row_height=self._char_height,
+            annot_height=self._annot_height,
             row_index=row_index,
         )
-        item.setPos(0, row_index * self.row_height)
+        item.setPos(0, row_index * self._row_stride)
         self.scene.addItem(item)
         self.header_items.append(item)
         self._update_scene_rect()
@@ -115,22 +156,18 @@ class HeaderViewerView(QGraphicsView):
         self._update_scene_rect()
 
     def apply_selection_to_items(self, changed_rows: FrozenSet[int]) -> None:
-        """
-        Seçim modeli değiştikten sonra sadece değişen item'ları günceller.
-        Tüm viewport yerine minimal repaint.
-        """
         for row in changed_rows:
             if 0 <= row < len(self.header_items):
                 self.header_items[row].set_selected(
                     self._selection.is_selected(row)
                 )
 
-    # ==================================================================
+    # ------------------------------------------------------------------
     # Geometri
-    # ==================================================================
+    # ------------------------------------------------------------------
 
     def _update_scene_rect(self) -> None:
-        height = len(self.header_items) * self.row_height
+        height = len(self.header_items) * self._row_stride
         width  = self.viewport().width() or self.header_width
         self.scene.setSceneRect(0, 0, width, height)
 
@@ -138,14 +175,11 @@ class HeaderViewerView(QGraphicsView):
         if not self.header_items:
             return 100
         metrics   = QFontMetrics(self.header_items[0].font)
-        left_pad  = 6
-        right_pad = 4
-        safety    = 4
         max_px    = max(
             metrics.horizontalAdvance(item.full_text)
             for item in self.header_items
         )
-        return max_px + left_pad + right_pad + safety
+        return max_px + 6 + 4 + 4
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -156,65 +190,12 @@ class HeaderViewerView(QGraphicsView):
         required = self.compute_required_width() if self.header_items else 10
         self.setMaximumWidth(required if w >= required else 16_777_215)
 
-    # ==================================================================
-    # Koordinat yardımcıları
-    # ==================================================================
-
-    def _row_at_viewport_y(self, y: int) -> int:
-        scene_y = self.mapToScene(0, y).y()
-        return int(math.floor(scene_y / self.row_height))
-
-    def _insert_pos_at_viewport_y(self, y: int) -> int:
-        scene_y = self.mapToScene(0, y).y()
-        insert  = int(round(scene_y / self.row_height))
-        return max(0, min(insert, len(self.header_items)))
-
-    def _item_viewport_rect(self, row_index: int) -> QRectF:
-        scene_rect = QRectF(
-            0, row_index * self.row_height,
-            self.viewport().width(), self.row_height,
-        )
-        tl = self.mapFromScene(scene_rect.topLeft())
-        br = self.mapFromScene(scene_rect.bottomRight())
-        return QRectF(tl, br)
-
-    # ==================================================================
-    # Tema
-    # ==================================================================
-
     def _on_theme_changed(self, _theme) -> None:
         self.viewport().update()
 
-    # ==================================================================
-    # Seçim
-    # ==================================================================
-
-    def _handle_selection(self, row: int, modifiers) -> None:
-        """Mouse click modifiyelerine göre seçim modelini günceller."""
-        n = len(self.header_items)
-        if n == 0:
-            return
-
-        ctrl  = bool(modifiers & Qt.ControlModifier)
-        shift = bool(modifiers & Qt.ShiftModifier)
-
-        if ctrl and shift:
-            # Ctrl+Shift: aralık seç ama mevcut seçimi koru
-            # (Windows'ta Ctrl+Shift genellikle Shift ile aynı davranır)
-            changed = self._selection.handle_shift_click(row, n)
-        elif ctrl:
-            changed = self._selection.handle_ctrl_click(row, n)
-        elif shift:
-            changed = self._selection.handle_shift_click(row, n)
-        else:
-            changed = self._selection.handle_click(row, n)
-
-        self.apply_selection_to_items(changed)
-        self._on_selection_changed(self._selection.selected_rows())
-
-    # ==================================================================
+    # ------------------------------------------------------------------
     # Inline edit
-    # ==================================================================
+    # ------------------------------------------------------------------
 
     def _start_edit(self, row_index: int) -> None:
         if row_index < 0 or row_index >= len(self.header_items):
@@ -222,22 +203,25 @@ class HeaderViewerView(QGraphicsView):
         self._cancel_edit()
 
         item     = self.header_items[row_index]
-        vp_rect  = self._item_viewport_rect(row_index)
-
-        full_text  = item.full_text
-        raw_header = full_text.split(". ", 1)[1] if ". " in full_text else full_text
+        stride   = self._row_stride
+        # Edit sadece metin bölgesinde (alt char_height kısım)
+        top_y    = row_index * stride + self._annot_height
+        vp_top   = self.mapFromScene(0, top_y).y()
 
         t      = theme_manager.current
         editor = QLineEdit(self.viewport())
+
+        full_text  = item.full_text
+        raw_header = full_text.split(". ", 1)[1] if ". " in full_text else full_text
         editor.setText(raw_header)
         editor.selectAll()
 
         margin = 2
+        vp_w   = self.viewport().width()
         editor.setGeometry(
-            int(vp_rect.left()) + margin,
-            int(vp_rect.top())  + margin,
-            int(vp_rect.width())  - margin * 2,
-            int(vp_rect.height()) - margin * 2,
+            margin, int(vp_top) + margin,
+            vp_w - margin * 2,
+            self._char_height - margin * 2,
         )
         editor.setStyleSheet(
             f"QLineEdit {{"
@@ -251,7 +235,6 @@ class HeaderViewerView(QGraphicsView):
         )
         editor.show()
         editor.setFocus()
-
         editor.returnPressed.connect(lambda: self._commit_edit(row_index))
         editor.editingFinished.connect(lambda: self._commit_edit(row_index))
 
@@ -269,25 +252,21 @@ class HeaderViewerView(QGraphicsView):
         self._on_edit_committed(row_index, new_text)
 
     def _cancel_edit(self) -> None:
-        # ÖNCE referansı al ve None yap — hide() editingFinished tetiklerse
-        # ikinci _commit_edit çağrısında guard düzgün çalışsın.
         widget = self._edit_widget
-        self._edit_widget = None          # ← None ataması hide()'dan ÖNCE
-
+        self._edit_widget = None
         if widget is not None:
-            widget.blockSignals(True)     # ← editingFinished'ı kapat
+            widget.blockSignals(True)
             widget.hide()
             widget.deleteLater()
-
         if self._editing_row is not None:
             idx = self._editing_row
             self._editing_row = None
             if 0 <= idx < len(self.header_items):
                 self.header_items[idx].set_hovered(False)
 
-    # ==================================================================
+    # ------------------------------------------------------------------
     # Drag & drop
-    # ==================================================================
+    # ------------------------------------------------------------------
 
     def _reset_drag_state(self) -> None:
         if self._drag_source_row is not None:
@@ -304,9 +283,30 @@ class HeaderViewerView(QGraphicsView):
         self._drag_insert_pos = self._insert_pos_at_viewport_y(vp_pos.y())
         self.viewport().update()
 
-    # ==================================================================
-    # Hook'lar (alt sınıf override eder)
-    # ==================================================================
+    # ------------------------------------------------------------------
+    # Seçim
+    # ------------------------------------------------------------------
+
+    def _handle_selection(self, row: int, modifiers) -> None:
+        n = len(self.header_items)
+        if n == 0:
+            return
+        ctrl  = bool(modifiers & Qt.ControlModifier)
+        shift = bool(modifiers & Qt.ShiftModifier)
+        if ctrl and shift:
+            changed = self._selection.handle_shift_click(row, n)
+        elif ctrl:
+            changed = self._selection.handle_ctrl_click(row, n)
+        elif shift:
+            changed = self._selection.handle_shift_click(row, n)
+        else:
+            changed = self._selection.handle_click(row, n)
+        self.apply_selection_to_items(changed)
+        self._on_selection_changed(self._selection.selected_rows())
+
+    # ------------------------------------------------------------------
+    # Hook'lar
+    # ------------------------------------------------------------------
 
     def _on_edit_committed(self, row_index: int, new_text: str) -> None:
         pass
@@ -320,29 +320,23 @@ class HeaderViewerView(QGraphicsView):
     def _on_rows_delete_requested(self, rows: FrozenSet[int]) -> None:
         pass
 
-    # ==================================================================
-    # Mouse olayları
-    # ==================================================================
+    # ------------------------------------------------------------------
+    # Mouse
+    # ------------------------------------------------------------------
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.LeftButton:
             row = self._row_at_viewport_y(event.pos().y())
-
-            # Aktif edit varsa ve başka satıra tıklandıysa kapat
             if self._editing_row is not None and self._editing_row != row:
                 self._commit_edit(self._editing_row)
-
             if 0 <= row < len(self.header_items):
                 self._press_pos       = event.pos()
                 self._drag_source_row = row
-                # Seçimi hemen uygula (drag olursa override edilmez)
                 self._handle_selection(row, event.modifiers())
             else:
-                # Boşa tıklandı → seçimi temizle
                 changed = self._selection.clear()
                 self.apply_selection_to_items(changed)
                 self._on_selection_changed(self._selection.selected_rows())
-
             self.setFocus()
             event.accept()
         else:
@@ -355,15 +349,12 @@ class HeaderViewerView(QGraphicsView):
             and self._drag_source_row is not None
         ):
             delta = (event.pos() - self._press_pos).manhattanLength()
-
             if not self._dragging and delta >= _DRAG_THRESHOLD_PX:
                 self._dragging = True
                 self.header_items[self._drag_source_row].set_dragging(True)
                 self.viewport().setCursor(Qt.SizeVerCursor)
-
             if self._dragging:
                 self._update_drag(event.pos())
-
             event.accept()
         else:
             super().mouseMoveEvent(event)
@@ -374,10 +365,8 @@ class HeaderViewerView(QGraphicsView):
                 src    = self._drag_source_row
                 insert = self._drag_insert_pos if self._drag_insert_pos is not None else src
                 to_idx = insert if insert <= src else insert - 1
-
                 self._reset_drag_state()
                 self.viewport().unsetCursor()
-
                 if to_idx != src:
                     self._on_row_move_requested(src, to_idx)
             else:
@@ -398,9 +387,9 @@ class HeaderViewerView(QGraphicsView):
         else:
             super().mouseDoubleClickEvent(event)
 
-    # ==================================================================
-    # Klavye kısayolları
-    # ==================================================================
+    # ------------------------------------------------------------------
+    # Klavye
+    # ------------------------------------------------------------------
 
     def keyPressEvent(self, event) -> None:
         key  = event.key()
@@ -408,14 +397,11 @@ class HeaderViewerView(QGraphicsView):
         n    = len(self.header_items)
 
         if ctrl and key == Qt.Key_A:
-            # Ctrl+A → tümünü seç
             changed = self._selection.select_all(n)
             self.apply_selection_to_items(changed)
             self._on_selection_changed(self._selection.selected_rows())
             event.accept()
-
         elif key == Qt.Key_Escape:
-            # Escape → seçimi temizle / edit'i iptal et
             if self._edit_widget is not None:
                 self._cancel_edit()
             else:
@@ -423,45 +409,37 @@ class HeaderViewerView(QGraphicsView):
                 self.apply_selection_to_items(changed)
                 self._on_selection_changed(self._selection.selected_rows())
             event.accept()
-
         elif key in (Qt.Key_Delete, Qt.Key_Backspace):
-            # Delete → seçili satırları sil
             rows = self._selection.selected_rows()
             if rows:
                 self._on_rows_delete_requested(rows)
             event.accept()
-
         else:
             super().keyPressEvent(event)
 
-    # ==================================================================
-    # Drop indicator çizimi
-    # ==================================================================
+    # ------------------------------------------------------------------
+    # Drop indicator
+    # ------------------------------------------------------------------
 
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
         super().drawForeground(painter, rect)
-
         if not self._dragging or self._drag_insert_pos is None:
             return
-
-        insert_y_scene = self._drag_insert_pos * self.row_height
+        insert_y_scene = self._drag_insert_pos * self._row_stride
         vp_y           = self.mapFromScene(0, insert_y_scene).y()
         vp_width       = self.viewport().width()
-
-        t = theme_manager.current
+        t              = theme_manager.current
 
         painter.save()
         painter.resetTransform()
-
         pen = QPen(t.drop_indicator, _DROP_LINE_WIDTH)
         pen.setCapStyle(Qt.RoundCap)
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
         painter.drawLine(8, vp_y, vp_width - 4, vp_y)
-
+        from PyQt5.QtGui import QBrush as _B
         r = 4
-        painter.setBrush(QBrush(t.drop_indicator))
+        painter.setBrush(_B(t.drop_indicator))
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(4, vp_y - r, r * 2, r * 2)
-
         painter.restore()

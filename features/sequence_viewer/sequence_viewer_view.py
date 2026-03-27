@@ -1,28 +1,37 @@
-# msa_viewer/sequence_viewer/sequence_viewer_view.py
+# features/sequence_viewer/sequence_viewer_view.py
+
+from __future__ import annotations
 
 from typing import List, Optional, Tuple, Any
 
-from PyQt5.QtCore import Qt, QPointF, QEasingCurve, QVariantAnimation
-from PyQt5.QtGui import QPainter
+from PyQt5.QtCore import Qt, QPointF, QRectF, QEasingCurve, QVariantAnimation
+from PyQt5.QtGui import QPainter, QPen, QColor
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QScrollBar
-from graphics.sequence_item.sequence_item import SequenceGraphicsItem
 
+from graphics.sequence_item.sequence_item import SequenceGraphicsItem
+from settings.theme import theme_manager
+
+# Per-row annotation sabitleri — per_row_annotation_item ile senkron
+from features.annotation_layer.per_row_annotation_item import (
+    LANE_HEIGHT, LANE_PADDING,
+)
+
+# Kılavuz çizgisi görünümü
+_GUIDE_COLOR = QColor(80, 130, 220, 160)   # yarı saydam mavi
+_GUIDE_WIDTH = 1
 
 
 class SequenceViewerView(QGraphicsView):
     """
-    Sadece sekansları çizen, düşük seviye QGraphicsView katmanı.
+    Sekans satırlarını çizen view.
 
-    CMV ayrımı:
-    - Model  : SequenceViewerModel (sekans verisi, seçim state'i)
-    - View   : Bu sınıf (scene + SequenceGraphicsItem çizimi / layout)
-    - Control: SequenceViewerController (event handling, zoom/selection mantığı)
-
-    Bu sınıf:
-    - Scene ve SequenceGraphicsItem'ları yönetir
-    - Zoom geometri/animasyon mantığını içerir
-    - Seçimin görsel highlight'ını uygular
-    - Mouse / wheel event'lerini opsiyonel olarak controller'a delege eder
+    Yeni özellikler (v2)
+    --------------------
+    * Per-row annotation alanı: her satırın üstünde `_per_row_annot_h` px
+      boşluk bırakılır. Satır Y = row_index * row_stride.
+    * Kılavuz çizgileri: annotasyon tıklandığında start/end pozisyonlarında
+      dikey çizgi çizilir (drawForeground).
+    * _per_row_annot_h dışarıdan set edilir (workspace günceller).
     """
 
     def __init__(
@@ -34,31 +43,32 @@ class SequenceViewerView(QGraphicsView):
     ) -> None:
         super().__init__(parent)
 
-        # Scene
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
-        # Geometri / layout
-        self.char_width: float = float(char_width)
-        self.char_height: int = int(round(char_height))
+        self.char_width:   float = float(char_width)
+        self.char_height:  int   = int(round(char_height))
+
+        # Per-row annotation yüksekliği (dışarıdan ayarlanır)
+        self._per_row_annot_h: int = 0
+
         self.trailing_padding_line_px: float = 80.0
         self.trailing_padding_text_px: float = 30.0
 
-        # En uzun sekans boyu (SequenceGraphicsItem.sequence üzerinden hesaplanır)
         self.max_sequence_length: int = 0
-
-        # Items
         self.sequence_items: List[SequenceGraphicsItem] = []
+
+        # Kılavuz çizgisi state'i: (start_col, end_col) veya None
+        self._guide_cols: Optional[Tuple[int, int]] = None
 
         # Zoom animasyonu
         self._zoom_animation = QVariantAnimation(self)
         self._zoom_animation.setEasingCurve(QEasingCurve.OutCubic)
         self._zoom_animation.valueChanged.connect(self._on_zoom_value_changed)
 
-        self._zoom_center_nt: Optional[float] = None
+        self._zoom_center_nt:    Optional[float] = None
         self._zoom_view_width_px: Optional[float] = None
 
-        # View ayarları
         self.setRenderHint(QPainter.Antialiasing, False)
         self.setRenderHint(QPainter.TextAntialiasing, True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -67,90 +77,140 @@ class SequenceViewerView(QGraphicsView):
         self.setMouseTracking(True)
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        # Controller referansı (SequenceViewerController ile bağlanacak)
         self._controller: Optional[Any] = None
 
-    # ---------------------------------------------------------------------
-    # Controller bağlantısı
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Per-row annotation yüksekliği
+    # ------------------------------------------------------------------
+
+    @property
+    def row_stride(self) -> int:
+        """Bir satırın toplam Y alanı: annotation strip + char_height."""
+        return self._per_row_annot_h + self.char_height
+
+    def set_per_row_annot_height(self, h: int) -> None:
+        """
+        Workspace / annotation store değişince çağrılır.
+        Tüm item'ların Y pozisyonlarını günceller.
+        """
+        if self._per_row_annot_h == h:
+            return
+        self._per_row_annot_h = h
+        self._reposition_items()
+        self._update_scene_rect()
+
+    def _reposition_items(self) -> None:
+        """Tüm sequence item'larını yeni row_stride ile yeniden konumlandır."""
+        stride = self.row_stride
+        for i, item in enumerate(self.sequence_items):
+            item.setPos(0, i * stride + self._per_row_annot_h)
+
+    # ------------------------------------------------------------------
+    # Kılavuz çizgileri
+    # ------------------------------------------------------------------
+
+    def set_guide_cols(self, start_col: int, end_col: int) -> None:
+        """Annotasyon tıklandığında workspace çağırır."""
+        self._guide_cols = (start_col, end_col)
+        self.viewport().update()
+
+    def clear_guide_cols(self) -> None:
+        self._guide_cols = None
+        self.viewport().update()
+        
+    def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
+        super().drawForeground(painter, rect)
+ 
+        if self._guide_cols is None:
+            return
+ 
+        start_col, end_col = self._guide_cols
+        cw = self._effective_char_width()
+        if cw <= 0:
+            return
+ 
+        hbar   = self.horizontalScrollBar()
+        vp_h   = float(self.viewport().height())
+        vp_w   = float(self.viewport().width())
+        offset = float(hbar.value())
+ 
+        # FIX: merkez yerine kenar pozisyonları
+        # start_col'un SOL kenarı   → annotasyonun başlangıcını soldan çerçevele
+        # end_col'un  SAĞ kenarı    → annotasyonun sonunu sağdan çerçevele
+        start_scene_x = start_col * cw               # sol kenar
+        end_scene_x   = (end_col + 1) * cw           # sağ kenar
+ 
+        start_vp_x = start_scene_x - offset
+        end_vp_x   = end_scene_x   - offset
+ 
+        painter.save()
+        painter.resetTransform()
+ 
+        pen = QPen(_GUIDE_COLOR, _GUIDE_WIDTH, Qt.DashLine)
+        pen.setDashPattern([4, 3])
+        painter.setPen(pen)
+ 
+        for vp_x in (start_vp_x, end_vp_x):
+            if -10 <= vp_x <= vp_w + 10:
+                painter.drawLine(
+                    QPointF(vp_x, 0),
+                    QPointF(vp_x, vp_h),
+                )
+ 
+        painter.restore()
+    # ------------------------------------------------------------------
+    # Controller
+    # ------------------------------------------------------------------
 
     def set_controller(self, controller: Any) -> None:
-        """
-        SequenceViewerController örneğini view ile ilişkilendir.
-        Event yönlendirmesi / yüksek seviye işlemler için kullanılır.
-        """
         self._controller = controller
 
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Public API: item yönetimi
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     def add_sequence_item(self, sequence_string: str) -> SequenceGraphicsItem:
-        """
-        Verilen sekans için yeni bir SequenceGraphicsItem oluşturup scene'e ekler.
-        Satır indeksi, mevcut item sayısına göre belirlenir.
-        """
         row_index = len(self.sequence_items)
         item = SequenceGraphicsItem(
             sequence=sequence_string,
             char_width=self.char_width,
             char_height=self.char_height,
         )
-        item.setPos(0, row_index * self.char_height)
+        # Y = annotation strip + sequence row
+        item.setPos(0, row_index * self.row_stride + self._per_row_annot_h)
         self.scene.addItem(item)
         self.sequence_items.append(item)
         self._update_scene_rect()
         return item
 
     def clear_items(self) -> None:
-        """
-        Tüm SequenceGraphicsItem'ları ve scene içeriğini temizler.
-        """
         self.sequence_items.clear()
         self.scene.clear()
         self.max_sequence_length = 0
         self.scene.setSceneRect(0, 0, 0, 0)
         self.scene.invalidate()
 
-    # ---------------------------------------------------------------------
-    # Public API: geometri / zoom
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Geometri / zoom
+    # ------------------------------------------------------------------
 
     def current_char_width(self) -> float:
-        """
-        Anlık char_width değerini döndürür.
-        Zoom animasyonu sırasında ara değeri döner.
-        """
         return self._effective_char_width()
 
     def compute_min_char_width(self) -> float:
-        """
-        Viewport genişliğine ve en uzun sekans boyuna göre
-        izin verilen minimum char_width değerini hesaplar.
-        """
         if not self.sequence_items:
             return self.char_width
-
         max_len = self.max_sequence_length
         if max_len <= 0:
             return self.char_width
-
-        viewport_width = self.viewport().width()
-        if viewport_width <= 0:
+        vp_w = self.viewport().width()
+        if vp_w <= 0:
             return self.char_width
-
-        # LINE modunda padding daha geniş; en geniş padding'i baz al
-        trailing_padding = max(
-            self.trailing_padding_line_px,
-            self._current_trailing_padding(),
-        )
-
-        available_width = viewport_width - trailing_padding
-        if available_width <= 0:
+        trailing = max(self.trailing_padding_line_px, self._current_trailing_padding())
+        available = vp_w - trailing
+        if available <= 0:
             return 0.000001
-
-        min_char_width = available_width / float(max_len)
-        return max(min_char_width, 0.000001)
+        return max(available / float(max_len), 0.000001)
 
     def apply_char_width(
         self,
@@ -158,305 +218,184 @@ class SequenceViewerView(QGraphicsView):
         center_nt: Optional[float] = None,
         view_width_px: Optional[float] = None,
     ) -> None:
-        """
-        View'daki tüm SequenceGraphicsItem'lara yeni char_width uygular
-        ve gerekiyorsa verilen pivot nt etrafında yeniden merkezler.
-
-        Genelde controller tarafından kullanılır.
-        """
         if view_width_px is None:
             view_width_px = float(self.viewport().width())
-
-        # char_width gerçekten değişmiyorsa ve pivot yoksa uğraşma
         if abs(new_char_width - self.char_width) < 0.0001 and center_nt is None:
             return
-
-        # 1) Yeni char_width'ü uygula
-        applied_width = float(new_char_width)
+        applied = float(new_char_width)
         for item in self.sequence_items:
-            item.set_char_width(applied_width)
-
-        # Item clamp/prepareGeometryChange sonrası gerçek değeri sakla
+            item.set_char_width(applied)
         if self.sequence_items:
-            applied_width = float(self.sequence_items[0].char_width)
-        self.char_width = applied_width
+            applied = float(self.sequence_items[0].char_width)
+        self.char_width = applied
         self._update_scene_rect()
-
-        # 2) Pivot nt etrafında yatayda yeniden merkezle
         if center_nt is not None:
             self._recenter_horizontally(center_nt, view_width_px)
-
-        # LOD güncelle (view tarafında böyle bir fonksiyon tanımlıysa)
-        if hasattr(self, "_update_lod_for_all_items"):
-            # type: ignore[attr-defined]
-            self._update_lod_for_all_items()
         self.scene.invalidate()
         self.viewport().update()
-        
+
     def start_zoom_animation(
         self,
         target_char_width: float,
         center_nt: float,
         view_width_px: Optional[float] = None,
     ) -> None:
-        """
-        Controller'dan tetiklenen zoom animasyonu.
-        """
         if view_width_px is None:
             view_width_px = float(self.viewport().width())
-
-        current_char_width = self._get_current_char_width()
-
-        # Hedefle mevcut aynıysa direkt uygula
-        if abs(target_char_width - current_char_width) < 0.0001:
+        current = self._get_current_char_width()
+        if abs(target_char_width - current) < 0.0001:
             self.apply_char_width(target_char_width, center_nt, view_width_px)
             return
-
-        # Animasyon zaten çalışıyorsa:
-        # - pivotu sabit tut (ilk başlatıldığında ne ise o),
-        # - sadece yeni hedef genişliği güncelle.
         if self._zoom_animation.state() == QVariantAnimation.Running:
             self._zoom_view_width_px = view_width_px
             self._zoom_animation.setEndValue(target_char_width)
             return
-
-        # Animasyon yeni başlıyorsa
-        self._zoom_center_nt = center_nt
+        self._zoom_center_nt     = center_nt
         self._zoom_view_width_px = view_width_px
-
-        self._zoom_animation.setDuration(180)  # 140–200 ms arası gayet akıcı
-        self._zoom_animation.setStartValue(current_char_width)
+        self._zoom_animation.setDuration(180)
+        self._zoom_animation.setStartValue(current)
         self._zoom_animation.setEndValue(target_char_width)
         self._zoom_animation.start()
 
     def zoom_to_nt_range(self, start_nt: float, end_nt: float) -> None:
-        """
-        Cetvelden gelen 'nt aralığına zoom' isteği için saf geometri.
-        Yüksek seviyede ruler/controller bu metodu çağırabilir.
-        """
         if not self.sequence_items:
             return
-
-        a = float(start_nt)
-        b = float(end_nt)
+        a, b = float(start_nt), float(end_nt)
         if a == b:
-            span_nt = 1.0
-            center_nt = a
+            span_nt, center_nt = 1.0, a
         else:
-            left_nt = min(a, b)
-            right_nt = max(a, b)
-            span_nt = max(right_nt - left_nt, 1.0)
-            center_nt = (left_nt + right_nt) / 2.0
-
-        viewport_width_px = float(self.viewport().width())
-        if viewport_width_px <= 0:
+            span_nt    = max(abs(b - a), 1.0)
+            center_nt  = (min(a, b) + max(a, b)) / 2.0
+        vp_w = float(self.viewport().width())
+        if vp_w <= 0:
             return
-
-        desired_char_width = viewport_width_px / span_nt
-
-        min_char_width = self.compute_min_char_width()
-        max_char_width = 90.0
-        new_char_width = max(min_char_width, min(desired_char_width, max_char_width))
-
-        if abs(new_char_width - self.char_width) > 0.0001:
-            self.char_width = new_char_width
+        desired = vp_w / span_nt
+        new_cw  = max(self.compute_min_char_width(), min(desired, 90.0))
+        if abs(new_cw - self.char_width) > 0.0001:
+            self.char_width = new_cw
             for item in self.sequence_items:
                 item.set_char_width(self.char_width)
             self._update_scene_rect()
-
-        # Aynı yeniden merkezleme mantığını kullan
-        self._recenter_horizontally(center_nt, viewport_width_px)
+        self._recenter_horizontally(center_nt, vp_w)
         self.scene.invalidate()
-
         self.viewport().update()
 
-    # ---------------------------------------------------------------------
-    # Public API: seçim çizimi
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Seçim
+    # ------------------------------------------------------------------
 
     def clear_visual_selection(self) -> None:
-        """
-        Model/controller seçim bilgisini temizlediğinde,
-        view tarafındaki highlight'ları sıfırlamak için.
-        """
         for item in self.sequence_items:
             item.clear_selection()
         self.scene.invalidate()
-
         self.viewport().update()
 
     def set_visual_selection(
-        self,
-        row_start: int,
-        row_end: int,
-        col_start: int,
-        col_end: int,
+        self, row_start: int, row_end: int, col_start: int, col_end: int,
     ) -> None:
-        """
-        Verilen satır / sütun aralığını highlight eder.
-        Satır / sütun aralığı önceden controller/model tarafından clamp'lenmiş olmalı.
-        """
-        for row_index, item in enumerate(self.sequence_items):
-            if row_start <= row_index <= row_end and col_start >= 0 and col_end >= 0:
+        for i, item in enumerate(self.sequence_items):
+            if row_start <= i <= row_end and col_start >= 0 and col_end >= 0:
                 item.set_selection(col_start, col_end)
             else:
                 item.clear_selection()
         self.scene.invalidate()
-
         self.viewport().update()
 
-    # ---------------------------------------------------------------------
-    # Yardımcılar: scene ve geometri
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Scene rect
+    # ------------------------------------------------------------------
 
     def _update_scene_rect(self) -> None:
-        """
-        SequenceGraphicsItem'ların boyuna göre scene rect'i günceller.
-        """
         if not self.sequence_items:
             self.scene.setSceneRect(0, 0, 0, 0)
             self.max_sequence_length = 0
             return
-
         max_len = max(len(item.sequence) for item in self.sequence_items)
         self.max_sequence_length = max_len
-        trailing_padding = self._current_trailing_padding()
-
-        width = max_len * self.char_width + trailing_padding
-        height = len(self.sequence_items) * self.char_height
+        trailing = self._current_trailing_padding()
+        width    = max_len * self.char_width + trailing
+        height   = len(self.sequence_items) * self.row_stride
         self.scene.setSceneRect(0, 0, width, height)
         self.scene.invalidate()
 
     def _current_trailing_padding(self) -> float:
-        """
-        Display moduna göre sağdaki boşluk miktarını belirler.
- 
-        BUG FIX: Eski kod sadece sequence_items[0].display_mode'a bakıyordu.
-        Mixed-mode durumunda (örn. zoom animasyonu sırasında bazı item'lar
-        henüz LINE_MODE'dayken diğerleri TEXT_MODE'a geçmişse) yanlış
-        padding hesaplanıyordu.
- 
-        Düzeltme: tüm item'lar arasında en büyük padding'i (en "geniş" modu)
-        seçiyoruz — bu her zaman güvenli taraftadır.
-        """
         if not self.sequence_items:
             return self.trailing_padding_text_px
- 
-        # Herhangi bir item LINE_MODE'daysa geniş padding kullan.
         for item in self.sequence_items:
             if item.display_mode == SequenceGraphicsItem.LINE_MODE:
                 return self.trailing_padding_line_px
- 
         return self.trailing_padding_text_px
-    def _effective_char_width(self) -> float:
-        """
-        Zoom animasyonu sırasında ara değer, değilse gerçek uygulanan char_width.
-        """
-        if self._zoom_animation.state() == QVariantAnimation.Running:
-            current_value = self._zoom_animation.currentValue()
-            if current_value is not None:
-                return float(current_value)
 
+    # ------------------------------------------------------------------
+    # Zoom yardımcıları
+    # ------------------------------------------------------------------
+
+    def _effective_char_width(self) -> float:
+        if self._zoom_animation.state() == QVariantAnimation.Running:
+            v = self._zoom_animation.currentValue()
+            if v is not None:
+                return float(v)
         if self.sequence_items:
             return float(self.sequence_items[0].char_width)
-
         return float(self.char_width)
 
     def _get_current_char_width(self) -> float:
-        """
-        Backward-compatible helper – dışarıdan current_char_width() kullanılabilir.
-        """
         return self._effective_char_width()
 
-    def _recenter_horizontally(
-        self,
-        center_nt: float,
-        view_width_px: float,
-    ) -> None:
-        """
-        Belirli bir nt'i viewport'un ortasında olacak şekilde yatay scroll ayarı yapar.
-        """
+    def _recenter_horizontally(self, center_nt: float, view_width_px: float) -> None:
         if view_width_px <= 0:
             view_width_px = float(self.viewport().width())
             if view_width_px <= 0:
                 return
-
-        scene_width = float(self.scene.sceneRect().width())
-        if scene_width <= 0:
+        scene_w = float(self.scene.sceneRect().width())
+        if scene_w <= 0:
             return
-
-        # nt aralığına clamp
         if self.max_sequence_length > 0:
             center_nt = max(0.0, min(center_nt, float(self.max_sequence_length)))
-
-        cw = self._effective_char_width()
-        center_x = center_nt * cw
-        ideal_left = center_x - view_width_px / 2.0
-
-        # Scene genişliğine göre clamp
-        max_left = max(0.0, scene_width - view_width_px)
+        cw        = self._effective_char_width()
+        ideal_left = center_nt * cw - view_width_px / 2.0
+        max_left   = max(0.0, scene_w - view_width_px)
         ideal_left = max(0.0, min(ideal_left, max_left))
-
         hbar: QScrollBar = self.horizontalScrollBar()
-        current_left = float(hbar.value())
-
-        # Çok küçük farklar için setValue çağırma → 1px jitter'ı azaltır
-        if abs(ideal_left - current_left) < 0.5:
-            return
-
-        hbar.setValue(int(round(ideal_left)))
+        if abs(float(hbar.value()) - ideal_left) >= 0.5:
+            hbar.setValue(int(round(ideal_left)))
 
     def _on_zoom_value_changed(self, value) -> None:
-        """
-        Zoom animasyonu her adımda çağrılır; ara char_width değeri uygular.
-        """
         if self._zoom_center_nt is None or self._zoom_view_width_px is None:
             return
-
         try:
-            new_char_width = float(value)
+            self.apply_char_width(
+                float(value),
+                self._zoom_center_nt,
+                float(self._zoom_view_width_px),
+            )
         except (TypeError, ValueError):
-            return
+            pass
 
-        self.apply_char_width(
-            new_char_width,
-            self._zoom_center_nt,
-            float(self._zoom_view_width_px),
-        )
-
-    # ---------------------------------------------------------------------
-    # Koordinat dönüşümü (controller için)
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Koordinat dönüşümü
+    # ------------------------------------------------------------------
 
     def scene_pos_to_row_col(self, scene_pos: QPointF) -> Tuple[int, int]:
-        """
-        Scene koordinatındaki bir noktayı, satır/sütun indeksine çevirir.
-        Controller, mouse event'lerini modele çevirmek için bu metodu kullanır.
-        """
-        row = int(scene_pos.y() // self.char_height)
+        stride = self.row_stride
+        if stride <= 0:
+            return 0, 0
+        raw_row = int(scene_pos.y() // stride)
+        cw = self._get_current_char_width()
+        if cw <= 0:
+            cw = max(self.char_width, 0.000001)
+        col = int(scene_pos.x() // cw)
+        return raw_row, col
 
-        current_cw = self._get_current_char_width()
-        if current_cw <= 0:
-            current_cw = self.char_width if self.char_width > 0 else 0.000001
-
-        col = int(scene_pos.x() // current_cw)
-        return row, col
-
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Event yönlendirme
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     def wheelEvent(self, event) -> None:
-        """
-        Yüksek seviye zoom/scroll davranışı controller tarafından
-        yönetilsin diye event'i önce controller'a paslıyoruz.
-        Controller None ise normal QGraphicsView davranışına döner.
-        """
         if self._controller is not None:
             handled = getattr(self._controller, "handle_wheel_event", None)
             if callable(handled) and handled(event):
                 return
-
         super().wheelEvent(event)
 
     def mousePressEvent(self, event) -> None:

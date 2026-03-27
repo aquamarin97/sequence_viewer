@@ -1,36 +1,11 @@
 # model/annotation.py
-"""
-Annotasyon veri modeli.
-
-AnnotationType
---------------
-FORWARD_PRIMER   ok sağa, dolgu kutu
-REVERSE_PRIMER   ok sola, dolgu kutu
-PROBE            düz dikdörtgen, farklı renk
-REGION           yarı saydam bant (amplikon vb.)
-
-Annotation
-----------
-Geneious benzeri tam metadata.
-id         : UUID string — store içinde benzersiz anahtar
-type       : AnnotationType
-start      : 0-based, inclusive
-end        : 0-based, inclusive
-label      : görüntülenen kısa isim
-strand     : "+" | "-" | "." (belirsiz)
-color      : None → type için varsayılan renk kullanılır
-score      : float veya None
-tm         : erime sıcaklığı (°C) veya None
-gc_percent : GC yüzdesi (0-100) veya None
-notes      : serbest metin
-"""
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional
+from typing import List, Optional
 
 from PyQt5.QtGui import QColor
 
@@ -51,50 +26,61 @@ class AnnotationType(Enum):
 
     def default_color(self) -> QColor:
         return {
-            AnnotationType.FORWARD_PRIMER: QColor( 52, 152, 219),  # mavi
-            AnnotationType.REVERSE_PRIMER: QColor(231,  76,  60),  # kırmızı
-            AnnotationType.PROBE:          QColor( 39, 174,  96),  # yeşil
-            AnnotationType.REGION:         QColor(243, 156,  18),  # turuncu
+            AnnotationType.FORWARD_PRIMER: QColor( 52, 152, 219),
+            AnnotationType.REVERSE_PRIMER: QColor(231,  76,  60),
+            AnnotationType.PROBE:          QColor( 39, 174,  96),
+            AnnotationType.REGION:         QColor(243, 156,  18),
         }[self]
 
 
 @dataclass
 class Annotation:
-    """Tek bir annotasyonun tam veri modeli."""
+    """
+    Tek bir annotasyonun tam veri modeli.
+
+    seq_indices
+    -----------
+    None      → annotasyon tüm satırlara uygulanır (alignment annotasyonu).
+    [0, 2, 5] → sadece belirtilen satır indekslerinde görünür.
+                 Find Motifs gibi per-sequence eşleşmelerde kullanılır.
+    """
 
     type:        AnnotationType
-    start:       int                       # 0-based, inclusive
-    end:         int                       # 0-based, inclusive
-    label:       str        = ""
-    strand:      str        = "+"          # "+" | "-" | "."
-    color:       Optional[QColor] = None   # None → type.default_color()
+    start:       int
+    end:         int
+    label:       str              = ""
+    strand:      str              = "+"
+    color:       Optional[QColor] = None
     score:       Optional[float]  = None
-    tm:          Optional[float]  = None   # erime sıcaklığı °C
-    gc_percent:  Optional[float]  = None   # 0-100
-    notes:       str        = ""
-    id:          str        = field(default_factory=lambda: str(uuid.uuid4()))
+    tm:          Optional[float]  = None
+    gc_percent:  Optional[float]  = None
+    notes:       str              = ""
+    id:          str              = field(default_factory=lambda: str(uuid.uuid4()))
+
+    # Hangi satır indekslerinde görüneceğini belirler.
+    # None → tüm satırlar (global alignment annotation)
+    seq_indices: Optional[List[int]] = None
 
     def __post_init__(self) -> None:
-        # start ≤ end garantisi
         if self.start > self.end:
             self.start, self.end = self.end, self.start
 
-    # ------------------------------------------------------------------
-    # Yardımcılar
-    # ------------------------------------------------------------------
-
     def resolved_color(self) -> QColor:
-        """Renk tanımlanmışsa onu, yoksa tip varsayılanını döner."""
         return self.color if self.color is not None else self.type.default_color()
 
     def length(self) -> int:
         return self.end - self.start + 1
 
+    def applies_to_row(self, row_index: int) -> bool:
+        """Bu annotasyon verilen satırda gösterilmeli mi?"""
+        if self.seq_indices is None:
+            return True
+        return row_index in self.seq_indices
+
     def overlaps(self, other: "Annotation") -> bool:
         return self.start <= other.end and self.end >= other.start
 
     def tooltip_text(self) -> str:
-        """Tooltip veya metadata paneli için formatlanmış metin."""
         lines = [
             f"<b>{self.label or '(isimsiz)'}</b>",
             f"Tip: {self.type.display_name()}",
