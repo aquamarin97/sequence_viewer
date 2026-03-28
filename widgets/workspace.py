@@ -21,8 +21,11 @@ from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation
 from widgets.row_layout import RowLayout
 
-_LANE_HEIGHT  = 16
-_LANE_PADDING =  2
+from widgets.row_layout import (
+    PAD_FAR, PAD_NEAR, LANE_GAP,
+    strip_height, above_lane_y, below_lane_y,
+)
+_LANE_HEIGHT = 16
 
 
 class _ScrollSyncGuard:
@@ -127,15 +130,14 @@ class SequenceWorkspaceWidget(QWidget):
     # ------------------------------------------------------------------
     def _compute_row_layout(self) -> RowLayout:
         ch = self.sequence_viewer.char_height
-        heights: List[int] = []
+        above_heights: List[int] = []
+        below_heights: List[int] = []
         for record in self._model.all_records():
-            if record.annotations:
-                n = lane_count(assign_lanes(record.annotations))
-                h = n * (_LANE_HEIGHT + _LANE_PADDING) + _LANE_PADDING if n > 0 else 0
-            else:
-                h = 0
-            heights.append(h)
-        return RowLayout.build(ch, heights)
+            above_anns = [a for a in record.annotations if a.type.is_above_sequence()]
+            below_anns = [a for a in record.annotations if not a.type.is_above_sequence()]
+            above_heights.append(strip_height(lane_count(assign_lanes(above_anns))))
+            below_heights.append(strip_height(lane_count(assign_lanes(below_anns))))
+        return RowLayout.build(ch, above_heights, below_heights)
 
     def _apply_layout(self, layout: RowLayout):
         self.sequence_viewer.apply_row_layout(layout)
@@ -154,17 +156,22 @@ class SequenceWorkspaceWidget(QWidget):
 
     def _per_row_lane_assignment(self, flat):
         """
-        Her satır icin ayri ayri assign_lanes cagirilir.
-        Global assignment: ayni pozisyondaki iki satir annotation'i
-        farkli lane'lere dusuyor; ama _compute_row_layout her satiri
-        bagimsiz hesapliyor -> yukseklik uyumsuzlugu olusur.
+        Her satır için ayrı ayrı assign_lanes çağrılır.
+        Üst (above) ve alt (below) annotation'lar bağımsız lane atamasına girer —
+        böylece her bölgenin lane sayısı ve şerit yüksekliği ayrı hesaplanır.
         """
         from collections import defaultdict
-        by_row = defaultdict(list)
+        above_by_row: dict = defaultdict(list)
+        below_by_row: dict = defaultdict(list)
         for row_index, ann in flat:
-            by_row[row_index].append(ann)
+            if ann.type.is_above_sequence():
+                above_by_row[row_index].append(ann)
+            else:
+                below_by_row[row_index].append(ann)
         result = {}
-        for anns in by_row.values():
+        for anns in above_by_row.values():
+            result.update(assign_lanes(anns))
+        for anns in below_by_row.values():
             result.update(assign_lanes(anns))
         return result
 
@@ -183,7 +190,10 @@ class SequenceWorkspaceWidget(QWidget):
                 continue
             lane    = assignment.get(ann.id, 0)
             scene_x = ann.start * cw
-            scene_y = float(layout.y_offsets[row_index]) + lane * (_LANE_HEIGHT + _LANE_PADDING) + _LANE_PADDING
+            if ann.type.is_above_sequence():
+                scene_y = float(layout.y_offsets[row_index]) + above_lane_y(lane)
+            else:
+                scene_y = float(layout.below_y_offsets[row_index]) + below_lane_y(lane)
             item = AnnotationGraphicsItem(
                 annotation=ann, row_index=row_index,
                 ann_width=ann.length() * cw, ann_height=ann_h,
@@ -210,7 +220,10 @@ class SequenceWorkspaceWidget(QWidget):
                 continue
             lane    = assignment.get(ann.id, 0)
             scene_x = ann.start * cw
-            scene_y = float(layout.y_offsets[row_index]) + lane * (_LANE_HEIGHT + _LANE_PADDING) + _LANE_PADDING
+            if ann.type.is_above_sequence():
+                scene_y = float(layout.y_offsets[row_index]) + above_lane_y(lane)
+            else:
+                scene_y = float(layout.below_y_offsets[row_index]) + below_lane_y(lane)
             for item in items:
                 if item.row_index == row_index:
                     item.setPos(scene_x, scene_y)

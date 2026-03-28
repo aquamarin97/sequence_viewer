@@ -45,6 +45,19 @@ class AnnotationType(Enum):
             AnnotationType.REGION:         QColor(243, 156,  18),
         }[self]
 
+    def is_above_sequence(self) -> bool:
+        """
+        True  → annotation dizinin ÜSTÜNDE render edilir  (primer, probe).
+        False → annotation dizinin ALTINDA render edilir  (region, gelecek tipler).
+
+        Yeni bir AnnotationType eklendiğinde bu metoda da eklenmeli.
+        """
+        return self in (
+            AnnotationType.FORWARD_PRIMER,
+            AnnotationType.REVERSE_PRIMER,
+            AnnotationType.PROBE,
+        )
+
 
 @dataclass
 class Annotation:

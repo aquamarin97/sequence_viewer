@@ -85,7 +85,8 @@ class HeaderViewerView(QGraphicsView):
 
         for i, item in enumerate(self.header_items):
             if i < layout.row_count:
-                item.set_annot_height(layout.per_row_annot_heights[i])
+                item.set_annot_height(layout.per_row_above_heights[i])
+                item.set_below_ann_height(layout.per_row_below_heights[i])
                 item.setPos(0, float(layout.y_offsets[i]))
 
         self._update_scene_rect()
@@ -170,6 +171,12 @@ class HeaderViewerView(QGraphicsView):
             stride  = self._row_stride_uniform
             y_start = float(row_index * stride)
 
+        layout = self._row_layout
+        if layout is not None and row_index < layout.row_count:
+            below_h = layout.per_row_below_heights[row_index]
+        else:
+            below_h = 0
+
         item = HeaderRowItem(
             text=display_text,
             width=item_width,
@@ -177,6 +184,7 @@ class HeaderViewerView(QGraphicsView):
             annot_height=ann_h,
             row_index=row_index,
         )
+        item.set_below_ann_height(below_h)
         item.setPos(0, y_start)
         self.scene.addItem(item)
         self.header_items.append(item)

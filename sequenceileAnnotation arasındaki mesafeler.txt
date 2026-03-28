@@ -1,0 +1,4 @@
+# Padding sabitleri — workspace ve header_item bu modülü import eder
+PAD_FAR  = 6   # şerit → dış kenar
+PAD_NEAR = 2   # şerit → sequence kenarı
+LANE_GAP = 2   # lane'ler arası boşluk

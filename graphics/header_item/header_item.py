@@ -58,10 +58,11 @@ class HeaderRowItem(QGraphicsItem):
             row_height=int(round(row_height)),
         )
 
-        self.width        = float(width)
-        self.row_height   = int(round(row_height))   # metin bölgesi yüksekliği
-        self.annot_height = int(annot_height)         # üst boşluk yüksekliği
-        self.row_index    = row_index
+        self.width            = float(width)
+        self.row_height       = int(round(row_height))   # metin bölgesi yüksekliği
+        self.annot_height     = int(annot_height)         # üst (above) şerit yüksekliği
+        self.below_ann_height = 0                         # alt (below) şerit yüksekliği
+        self.row_index        = row_index
 
         # Font — char_height bazlı, değişmez
         self.font = QFont("Arial")
@@ -81,7 +82,7 @@ class HeaderRowItem(QGraphicsItem):
 
     @property
     def total_height(self) -> int:
-        return self.annot_height + self.row_height
+        return self.annot_height + self.row_height + self.below_ann_height
 
     # ------------------------------------------------------------------
     # Eski API uyumluluğu
@@ -96,11 +97,19 @@ class HeaderRowItem(QGraphicsItem):
     # ------------------------------------------------------------------
 
     def set_annot_height(self, h: int) -> None:
-        """Workspace per_row_annot_height değişince çağrılır."""
+        """Workspace per_row_above_height değişince çağrılır."""
         if self.annot_height == h:
             return
         self.prepareGeometryChange()
         self.annot_height = h
+        self.update()
+
+    def set_below_ann_height(self, h: int) -> None:
+        """Workspace per_row_below_height değişince çağrılır."""
+        if self.below_ann_height == h:
+            return
+        self.prepareGeometryChange()
+        self.below_ann_height = h
         self.update()
 
     def set_hovered(self, hovered: bool) -> None:
@@ -207,13 +216,14 @@ class HeaderRowItem(QGraphicsItem):
             painter.setPen(QPen(t.border_drag, 1, Qt.DashLine))
             painter.setBrush(Qt.NoBrush)
             painter.drawRect(text_rect_full.adjusted(0, 0, -1, -1))
-        else:
-            # Sadece alt çizgi
+        elif self.below_ann_height == 0:
+            # Alt şerit yoksa metin bloğunun altına border çiz
             painter.setPen(QPen(t.border_normal, 0))
             painter.drawLine(
-                int(0),      int(text_top + row_h) - 1,
+                int(0),       int(text_top + row_h) - 1,
                 int(total_w), int(text_top + row_h) - 1,
             )
+        # below_ann_height > 0 → border alt şeridin içinde çizilecek
 
         # Seçim göstergesi: sol kenar çubuğu 2px
         if self._selected:
@@ -235,5 +245,18 @@ class HeaderRowItem(QGraphicsItem):
             row_h,
         )
         painter.drawText(draw_rect, Qt.AlignVCenter | Qt.AlignLeft, display_txt)
+
+        # ---- Alt bölge: below-annotation şeridine karşılık gelen alan ----
+        below_h = float(self.below_ann_height)
+        if below_h > 0:
+            below_top = ann_h + row_h
+            below_bg = t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
+            painter.fillRect(QRectF(0, below_top, total_w, below_h), QBrush(QColor(below_bg)))
+            # Alt kenar çizgisi (satırın gerçek sonu)
+            painter.setPen(QPen(t.border_normal, 0))
+            painter.drawLine(
+                int(0),       int(below_top + below_h) - 1,
+                int(total_w), int(below_top + below_h) - 1,
+            )
 
         painter.restore()
