@@ -186,18 +186,12 @@ class HeaderRowItem(QGraphicsItem):
 
         # ---- Üst bölge: annotation şeridine karşılık gelen boş alan ----
         if ann_h > 0:
-            # FIX 1.2: Satırın kendi zebra indeksine uygun renk kullan.
-            # Önceden hep t.row_bg_odd sabit kullanılıyordu; artık
-            # row_bg_even / row_bg_odd satır indeksine göre seçiliyor.
+            # Zebra rengini satırın kendi indeksine göre seç
             ann_bg = t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
             painter.fillRect(QRectF(0, 0, total_w, ann_h), QBrush(QColor(ann_bg)))
-
-            # Alt çizgi (annotation şeridini ayıran ince çizgi)
-            painter.setPen(QPen(t.border_normal, 0))
-            painter.drawLine(
-                int(0), int(ann_h) - 1,
-                int(total_w), int(ann_h) - 1,
-            )
+            # İç border çizilmiyor: annotation şeridi ile metin aynı
+            # hücrenin parçası gibi görünmeli — aradaki çizgi
+            # "boş hücre" algısı yaratıyordu.
 
         # ---- Alt bölge: gerçek header satırı ----
         text_top = ann_h

@@ -97,6 +97,9 @@ class SequenceWorkspaceWidget(QWidget):
         self.annotation_layer.annotationClicked.connect(self._on_annotation_layer_clicked)
         self.annotation_layer.annotationDoubleClicked.connect(self._on_annotation_layer_double_clicked)
         self.annotation_layer.installEventFilter(self)
+        # annotation_layer __init__ sırasında yüksekliğini set etti;
+        # eventFilter henüz bağlı değildi — ilk senkronu elle yap.
+        self.annotation_spacer.sync_height(self.annotation_layer.height())
 
         # Sinyaller — model satır
         self._model.rowAppended.connect(self._on_row_appended)
@@ -149,13 +152,28 @@ class SequenceWorkspaceWidget(QWidget):
                     scene.removeItem(item)
         self._ann_items.clear()
 
+    def _per_row_lane_assignment(self, flat):
+        """
+        Her satır icin ayri ayri assign_lanes cagirilir.
+        Global assignment: ayni pozisyondaki iki satir annotation'i
+        farkli lane'lere dusuyor; ama _compute_row_layout her satiri
+        bagimsiz hesapliyor -> yukseklik uyumsuzlugu olusur.
+        """
+        from collections import defaultdict
+        by_row = defaultdict(list)
+        for row_index, ann in flat:
+            by_row[row_index].append(ann)
+        result = {}
+        for anns in by_row.values():
+            result.update(assign_lanes(anns))
+        return result
+
     def _rebuild_ann_items(self, layout: RowLayout):
         self._remove_all_ann_items()
         flat = self._model.all_annotations_flat()
         if not flat or layout.row_count == 0:
             return
-        all_anns   = [ann for _, ann in flat]
-        assignment = assign_lanes(all_anns)
+        assignment = self._per_row_lane_assignment(flat)
         cw    = float(self.sequence_viewer.current_char_width())
         ann_h = float(_LANE_HEIGHT)
         scene = self.sequence_viewer.scene
@@ -163,9 +181,9 @@ class SequenceWorkspaceWidget(QWidget):
         for row_index, ann in flat:
             if row_index >= layout.row_count:
                 continue
-            lane       = assignment.get(ann.id, 0)
-            scene_x    = ann.start * cw
-            scene_y    = float(layout.y_offsets[row_index]) + lane * (_LANE_HEIGHT + _LANE_PADDING) + _LANE_PADDING
+            lane    = assignment.get(ann.id, 0)
+            scene_x = ann.start * cw
+            scene_y = float(layout.y_offsets[row_index]) + lane * (_LANE_HEIGHT + _LANE_PADDING) + _LANE_PADDING
             item = AnnotationGraphicsItem(
                 annotation=ann, row_index=row_index,
                 ann_width=ann.length() * cw, ann_height=ann_h,
@@ -182,7 +200,7 @@ class SequenceWorkspaceWidget(QWidget):
         flat = self._model.all_annotations_flat()
         if not flat:
             return
-        assignment = assign_lanes([ann for _, ann in flat])
+        assignment = self._per_row_lane_assignment(flat)
         cw    = float(self.sequence_viewer.current_char_width())
         ann_h = float(_LANE_HEIGHT)
 
@@ -308,7 +326,17 @@ class SequenceWorkspaceWidget(QWidget):
                 pass
 
     def _on_selection_changed(self, selected_rows):
-        pass
+        """
+        Header satır seçimi değişince sequence viewer'da yatay
+        kılavuz çizgileri güncellenir.
+
+        Seçili satır(lar)ın tam yükseklik bloğunu (annotation şeridi
+        dahil) üstten ve alttan yatay çizgiyle çerçeveliyoruz.
+        """
+        if not selected_rows:
+            self.sequence_viewer.clear_h_guides()
+        else:
+            self.sequence_viewer.set_h_guides(frozenset(selected_rows))
 
     # ------------------------------------------------------------------
     # Model → View

@@ -53,6 +53,8 @@ class SequenceViewerView(QGraphicsView):
         self.sequence_items: List[SequenceGraphicsItem] = []
 
         self._guide_cols: Optional[Tuple[int, int]] = None
+        # Yatay kılavuz çizgileri: seçili satır indeksleri (frozenset)
+        self._h_guide_rows: frozenset = frozenset()
 
         self._zoom_animation = QVariantAnimation(self)
         self._zoom_animation.setEasingCurve(QEasingCurve.OutCubic)
@@ -124,29 +126,77 @@ class SequenceViewerView(QGraphicsView):
         self._guide_cols = None
         self.viewport().update()
 
+    # ------------------------------------------------------------------
+    # Yatay kılavuz çizgileri (satır seçimi)
+    # ------------------------------------------------------------------
+
+    def set_h_guides(self, row_indices: frozenset) -> None:
+        """Seçili satır(lar)ın üst ve alt kenarına yatay kılavuz çiz."""
+        self._h_guide_rows = row_indices
+        self.viewport().update()
+
+    def clear_h_guides(self) -> None:
+        if self._h_guide_rows:
+            self._h_guide_rows = frozenset()
+            self.viewport().update()
+
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
         super().drawForeground(painter, rect)
-        if self._guide_cols is None:
-            return
-        start_col, end_col = self._guide_cols
-        cw = self._effective_char_width()
-        if cw <= 0:
-            return
-        hbar   = self.horizontalScrollBar()
-        vp_h   = float(self.viewport().height())
-        vp_w   = float(self.viewport().width())
-        offset = float(hbar.value())
-        start_vp_x = start_col * cw - offset
-        end_vp_x   = (end_col + 1) * cw - offset
-        painter.save()
-        painter.resetTransform()
-        pen = QPen(_GUIDE_COLOR, _GUIDE_WIDTH, Qt.DashLine)
-        pen.setDashPattern([4, 3])
-        painter.setPen(pen)
-        for vp_x in (start_vp_x, end_vp_x):
-            if -10 <= vp_x <= vp_w + 10:
-                painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, vp_h))
-        painter.restore()
+
+        # ---- Dikey kılavuz çizgileri (annotation seçimi) ----
+        if self._guide_cols is not None:
+            start_col, end_col = self._guide_cols
+            cw = self._effective_char_width()
+            if cw > 0:
+                hbar   = self.horizontalScrollBar()
+                vp_h   = float(self.viewport().height())
+                vp_w   = float(self.viewport().width())
+                offset = float(hbar.value())
+                start_vp_x = start_col * cw - offset
+                end_vp_x   = (end_col + 1) * cw - offset
+                painter.save()
+                painter.resetTransform()
+                pen = QPen(_GUIDE_COLOR, _GUIDE_WIDTH, Qt.DashLine)
+                pen.setDashPattern([4, 3])
+                painter.setPen(pen)
+                for vp_x in (start_vp_x, end_vp_x):
+                    if -10 <= vp_x <= vp_w + 10:
+                        painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, vp_h))
+                painter.restore()
+
+        # ---- Yatay kılavuz çizgileri (header satır seçimi) ----
+        # guide_cols durumundan bağımsız — her zaman kontrol edilir.
+        if self._h_guide_rows:
+            layout = self._row_layout
+            vbar   = self.verticalScrollBar()
+            v_off  = float(vbar.value())
+            vp_w2  = float(self.viewport().width())
+
+            painter.save()
+            painter.resetTransform()
+
+            h_pen = QPen(_GUIDE_COLOR, _GUIDE_WIDTH, Qt.SolidLine)
+            painter.setPen(h_pen)
+
+            for row in self._h_guide_rows:
+                if layout is not None and row < layout.row_count:
+                    top_scene    = float(layout.y_offsets[row])
+                    bottom_scene = top_scene + float(layout.row_strides[row])
+                else:
+                    stride       = self._per_row_annot_h + self.char_height
+                    top_scene    = float(row * stride)
+                    bottom_scene = top_scene + float(stride)
+
+                top_vp    = top_scene    - v_off
+                bottom_vp = bottom_scene - v_off
+
+                for vp_y in (top_vp, bottom_vp):
+                    if -2 <= vp_y <= float(self.viewport().height()) + 2:
+                        painter.drawLine(
+                            QPointF(0, vp_y),
+                            QPointF(vp_w2, vp_y),
+                        )
+            painter.restore()
 
     # ------------------------------------------------------------------
     # Controller
@@ -425,6 +475,14 @@ class SequenceViewerView(QGraphicsView):
                 if 0 <= y_in_row < self._per_row_annot_h:
                     super().mousePressEvent(event)
                     return
+
+        # Sequence alanına tıklama: yalnızca dikey kılavuzu temizle.
+        # Yatay kılavuzlar (h_guides) header seçimiyle yönetilir,
+        # burada dokunulmaz.
+        if event.button() == Qt.LeftButton:
+            if self._guide_cols is not None:
+                self._guide_cols = None
+                self.viewport().update()
 
         if self._controller is not None:
             handled = getattr(self._controller, "handle_mouse_press", None)
