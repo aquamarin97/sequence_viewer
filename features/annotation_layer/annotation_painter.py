@@ -1,14 +1,30 @@
 # features/annotation_layer/annotation_painter.py
 """
-Annotasyon şekil çizim fonksiyonları — v2 düzeltmeleri.
+Annotation şekil çizim fonksiyonları.
 
-Değişiklikler
--------------
-* FORWARD/REVERSE_PRIMER: dik üçgen (right-angled triangle).
-  Üçgenin gövdeye bakan kenarı tam 90° dikey.
-  Gövde ve uç aynı renk → yekpare görünüm.
-* PROBE: strand parametresi eklendi.
-  strand="+" → forward ok (sağa),  strand="-" → reverse ok (sola).
+Şekil: Dik Yamuk (Right Trapezoid)
+------------------------------------
+PRIMER ve PROBE için kullanılan şekil, 30-60-90 üçgen oranlarına sahip
+bir dik yamuğun dikdörtgen gövdeye eklenmesiyle oluşur.
+
+Geometri (Forward +):
+
+    (0,0)──────────(body_w, 0)
+      │                  /   ← slant 60° yataydan / 30° dikeyde
+      │                   \
+      │                    \
+    (0,h)──────────────────(w, h)   ← tip (en sağ nokta)
+
+    tip_w = h / √3   → 60°/30° oranı
+    body_w = w − tip_w  (0'a inebilir → saf üçgen, yön korunur)
+
+Zoom-out garantisi:
+    tip_w ≥ _MIN_TIP_W  → her zoom seviyesinde yön görünür.
+    body_w = 0 olduğunda şekil otomatik olarak üçgene dejenere olur.
+
+Reverse (−): forward'ın yatay yansıması.
+
+REPEATED_REGION: yarı saydam dikdörtgen.
 """
 
 from __future__ import annotations
@@ -19,115 +35,142 @@ from PyQt5.QtGui import (
     QFont, QFontMetrics, QPolygonF,
 )
 
-_LABEL_MARGIN    = 4
-_MIN_LABEL_W     = 20
-_ARROW_TIP_RATIO = 0.18   # ok ucunun genişliğinin toplam genişliğe oranı
+# --- Sabitler ---
+_LABEL_MARGIN = 4
+_MIN_LABEL_W  = 16
+
+# Tip (ok ucu) her zoom seviyesinde görünür kalmak için minimum piksel genişliği.
+# Zoom-out'ta char_width küçüldükçe tip de küçülür; ama asla bu değerin altına inmez.
+_MIN_TIP_PX = 5.0
 
 
-def draw_forward_primer(
+# ---------------------------------------------------------------------------
+# PRIMER
+# ---------------------------------------------------------------------------
+
+def draw_primer(
     painter: QPainter,
     x: float, y: float, w: float, h: float,
     color: QColor, label: str,
+    strand: str = "+",
+    char_width: float = 12.0,
 ) -> None:
     """
-    Dik üçgen uçlu forward primer (→).
-    Üçgenin SOL kenarı gövdeye tam 90° dikey.
+    Dik yamuk şeklinde primer.
 
-         ┌────────────┐
-         │            ├──►
-         └────────────┘
+    tip_w = char_width (1 nükleotid hücresi) — zoom ile birlikte ölçeklenir,
+    yön her zoom seviyesinde tutarlı kalır.
+    body_w = 0 olduğunda şekil üçgene dejenere olur.
+
+    Forward (+): sol dik kenar, sağa uzayan taban → sağa yönelik.
+    Reverse (−): sağ dik kenar, sola uzayan taban → sola yönelik.
     """
     if w <= 0:
         return
 
-    tip_w  = min(w * _ARROW_TIP_RATIO, h * 0.9, 14.0)
-    body_w = w - tip_w
+    # tip_w = 2 nükleotid genişliği; zoom-out'ta _MIN_TIP_PX garantisi.
+    # body_w = 0 → saf üçgen (yön her zaman korunur).
+    tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
+    body_w = max(0.0, w - tip_w)
 
+    painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setPen(Qt.NoPen)
     painter.setBrush(QBrush(color))
 
-    # Gövde dikdörtgeni
-    painter.drawRect(QRectF(x, y, body_w, h))
+    if strand == "+":
+        # Forward: sol dik kenar, sağa yönelik üçgen uç
+        poly = QPolygonF([
+            QPointF(x,           y),      # TL  (90°)
+            QPointF(x + body_w,  y),      # TR  (gövde-uç birleşimi)
+            QPointF(x + w,       y + h),  # tip (sağ alt)
+            QPointF(x,           y + h),  # BL  (90°)
+        ])
+        label_x = x
+        label_w = body_w
+    else:
+        # Reverse: sağ dik kenar, sola yönelik üçgen uç
+        poly = QPolygonF([
+            QPointF(x + tip_w,   y),      # TL  (gövde-uç birleşimi)
+            QPointF(x + w,       y),      # TR  (90°)
+            QPointF(x + w,       y + h),  # BR  (90°)
+            QPointF(x,           y + h),  # tip (sol alt)
+        ])
+        label_x = x + tip_w
+        label_w = body_w
 
-    # Dik üçgen:
-    #   sol kenar → tam dikey (90°)
-    #   tepe noktası → orta sağda (ok ucu)
-    tip_base_x = x + body_w
-    poly = QPolygonF([
-        QPointF(tip_base_x,          y),           # sol üst (90° köşe)
-        QPointF(tip_base_x + tip_w,  y + h / 2.0), # ok ucu
-        QPointF(tip_base_x,          y + h),        # sol alt (90° köşe)
-    ])
     painter.drawPolygon(poly)
+    if label_w >= _MIN_LABEL_W:
+        _draw_label(painter, label_x, y, label_w, h, label, color)
 
-    _draw_label(painter, x, y, body_w, h, label, color)
 
-
-def draw_reverse_primer(
-    painter: QPainter,
-    x: float, y: float, w: float, h: float,
-    color: QColor, label: str,
-) -> None:
-    """
-    Dik üçgen uçlu reverse primer (←).
-    Üçgenin SAĞ kenarı gövdeye tam 90° dikey.
-
-    ◄──┌────────────┐
-       └────────────┘
-    """
-    if w <= 0:
-        return
-
-    tip_w  = min(w * _ARROW_TIP_RATIO, h * 0.9, 14.0)
-    body_x = x + tip_w
-    body_w = w - tip_w
-
-    painter.setPen(Qt.NoPen)
-    painter.setBrush(QBrush(color))
-
-    # Gövde
-    painter.drawRect(QRectF(body_x, y, body_w, h))
-
-    # Dik üçgen:
-    #   sağ kenar → tam dikey (90°)
-    #   tepe noktası → orta solda (ok ucu)
-    poly = QPolygonF([
-        QPointF(body_x,        y),            # sağ üst (90° köşe)
-        QPointF(x,             y + h / 2.0),  # ok ucu
-        QPointF(body_x,        y + h),         # sağ alt (90° köşe)
-    ])
-    painter.drawPolygon(poly)
-
-    _draw_label(painter, body_x, y, body_w, h, label, color)
-
+# ---------------------------------------------------------------------------
+# PROBE
+# ---------------------------------------------------------------------------
 
 def draw_probe(
     painter: QPainter,
     x: float, y: float, w: float, h: float,
     color: QColor, label: str,
     strand: str = "+",
+    char_width: float = 12.0,
 ) -> None:
     """
-    Probe — strand'a göre otomatik ok yönü.
-    strand="+"  → forward ok (sağa, draw_forward_primer ile aynı)
-    strand="-"  → reverse ok (sola, draw_reverse_primer ile aynı)
+    Primer ile aynı dik yamuk geometrisi; dolgu biraz daha şeffaf,
+    kenarlık eklenmiş → primer'dan görsel olarak ayırt edilebilir.
+    tip_w = char_width (1 nükleotid hücresi).
     """
-    if strand == "-":
-        draw_reverse_primer(painter, x, y, w, h, color, label)
+    if w <= 0:
+        return
+
+    tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
+    body_w = max(0.0, w - tip_w)
+
+    fill    = QColor(color); fill.setAlpha(170)
+    outline = QColor(color)
+
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setBrush(QBrush(fill))
+    painter.setPen(QPen(outline, 1.5))
+
+    if strand == "+":
+        poly = QPolygonF([
+            QPointF(x,           y),
+            QPointF(x + body_w,  y),
+            QPointF(x + w,       y + h),
+            QPointF(x,           y + h),
+        ])
+        label_x = x
+        label_w = body_w
     else:
-        draw_forward_primer(painter, x, y, w, h, color, label)
+        poly = QPolygonF([
+            QPointF(x + tip_w,   y),
+            QPointF(x + w,       y),
+            QPointF(x + w,       y + h),
+            QPointF(x,           y + h),
+        ])
+        label_x = x + tip_w
+        label_w = body_w
+
+    painter.drawPolygon(poly)
+    if label_w >= _MIN_LABEL_W:
+        _draw_label(painter, label_x, y, label_w, h, label, color)
 
 
-def draw_region(
+# ---------------------------------------------------------------------------
+# REPEATED REGION
+# ---------------------------------------------------------------------------
+
+def draw_repeated_region(
     painter: QPainter,
     x: float, y: float, w: float, h: float,
     color: QColor, label: str,
 ) -> None:
-    """Yarı saydam bant + ince kenarlık."""
+    """Yarı saydam dikdörtgen — yön taşımaz, alt şeritte render edilir."""
     if w <= 0:
         return
     fill   = QColor(color); fill.setAlpha(60)
     border = QColor(color); border.setAlpha(180)
+    painter.setRenderHint(QPainter.Antialiasing, False)
     painter.setBrush(QBrush(fill))
     painter.setPen(QPen(border, 1.0))
     painter.drawRect(QRectF(x, y, w, h))
@@ -135,7 +178,7 @@ def draw_region(
 
 
 # ---------------------------------------------------------------------------
-# Yardımcı
+# Yardımcı: etiket çizimi
 # ---------------------------------------------------------------------------
 
 def _draw_label(

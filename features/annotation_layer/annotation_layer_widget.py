@@ -21,7 +21,7 @@ from features.annotation_layer.annotation_layout_engine import (
     assign_lanes, lane_count,
 )
 from features.annotation_layer.annotation_painter import (
-    draw_forward_primer, draw_reverse_primer, draw_probe, draw_region,
+    draw_primer, draw_probe, draw_repeated_region,
 )
 from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation, AnnotationType
@@ -178,18 +178,18 @@ class AnnotationLayerWidget(QWidget):
 
             painter.save()
 
-            if ann.type == AnnotationType.FORWARD_PRIMER:
-                draw_forward_primer(painter, vp.x(), vp.y(), vp.width(), vp.height(),
-                                    ann.resolved_color(), ann.label)
-            elif ann.type == AnnotationType.REVERSE_PRIMER:
-                draw_reverse_primer(painter, vp.x(), vp.y(), vp.width(), vp.height(),
-                                    ann.resolved_color(), ann.label)
+            ann_char_w = vp.width() / max(ann.length(), 1)
+            if ann.type == AnnotationType.PRIMER:
+                draw_primer(painter, vp.x(), vp.y(), vp.width(), vp.height(),
+                            ann.resolved_color(), ann.label,
+                            strand=ann.strand, char_width=ann_char_w)
             elif ann.type == AnnotationType.PROBE:
                 draw_probe(painter, vp.x(), vp.y(), vp.width(), vp.height(),
-                           ann.resolved_color(), ann.label, strand=ann.strand)
-            else:
-                draw_region(painter, vp.x(), vp.y(), vp.width(), vp.height(),
-                            ann.resolved_color(), ann.label)
+                           ann.resolved_color(), ann.label,
+                           strand=ann.strand, char_width=ann_char_w)
+            else:  # REPEATED_REGION
+                draw_repeated_region(painter, vp.x(), vp.y(), vp.width(), vp.height(),
+                                     ann.resolved_color(), ann.label)
 
             painter.restore()
             self._hit_rects.append((vp, ann))

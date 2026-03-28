@@ -2,15 +2,16 @@
 """
 Tek bir annotasyonun domain modeli.
 
-Adım 1 değişikliği
-------------------
-seq_indices alanı kaldırıldı.  Annotation artık hangi diziye ait olduğunu
-kendi içinde tutmaz; bu ilişki SequenceRecord.annotations listesinin
-sahipliği ile ifade edilir.  Bir annotation bir SequenceRecord'a
-aitse o record'un listesindedir — başka bir referansa gerek yoktur.
-
-global_annotations (AlignmentDataModel düzeyi) için de aynı prensip:
-o liste içindeyse globaldir, başka bir alan gerekmez.
+AnnotationType genişletme rehberi
+----------------------------------
+Yeni bir tip eklemek için:
+1. AnnotationType enum'una değer ekle.
+2. display_name() sözlüğüne ekle.
+3. default_color() sözlüğüne ekle.
+4. is_above_sequence() metodunu güncelle.
+5. annotation_painter.py içinde draw_* fonksiyonunu ekle/güncelle.
+6. annotation_graphics_item.py ve annotation_layer_widget.py
+   paint() metodlarını güncelle.
 """
 
 from __future__ import annotations
@@ -24,37 +25,40 @@ from PyQt5.QtGui import QColor
 
 
 class AnnotationType(Enum):
-    FORWARD_PRIMER = auto()
-    REVERSE_PRIMER = auto()
-    PROBE          = auto()
-    REGION         = auto()
+    PRIMER          = auto()   # Forward veya reverse primer; yön strand ile belirlenir
+    PROBE           = auto()   # Hibridizasyon probu; yön strand ile belirlenir
+    REPEATED_REGION = auto()   # Tekrarlayan bölge (alt şeritte gösterilir)
 
     def display_name(self) -> str:
         return {
-            AnnotationType.FORWARD_PRIMER: "Forward Primer",
-            AnnotationType.REVERSE_PRIMER: "Reverse Primer",
-            AnnotationType.PROBE:          "Probe",
-            AnnotationType.REGION:         "Region",
+            AnnotationType.PRIMER:          "Primer",
+            AnnotationType.PROBE:           "Probe",
+            AnnotationType.REPEATED_REGION: "Repeated Region",
         }[self]
 
     def default_color(self) -> QColor:
         return {
-            AnnotationType.FORWARD_PRIMER: QColor( 52, 152, 219),
-            AnnotationType.REVERSE_PRIMER: QColor(231,  76,  60),
-            AnnotationType.PROBE:          QColor( 39, 174,  96),
-            AnnotationType.REGION:         QColor(243, 156,  18),
+            AnnotationType.PRIMER:          QColor( 52, 152, 219),  # mavi
+            AnnotationType.PROBE:           QColor( 39, 174,  96),  # yeşil
+            AnnotationType.REPEATED_REGION: QColor(243, 156,  18),  # turuncu
         }[self]
 
     def is_above_sequence(self) -> bool:
         """
-        True  → annotation dizinin ÜSTÜNDE render edilir  (primer, probe).
-        False → annotation dizinin ALTINDA render edilir  (region, gelecek tipler).
+        True  → annotation dizinin ÜSTÜNDE render edilir (primer, probe).
+        False → annotation dizinin ALTINDA render edilir (repeated region, vb.).
 
-        Yeni bir AnnotationType eklendiğinde bu metoda da eklenmeli.
+        Yeni bir tip eklendiğinde bu metod güncellenmeli.
         """
         return self in (
-            AnnotationType.FORWARD_PRIMER,
-            AnnotationType.REVERSE_PRIMER,
+            AnnotationType.PRIMER,
+            AnnotationType.PROBE,
+        )
+
+    def uses_strand(self) -> bool:
+        """True ise annotation yön (strand) bilgisi taşır ve ok şekli kullanır."""
+        return self in (
+            AnnotationType.PRIMER,
             AnnotationType.PROBE,
         )
 
@@ -64,11 +68,8 @@ class Annotation:
     """
     Tek bir annotasyonun tam veri modeli.
 
-    Sahiplik ilişkisi
-    -----------------
-    Bu obje hangi diziye ait olduğunu bilmez.  İlişki şu şekilde ifade edilir:
-        - Per-sequence annotation → SequenceRecord.annotations listesinde
-        - Alignment-level (global) annotation → AlignmentDataModel.global_annotations listesinde
+    strand : "+" → forward (sağa ok), "-" → reverse (sola ok).
+             uses_strand() False ise strand yoksayılır.
     """
 
     type:        AnnotationType
@@ -101,8 +102,10 @@ class Annotation:
             f"<b>{self.label or '(isimsiz)'}</b>",
             f"Tip: {self.type.display_name()}",
             f"Pozisyon: {self.start + 1}–{self.end + 1} ({self.length()} bp)",
-            f"Strand: {self.strand}",
         ]
+        if self.type.uses_strand():
+            direction = "Forward (+)" if self.strand == "+" else "Reverse (−)"
+            lines.append(f"Yön: {direction}")
         if self.tm is not None:
             lines.append(f"Tm: {self.tm:.1f} °C")
         if self.gc_percent is not None:

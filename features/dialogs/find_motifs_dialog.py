@@ -23,10 +23,8 @@ from model.annotation import Annotation, AnnotationType
 from model.motif_finder import MotifFinder
 
 _TYPE_OPTIONS = [
-    ("Forward Primer", AnnotationType.FORWARD_PRIMER),
-    ("Reverse Primer", AnnotationType.REVERSE_PRIMER),
-    ("Probe",          AnnotationType.PROBE),
-    ("Region",         AnnotationType.REGION),
+    ("Primer", AnnotationType.PRIMER),
+    ("Probe",  AnnotationType.PROBE),
 ]
 
 
@@ -148,18 +146,12 @@ class FindMotifsDialog(QDialog):
 
         added = 0
         for hit in hits:
-            effective_type = ann_type
-            if hit.strand == "-" and ann_type == AnnotationType.FORWARD_PRIMER:
-                effective_type = AnnotationType.REVERSE_PRIMER
-            elif hit.strand == "+" and ann_type == AnnotationType.REVERSE_PRIMER:
-                effective_type = AnnotationType.FORWARD_PRIMER
-
             ann = Annotation(
-                type   = effective_type,
+                type   = ann_type,
                 start  = hit.start,
                 end    = hit.end,
                 label  = name,
-                strand = hit.strand,
+                strand = hit.strand,   # "+" veya "-" hit'ten gelir
                 notes  = f"Fuzzy search: max {max_mm} mismatch(es)",
             )
             try:
