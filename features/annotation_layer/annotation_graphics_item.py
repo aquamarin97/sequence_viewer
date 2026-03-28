@@ -58,8 +58,11 @@ class AnnotationGraphicsItem(QGraphicsItem):
         color = ann.resolved_color()
 
         if self._selected:
-            from PyQt5.QtGui import QPen, QColor
-            painter.setPen(QPen(QColor(255, 255, 255), 1.5))
+            from PyQt5.QtGui import QPen
+            from settings.theme import theme_manager as _tm
+            # Seçim kenarlığı: dark modda açık, light'ta koyu
+            border_color = _tm.current.text_selected
+            painter.setPen(QPen(border_color, 1.5))
         else:
             painter.setPen(Qt.NoPen)
 

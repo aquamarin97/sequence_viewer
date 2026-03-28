@@ -55,7 +55,7 @@ class HeaderViewerView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.setMinimumWidth(60)
-        self.setMaximumWidth(400)
+        # Maksimum genişlik dinamik olarak resizeEvent'te yönetilir.
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
 
@@ -70,6 +70,8 @@ class HeaderViewerView(QGraphicsView):
         self._dragging:        bool             = False
 
         theme_manager.themeChanged.connect(self._on_theme_changed)
+        # Sahne arka planını tema ile senkronize et
+        self._apply_scene_background()
 
     # ------------------------------------------------------------------
     # Layout API — yeni
@@ -235,10 +237,26 @@ class HeaderViewerView(QGraphicsView):
         for item in self.header_items:
             item.set_width(w)
         self._update_scene_rect()
-        required = self.compute_required_width() if self.header_items else 10
-        self.setMaximumWidth(required if w >= required else 16_777_215)
+        if self.header_items:
+            required = self.compute_required_width()
+            # İçerik tam sığıyorsa genişliği kilitle, değilse serbest bırak
+            self.setMaximumWidth(required if w >= required else 16_777_215)
+        else:
+            # Dizi yokken: sol panel serbest genişleyebilir
+            self.setMaximumWidth(16_777_215)
+
+    def _apply_scene_background(self) -> None:
+        from PyQt5.QtGui import QBrush as _B
+        t = theme_manager.current
+        self.scene.setBackgroundBrush(_B(t.row_bg_even))
+
+    def drawBackground(self, painter, rect) -> None:
+        t = theme_manager.current
+        painter.fillRect(rect, t.row_bg_even)
 
     def _on_theme_changed(self, _theme) -> None:
+        self._apply_scene_background()
+        self.scene.invalidate()
         self.viewport().update()
 
     # ------------------------------------------------------------------

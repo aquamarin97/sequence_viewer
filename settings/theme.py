@@ -2,73 +2,64 @@
 """
 Uygulama tema sistemi.
 
-Kullanım
---------
-    from settings.theme import theme_manager, AppTheme
-
-    # Mevcut temayı oku
-    t = theme_manager.current
-
-    # Tema değişikliğini dinle
-    theme_manager.themeChanged.connect(my_widget.on_theme_changed)
-
-    # Temayı değiştir
-    theme_manager.set_dark()
-    theme_manager.set_light()
+Token grupları
+--------------
+row_bg_*    → Header/sequence satır arkaplanları (zebra, seçim, hover)
+text_*      → Metin renkleri
+border_*    → Kenarlık ve çizgi renkleri
+ruler_*     → Navigation ruler + Position ruler arkaplan/metin
+seq_*       → Sequence görüntüleme (hücre arkaplanı, seçim, line modu)
+editor_*    → Inline edit alanı (CSS string)
+drop_*      → Drag & drop göstergeleri
 
 Yeni widget eklerken
 --------------------
-    1. paintEvent / paint içinde renkleri sabit yazmak yerine
-       theme_manager.current.<token> kullanın.
-    2. __init__ içinde theme_manager.themeChanged.connect(self.update) ekleyin.
-    Başka bir şey gerekmez.
+1. paintEvent / paint içinde renkleri sabit yazmak yerine
+   theme_manager.current.<token> kullanın.
+2. __init__ içinde theme_manager.themeChanged.connect(self.update) ekleyin.
 """
 
 from __future__ import annotations
-
 from dataclasses import dataclass
-
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QColor
 
 
-# ---------------------------------------------------------------------------
-# Renk token kataloğu
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class AppTheme:
-    """
-    Uygulamada kullanılan tüm renk token'ları.
-
-    frozen=True: tema nesneleri değiştirilemez;
-    tema değiştirmek için ThemeManager.set_light/dark() kullanılır.
-    """
-
-    name: str                   # "light" | "dark"
+    name: str
 
     # --- Satır arkaplanları (zebra) ---
-    row_bg_even:          QColor  # çift indeksli satırlar
-    row_bg_odd:           QColor  # tek indeksli satırlar
-
-    # --- Satır durumları ---
-    row_bg_hover:         QColor  # fare üzerindeyken (seçili değil)
-    row_bg_selected:      QColor  # seçili, fare dışında
-    row_bg_selected_hover:QColor  # seçili + fare üzerinde
-    row_bg_dragging:      QColor  # sürükleniyor
+    row_bg_even:          QColor
+    row_bg_odd:           QColor
+    row_bg_hover:         QColor
+    row_bg_selected:      QColor
+    row_bg_selected_hover:QColor
+    row_bg_dragging:      QColor
 
     # --- Metin ---
-    text_primary:         QColor  # normal satır metni
-    text_selected:        QColor  # seçili satır metni
+    text_primary:         QColor
+    text_selected:        QColor
 
     # --- Kenarlık / çizgi ---
-    border_normal:        QColor  # satır alt çizgisi
-    border_drag:          QColor  # drag modunda item kenarlığı
-    drop_indicator:       QColor  # drop indicator çizgisi ve daire
+    border_normal:        QColor
+    border_drag:          QColor
+    drop_indicator:       QColor
+
+    # --- Ruler (navigation minimap + position cetvel) ---
+    ruler_bg:             QColor   # cetvel arkaplanı
+    ruler_fg:             QColor   # cetvel metin ve tick rengi
+    ruler_border:         QColor   # cetvel çerçeve rengi
+    ruler_selection_fg:   QColor   # seçili pozisyon label rengi (bold)
+
+    # --- Sequence hücresi ---
+    seq_bg:               QColor   # dizi hücresi arkaplanı
+    seq_selection_bg:     QColor   # seçim highlight arkaplanı
+    seq_line_fg:          QColor   # LINE modu çizgi rengi
 
     # --- Inline editor (CSS string) ---
-    editor_bg:            str     # örn. "#EEF4FF"
-    editor_border:        str     # örn. "#5B8DEF"
+    editor_bg:            str
+    editor_border:        str
 
 
 # ---------------------------------------------------------------------------
@@ -76,64 +67,72 @@ class AppTheme:
 # ---------------------------------------------------------------------------
 
 LIGHT_THEME = AppTheme(
-    name                 = "light",
+    name                  = "light",
 
-    row_bg_even          = QColor(255, 255, 255),   # saf beyaz
-    row_bg_odd           = QColor(244, 246, 250),   # çok hafif gri-mavi
+    row_bg_even           = QColor(255, 255, 255),
+    row_bg_odd            = QColor(244, 246, 250),
+    row_bg_hover          = QColor(224, 235, 255),
+    row_bg_selected       = QColor(193, 214, 255),
+    row_bg_selected_hover = QColor(170, 200, 255),
+    row_bg_dragging       = QColor(200, 215, 245),
 
-    row_bg_hover         = QColor(224, 235, 255),   # soluk mavi
-    row_bg_selected      = QColor(193, 214, 255),   # orta mavi
-    row_bg_selected_hover= QColor(170, 200, 255),   # biraz daha koyu mavi
-    row_bg_dragging      = QColor(200, 215, 245),   # drag mavi
+    text_primary          = QColor( 30,  30,  30),
+    text_selected         = QColor(  0,  30,  90),
 
-    text_primary         = QColor( 30,  30,  30),   # neredeyse siyah
-    text_selected        = QColor(  0,  30,  90),   # koyu lacivert
+    border_normal         = QColor(210, 215, 225),
+    border_drag           = QColor(100, 140, 220),
+    drop_indicator        = QColor( 60, 120, 240),
 
-    border_normal        = QColor(210, 215, 225),   # açık gri çizgi
-    border_drag          = QColor(100, 140, 220),   # mavi dashed kenarlık
-    drop_indicator       = QColor( 60, 120, 240),   # drop çizgisi
+    # Ruler — light: beyaz zemin, siyah metin
+    ruler_bg              = QColor(255, 255, 255),
+    ruler_fg              = QColor( 30,  30,  30),
+    ruler_border          = QColor(180, 185, 195),
+    ruler_selection_fg    = QColor(  0,   0, 200),
 
-    editor_bg            = "#EEF4FF",
-    editor_border        = "#5B8DEF",
+    # Sequence hücresi — light: beyaz zemin
+    seq_bg                = QColor(255, 255, 255),
+    seq_selection_bg      = QColor(173, 216, 230),
+    seq_line_fg           = QColor(160, 160, 160),
+
+    editor_bg             = "#EEF4FF",
+    editor_border         = "#5B8DEF",
 )
 
 DARK_THEME = AppTheme(
-    name                 = "dark",
+    name                  = "dark",
 
-    row_bg_even          = QColor( 30,  32,  38),
-    row_bg_odd           = QColor( 36,  38,  46),
+    row_bg_even           = QColor( 30,  32,  38),
+    row_bg_odd            = QColor( 36,  38,  46),
+    row_bg_hover          = QColor( 50,  60,  90),
+    row_bg_selected       = QColor( 40,  80, 160),
+    row_bg_selected_hover = QColor( 50,  95, 180),
+    row_bg_dragging       = QColor( 45,  70, 140),
 
-    row_bg_hover         = QColor( 50,  60,  90),
-    row_bg_selected      = QColor( 40,  80, 160),
-    row_bg_selected_hover= QColor( 50,  95, 180),
-    row_bg_dragging      = QColor( 45,  70, 140),
+    text_primary          = QColor(210, 215, 225),
+    text_selected         = QColor(220, 235, 255),
 
-    text_primary         = QColor(210, 215, 225),
-    text_selected        = QColor(220, 235, 255),
+    border_normal         = QColor( 55,  60,  72),
+    border_drag           = QColor( 90, 140, 230),
+    drop_indicator        = QColor( 80, 150, 255),
 
-    border_normal        = QColor( 55,  60,  72),
-    border_drag          = QColor( 90, 140, 230),
-    drop_indicator       = QColor( 80, 150, 255),
+    # Ruler — dark: koyu zemin, açık metin
+    ruler_bg              = QColor( 22,  24,  30),
+    ruler_fg              = QColor(190, 195, 210),
+    ruler_border          = QColor( 55,  60,  72),
+    ruler_selection_fg    = QColor(100, 160, 255),
 
-    editor_bg            = "#1E2A4A",
-    editor_border        = "#4A80E0",
+    # Sequence hücresi — dark: koyu zemin
+    seq_bg                = QColor( 28,  30,  36),
+    seq_selection_bg      = QColor( 40,  80, 140),
+    seq_line_fg           = QColor(100, 105, 120),
+
+    editor_bg             = "#1E2A4A",
+    editor_border         = "#4A80E0",
 )
 
 
-# ---------------------------------------------------------------------------
-# ThemeManager — singleton
-# ---------------------------------------------------------------------------
-
 class _ThemeManager(QObject):
-    """
-    Aktif temayı tutar ve değişiklikte sinyal yayınlar.
-
-    Widget'lar __init__ içinde:
-        theme_manager.themeChanged.connect(self.update)
-    bağlantısını kurar; başka bir şey gerekmez.
-    """
-
-    themeChanged = pyqtSignal(object)   # AppTheme nesnesi iletilir
+    themeChanged = pyqtSignal(object)
 
     def __init__(self) -> None:
         super().__init__()
@@ -160,5 +159,4 @@ class _ThemeManager(QObject):
             self.set_light()
 
 
-# Modül düzeyinde tek örnek — her yerden import edilebilir
 theme_manager = _ThemeManager()

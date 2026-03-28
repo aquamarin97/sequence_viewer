@@ -73,6 +73,61 @@ class SequenceViewerView(QGraphicsView):
 
         self._controller: Optional[Any] = None
 
+        # Tema değişince sahne arka planını ve viewport'u güncelle
+        theme_manager.themeChanged.connect(self._on_theme_changed)
+        self._apply_scene_background()
+
+    # ------------------------------------------------------------------
+    # Tema yönetimi
+    # ------------------------------------------------------------------
+
+    def _apply_scene_background(self) -> None:
+        """Sahne arka planını mevcut temaya göre ayarla."""
+        from PyQt5.QtGui import QBrush as _QBrush
+        t = theme_manager.current
+        self.scene.setBackgroundBrush(_QBrush(t.seq_bg))
+
+    def _on_theme_changed(self, _theme) -> None:
+        self._apply_scene_background()
+        self.scene.invalidate()
+        self.viewport().update()
+
+    def drawBackground(self, painter, rect) -> None:
+        """
+        Sahne arka planı — zebra şeritleri.
+        SequenceGraphicsItem'lar kendi seq alanını çizer;
+        bu metod annotation şeritleri ve satırlar arası boşlukları kapsar.
+        """
+        t      = theme_manager.current
+        layout = self._row_layout
+
+        # Layout yoksa (dizi yok / henüz hesaplanmadı) düz arka plan
+        if layout is None or layout.row_count == 0:
+            painter.fillRect(rect, t.seq_bg)
+            return
+
+        # Görünür rect ile kesişen satırları bul
+        vis_top    = rect.top()
+        vis_bottom = rect.bottom()
+
+        # Önce tüm alanı temel renkle doldur (boşluklar için)
+        painter.fillRect(rect, t.seq_bg)
+
+        # Her satır bloğunu (above_ann + seq + below_ann) zebra renkle boyat
+        for i in range(layout.row_count):
+            y_top    = float(layout.y_offsets[i])
+            y_bottom = y_top + float(layout.row_strides[i])
+
+            if y_bottom < vis_top or y_top > vis_bottom:
+                continue   # görünür alanda değil
+
+            row_bg = t.row_bg_even if i % 2 == 0 else t.row_bg_odd
+            from PyQt5.QtCore import QRectF as _R
+            painter.fillRect(
+                _R(rect.left(), y_top, rect.width(), y_bottom - y_top),
+                row_bg,
+            )
+
     # ------------------------------------------------------------------
     # Per-row layout — yeni API
     # ------------------------------------------------------------------
@@ -215,6 +270,7 @@ class SequenceViewerView(QGraphicsView):
             sequence=sequence_string,
             char_width=self.char_width,
             char_height=self.char_height,
+            row_index=row_index,
         )
         layout = self._row_layout
         if layout is not None and row_index < layout.row_count:

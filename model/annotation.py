@@ -37,11 +37,12 @@ class AnnotationType(Enum):
         }[self]
 
     def default_color(self) -> QColor:
-        return {
-            AnnotationType.PRIMER:          QColor( 52, 152, 219),  # mavi
-            AnnotationType.PROBE:           QColor( 39, 174,  96),  # yeşil
-            AnnotationType.REPEATED_REGION: QColor(243, 156,  18),  # turuncu
-        }[self]
+        """
+        Varsayılan rengi color_style_manager'dan alır.
+        Bu sayede kullanıcı Settings üzerinden rengi değiştirebilir.
+        """
+        from settings.color_styles import color_style_manager
+        return color_style_manager.annotation_color(self)
 
     def is_above_sequence(self) -> bool:
         """

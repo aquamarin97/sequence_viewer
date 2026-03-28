@@ -18,6 +18,7 @@ from features.navigation_ruler.navigation_ruler_widget import RulerWidget
 from features.position_ruler.position_ruler_widget import SequencePositionRulerWidget
 from features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 from model.alignment_data_model import AlignmentDataModel
+from settings.scrollbar_style import apply_scrollbar_style
 from model.annotation import Annotation
 from widgets.row_layout import RowLayout
 
@@ -80,7 +81,8 @@ class SequenceWorkspaceWidget(QWidget):
         self.splitter = QSplitter(Qt.Horizontal, self)
         self.splitter.addWidget(self.left_panel)
         self.splitter.addWidget(right_panel)
-        self.splitter.setSizes([200, 800])
+        # Başlangıçta dizi yok — eşit bölüm (resize sonrası güncellenir)
+        self.splitter.setSizes([130, 500])
         self.splitter.splitterMoved.connect(self._on_splitter_moved)
 
         ml = QHBoxLayout(self)
@@ -124,6 +126,10 @@ class SequenceWorkspaceWidget(QWidget):
         if anim is not None:
             anim.valueChanged.connect(self._on_zoom_changed)
         self.sequence_viewer.horizontalScrollBar().rangeChanged.connect(self._on_zoom_changed)
+
+        from settings.theme import theme_manager
+        theme_manager.themeChanged.connect(self._on_theme_changed)
+        self._on_theme_changed(theme_manager.current)
 
     # ------------------------------------------------------------------
     # RowLayout
@@ -228,6 +234,22 @@ class SequenceWorkspaceWidget(QWidget):
                 if item.row_index == row_index:
                     item.setPos(scene_x, scene_y)
                     item.update_size(ann.length() * cw, ann_h)
+
+    # ------------------------------------------------------------------
+    # Tema & arka plan
+    # ------------------------------------------------------------------
+    def _on_theme_changed(self, theme) -> None:
+        """Tema değişince tüm widget arka planlarını ve scrollbar stilini güncelle."""
+        from PyQt5.QtGui import QPalette, QBrush as _B
+        t_bg = theme.seq_bg
+        for widget in (self, self.left_panel, self.splitter):
+            p = widget.palette()
+            p.setBrush(QPalette.Window, _B(t_bg))
+            widget.setAutoFillBackground(True)
+            widget.setPalette(p)
+        # Sequence viewer scrollbar'larına tema uyumlu stil uygula
+        apply_scrollbar_style(self.sequence_viewer)
+        self.update()
 
     # ------------------------------------------------------------------
     # Callbacks
@@ -441,11 +463,20 @@ class SequenceWorkspaceWidget(QWidget):
             self.splitter.blockSignals(False)
 
     def _update_header_max_width(self):
+        big = 16_777_215
         if self.header_viewer.header_items:
             req = self.header_viewer.compute_required_width()
             self.header_viewer.setMaximumWidth(req)
             self.left_panel.setMaximumWidth(req)
         else:
-            big = 16_777_215
+            # Dizi yokken: sol ve sağ panel eşit genişliği paylaşır.
+            # Header viewer ve sol panel kısıtlamaları kaldır.
             self.header_viewer.setMaximumWidth(big)
             self.left_panel.setMaximumWidth(big)
+            # Splitter'ı ortala (bir sonraki show/resize'da geçerli olur)
+            total = sum(self.splitter.sizes())
+            if total > 0:
+                half = total // 2
+                self.splitter.blockSignals(True)
+                self.splitter.setSizes([half, total - half])
+                self.splitter.blockSignals(False)

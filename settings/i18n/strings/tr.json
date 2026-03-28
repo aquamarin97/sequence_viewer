@@ -1,0 +1,99 @@
+{
+  "_meta": {
+    "language": "Türkçe",
+    "code": "tr",
+    "version": "1.0"
+  },
+
+  "app": {
+    "title": "MSA Viewer"
+  },
+
+  "menu": {
+    "file":             "Dosya",
+    "file.open_fasta":  "FASTA Aç...",
+    "file.exit":        "Çıkış",
+    "annotate":                     "Annotasyon",
+    "annotate.find_motifs":         "Motif Bul…",
+    "annotate.clear_all":           "Tüm Annotasyonları Sil",
+    "view":                         "Görünüm",
+    "view.toggle_dark":             "Karanlık Mod"
+  },
+
+  "header": {
+    "label":      "Başlık",
+    "consensus":  "Konsensüs",
+    "annotations":"Annotasyonlar"
+  },
+
+  "annotation_type": {
+    "primer":          "Primer",
+    "probe":           "Prob",
+    "repeated_region": "Tekrarlayan Bölge"
+  },
+
+  "strand": {
+    "forward": "Forward (+)",
+    "reverse": "Reverse (−)"
+  },
+
+  "find_motifs": {
+    "title":            "Motif Bul",
+    "sequence_group":   "Dizi",
+    "sequence_hint":    "Motif / primer / prob dizisini girin…\nBoşluk ve tire (-) karakterleri yoksayılır.",
+    "nt_count":         "{n} nt",
+    "params_group":     "Parametreler",
+    "max_mismatches":   "Maks. Uyumsuzluk:",
+    "mismatch_suffix":  " uyumsuzluk",
+    "ann_name":         "Annotasyon Adı:",
+    "ann_name_hint":    "örn. FP-1, Prob-TaqMan…",
+    "ann_type":         "Annotasyon Tipi:",
+    "search_in_group":  "Arama Yönü",
+    "forward_strand":   "Forward strand  (+)",
+    "reverse_strand":   "Reverse strand  (−)",
+    "search_btn":       "Ara",
+    "close_btn":        "Kapat",
+    "err_no_query":     "Lütfen bir dizi girin.",
+    "err_no_strand":    "En az bir arama yönü seçin.",
+    "result_not_found": "Eşleşme bulunamadı.",
+    "result_found":     "{hits} eşleşme bulundu, {added} annotasyon eklendi."
+  },
+
+  "edit_annotation": {
+    "title":          "Annotasyonu Düzenle",
+    "general_group":  "Genel",
+    "name":           "Ad:",
+    "type":           "Tip:",
+    "direction":      "Yön:",
+    "binding_site":   "Bağlanma Bölgesi:",
+    "to":             " ile ",
+    "props_group":    "Özellikler",
+    "color":          "Renk:",
+    "choose_color":   "Seç…",
+    "identity":       "% Kimlik:",
+    "score":          "Skor:",
+    "notes":          "Notlar:",
+    "ok":             "Tamam",
+    "cancel":         "İptal"
+  },
+
+  "tooltip": {
+    "unnamed":      "(isimsiz)",
+    "type":         "Tip",
+    "position":     "Pozisyon",
+    "strand":       "Yön",
+    "tm":           "Tm",
+    "gc":           "GC",
+    "score":        "Skor",
+    "notes":        "Notlar"
+  },
+
+  "fasta": {
+    "loading":      "FASTA okunuyor: {name}",
+    "loaded":       "→ {count} sekans yüklendi",
+    "error":        "Hata ({name}): {error}",
+    "no_biopython": "BioPython kurulu değil! 'pip install biopython' ile kurun.",
+    "dialog_title": "FASTA Dosyası Seç",
+    "dialog_filter":"FASTA Dosyaları (*.fasta *.fa *.fna *.faa *.ffn *.frn);;Tüm Dosyalar (*)"
+  }
+}

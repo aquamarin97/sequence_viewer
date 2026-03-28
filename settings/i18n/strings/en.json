@@ -1,0 +1,99 @@
+{
+  "_meta": {
+    "language": "English",
+    "code": "en",
+    "version": "1.0"
+  },
+
+  "app": {
+    "title": "MSA Viewer"
+  },
+
+  "menu": {
+    "file":             "File",
+    "file.open_fasta":  "Open FASTA...",
+    "file.exit":        "Exit",
+    "annotate":                     "Annotate",
+    "annotate.find_motifs":         "Find Motifs…",
+    "annotate.clear_all":           "Clear All Annotations",
+    "view":                         "View",
+    "view.toggle_dark":             "Toggle Dark Mode"
+  },
+
+  "header": {
+    "label":      "Header",
+    "consensus":  "Consensus",
+    "annotations":"Annotations"
+  },
+
+  "annotation_type": {
+    "primer":          "Primer",
+    "probe":           "Probe",
+    "repeated_region": "Repeated Region"
+  },
+
+  "strand": {
+    "forward": "Forward (+)",
+    "reverse": "Reverse (−)"
+  },
+
+  "find_motifs": {
+    "title":            "Find Motifs",
+    "sequence_group":   "Sequence",
+    "sequence_hint":    "Enter motif / primer / probe sequence…\nSpaces and dashes (-) are ignored.",
+    "nt_count":         "{n} nt",
+    "params_group":     "Parameters",
+    "max_mismatches":   "Max. Mismatches:",
+    "mismatch_suffix":  " mismatch(es)",
+    "ann_name":         "Annotation Name:",
+    "ann_name_hint":    "e.g. FP-1, TaqMan-Probe…",
+    "ann_type":         "Annotation Type:",
+    "search_in_group":  "Search In",
+    "forward_strand":   "Forward strand  (+)",
+    "reverse_strand":   "Reverse strand  (−)",
+    "search_btn":       "Search",
+    "close_btn":        "Close",
+    "err_no_query":     "Please enter a sequence.",
+    "err_no_strand":    "Select at least one search direction.",
+    "result_not_found": "No matches found.",
+    "result_found":     "{hits} match(es) found, {added} annotation(s) added."
+  },
+
+  "edit_annotation": {
+    "title":          "Edit Annotation",
+    "general_group":  "General",
+    "name":           "Name:",
+    "type":           "Type:",
+    "direction":      "Direction:",
+    "binding_site":   "Binding Site:",
+    "to":             " to ",
+    "props_group":    "Properties",
+    "color":          "Color:",
+    "choose_color":   "Choose…",
+    "identity":       "% Identity:",
+    "score":          "Score:",
+    "notes":          "Notes:",
+    "ok":             "OK",
+    "cancel":         "Cancel"
+  },
+
+  "tooltip": {
+    "unnamed":      "(unnamed)",
+    "type":         "Type",
+    "position":     "Position",
+    "strand":       "Direction",
+    "tm":           "Tm",
+    "gc":           "GC",
+    "score":        "Score",
+    "notes":        "Notes"
+  },
+
+  "fasta": {
+    "loading":      "Reading FASTA: {name}",
+    "loaded":       "→ {count} sequence(s) loaded",
+    "error":        "Error ({name}): {error}",
+    "no_biopython": "BioPython not installed! Run 'pip install biopython'.",
+    "dialog_title": "Select FASTA File",
+    "dialog_filter":"FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn);;All Files (*)"
+  }
+}
