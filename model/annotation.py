@@ -1,11 +1,24 @@
 # model/annotation.py
+"""
+Tek bir annotasyonun domain modeli.
+
+Adım 1 değişikliği
+------------------
+seq_indices alanı kaldırıldı.  Annotation artık hangi diziye ait olduğunu
+kendi içinde tutmaz; bu ilişki SequenceRecord.annotations listesinin
+sahipliği ile ifade edilir.  Bir annotation bir SequenceRecord'a
+aitse o record'un listesindedir — başka bir referansa gerek yoktur.
+
+global_annotations (AlignmentDataModel düzeyi) için de aynı prensip:
+o liste içindeyse globaldir, başka bir alan gerekmez.
+"""
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import List, Optional
+from typing import Optional
 
 from PyQt5.QtGui import QColor
 
@@ -38,11 +51,11 @@ class Annotation:
     """
     Tek bir annotasyonun tam veri modeli.
 
-    seq_indices
-    -----------
-    None      → annotasyon tüm satırlara uygulanır (alignment annotasyonu).
-    [0, 2, 5] → sadece belirtilen satır indekslerinde görünür.
-                 Find Motifs gibi per-sequence eşleşmelerde kullanılır.
+    Sahiplik ilişkisi
+    -----------------
+    Bu obje hangi diziye ait olduğunu bilmez.  İlişki şu şekilde ifade edilir:
+        - Per-sequence annotation → SequenceRecord.annotations listesinde
+        - Alignment-level (global) annotation → AlignmentDataModel.global_annotations listesinde
     """
 
     type:        AnnotationType
@@ -57,10 +70,6 @@ class Annotation:
     notes:       str              = ""
     id:          str              = field(default_factory=lambda: str(uuid.uuid4()))
 
-    # Hangi satır indekslerinde görüneceğini belirler.
-    # None → tüm satırlar (global alignment annotation)
-    seq_indices: Optional[List[int]] = None
-
     def __post_init__(self) -> None:
         if self.start > self.end:
             self.start, self.end = self.end, self.start
@@ -70,12 +79,6 @@ class Annotation:
 
     def length(self) -> int:
         return self.end - self.start + 1
-
-    def applies_to_row(self, row_index: int) -> bool:
-        """Bu annotasyon verilen satırda gösterilmeli mi?"""
-        if self.seq_indices is None:
-            return True
-        return row_index in self.seq_indices
 
     def overlaps(self, other: "Annotation") -> bool:
         return self.start <= other.end and self.end >= other.start

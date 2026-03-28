@@ -1,7 +1,12 @@
 # features/annotation_layer/annotation_layer_widget.py
 """
 Sabit annotasyon şeridi — position ruler altında, consensus üstünde.
-Probe için strand bilgisi draw_probe'a iletiliyor.
+
+Adım 2 değişikliği
+------------------
+Artık AnnotationStore yerine AlignmentDataModel'den besleniyor.
+- model.is_aligned = True  → model.global_annotations gösterilir
+- model.is_aligned = False → widget gizlenir (yükseklik 0)
 """
 
 from __future__ import annotations
@@ -18,8 +23,8 @@ from features.annotation_layer.annotation_layout_engine import (
 from features.annotation_layer.annotation_painter import (
     draw_forward_primer, draw_reverse_primer, draw_probe, draw_region,
 )
+from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation, AnnotationType
-from model.annotation_store import AnnotationStore
 from settings.theme import theme_manager
 
 _LANE_HEIGHT  = 20
@@ -34,26 +39,30 @@ class AnnotationLayerWidget(QWidget):
 
     def __init__(
         self,
-        store: AnnotationStore,
+        model: AlignmentDataModel,
         sequence_viewer,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
 
-        self._store           = store
+        self._model           = model
         self._sequence_viewer = sequence_viewer
 
-        self._lane_assignment: Dict[str, int]           = {}
-        self._annotations:     List[Annotation]         = []
+        self._lane_assignment: Dict[str, int]               = {}
+        self._annotations:     List[Annotation]             = []
         self._hit_rects:       List[Tuple[QRectF, Annotation]] = []
 
         self.setMouseTracking(True)
-        self._update_height()
+        self._sync_from_model()
 
-        self._store.annotationAdded.connect(self._on_store_changed)
-        self._store.annotationRemoved.connect(self._on_store_changed)
-        self._store.annotationUpdated.connect(self._on_store_changed)
-        self._store.storeReset.connect(self._on_store_changed)
+        # Global annotation sinyalleri
+        self._model.globalAnnotationAdded.connect(self._on_global_changed)
+        self._model.globalAnnotationRemoved.connect(self._on_global_changed)
+        self._model.globalAnnotationUpdated.connect(self._on_global_changed)
+        # Hizalama durumu değişince göster/gizle
+        self._model.alignmentStateChanged.connect(self._on_alignment_changed)
+        # Model reset
+        self._model.modelReset.connect(self._on_global_changed)
 
         hbar: QScrollBar = self._sequence_viewer.horizontalScrollBar()
         hbar.valueChanged.connect(self.update)
@@ -66,22 +75,39 @@ class AnnotationLayerWidget(QWidget):
         theme_manager.themeChanged.connect(self.update)
 
     # ------------------------------------------------------------------
-    # Layout
+    # Model senkronizasyonu
     # ------------------------------------------------------------------
 
-    def _update_height(self) -> None:
+    def _sync_from_model(self) -> None:
+        """Model'den global annotation'ları oku ve layout'u güncelle."""
+        if self._model.is_aligned:
+            self._annotations    = list(self._model.global_annotations)
+        else:
+            self._annotations    = []
+        self._lane_assignment = assign_lanes(self._annotations)
+        self._update_visibility()
+        self.update()
+
+    def _update_visibility(self) -> None:
+        """is_aligned ve annotation sayısına göre yüksekliği ayarla."""
+        if not self._model.is_aligned or not self._annotations:
+            self.setFixedHeight(0)
+            self.setVisible(False)
+            return
         n = lane_count(self._lane_assignment)
         h = max(_MIN_HEIGHT, n * (_LANE_HEIGHT + _LANE_PADDING) + _LANE_PADDING)
         self.setFixedHeight(h)
+        self.setVisible(True)
 
-    def _recompute_layout(self) -> None:
-        self._annotations    = self._store.all()
-        self._lane_assignment = assign_lanes(self._annotations)
-        self._update_height()
-        self.update()
+    # ------------------------------------------------------------------
+    # Slot'lar
+    # ------------------------------------------------------------------
 
-    def _on_store_changed(self, *_args) -> None:
-        self._recompute_layout()
+    def _on_global_changed(self, *_args) -> None:
+        self._sync_from_model()
+
+    def _on_alignment_changed(self, is_aligned: bool) -> None:
+        self._sync_from_model()
 
     # ------------------------------------------------------------------
     # Geometri
@@ -118,12 +144,15 @@ class AnnotationLayerWidget(QWidget):
     # ------------------------------------------------------------------
 
     def paintEvent(self, event) -> None:
+        if not self.isVisible() or self.height() == 0:
+            return
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
         painter.setRenderHint(QPainter.TextAntialiasing, True)
 
-        t      = theme_manager.current
-        rect   = self.rect()
+        t    = theme_manager.current
+        rect = self.rect()
 
         painter.fillRect(rect, QBrush(t.row_bg_even))
         painter.setPen(QPen(t.border_normal))
@@ -132,7 +161,7 @@ class AnnotationLayerWidget(QWidget):
         if not self._annotations:
             painter.setPen(QPen(QColor(t.text_primary).lighter(150)))
             painter.drawText(rect.adjusted(6, 0, 0, 0),
-                             Qt.AlignVCenter | Qt.AlignLeft, "Annotations")
+                             Qt.AlignVCenter | Qt.AlignLeft, "Global Annotations")
             painter.end()
             return
 

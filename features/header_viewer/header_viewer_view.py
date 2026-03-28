@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import FrozenSet, List, Optional
+from typing import TYPE_CHECKING, FrozenSet, List, Optional
 
 from PyQt5.QtCore import Qt, QRectF, QPoint
 from PyQt5.QtGui import QPainter, QFontMetrics, QPen, QBrush, QColor
@@ -13,21 +13,21 @@ from graphics.header_item.header_item import HeaderRowItem
 from model.row_selection_model import RowSelectionModel
 from settings.theme import theme_manager
 
+if TYPE_CHECKING:
+    from widgets.row_layout import RowLayout
+
 _DRAG_THRESHOLD_PX = 6
 _DROP_LINE_WIDTH   = 2
 
 
 class HeaderViewerView(QGraphicsView):
     """
-    Header satırlarını çizen view — v3.
+    Header satırlarını çizen view — Adım 2.
 
-    Hizalama düzeltmesi
-    -------------------
-    set_annot_height(h) çağrıldığında:
-    - Her item'ın annot_height'ı güncellenir (üst boşluk)
-    - Item'ların Y pozisyonu row_index * (annot_height + char_height) olur
-    - Item yüksekliği = annot_height + char_height (total_height)
-    - Font boyutu DEĞİŞMEZ → profesyonel görünüm korunur
+    Değişiklik
+    ----------
+    apply_row_layout(layout)  — per-row değişken yükseklik.
+    set_annot_height(h)       — geriye dönük shim (uniform yükseklik).
     """
 
     def __init__(
@@ -42,13 +42,12 @@ class HeaderViewerView(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
-        # char_height — asla değişmez
-        self._char_height:   int   = int(round(row_height))
-        # annotation strip yüksekliği — dışarıdan güncellenir
-        self._annot_height:  int   = 0
+        self._char_height:  int   = int(round(row_height))
+        self._annot_height: int   = 0       # uniform shim
+        self._row_layout: Optional["RowLayout"] = None
 
-        self.row_height:     int   = self._char_height   # eski API uyumluluğu
-        self.header_width:   float = float(initial_width)
+        self.row_height:   int   = self._char_height
+        self.header_width: float = float(initial_width)
 
         self.header_items: List[HeaderRowItem] = []
 
@@ -73,56 +72,83 @@ class HeaderViewerView(QGraphicsView):
         theme_manager.themeChanged.connect(self._on_theme_changed)
 
     # ------------------------------------------------------------------
-    # Annotation yüksekliği senkronizasyonu (FIX 1)
+    # Layout API — yeni
+    # ------------------------------------------------------------------
+
+    def apply_row_layout(self, layout: "RowLayout") -> None:
+        """
+        Per-row değişken yükseklik uygular.
+        Workspace her annotation değişiminde çağırır.
+        """
+        self._row_layout   = layout
+        self._annot_height = 0
+
+        for i, item in enumerate(self.header_items):
+            if i < layout.row_count:
+                item.set_annot_height(layout.per_row_annot_heights[i])
+                item.setPos(0, float(layout.y_offsets[i]))
+
+        self._update_scene_rect()
+
+    # ------------------------------------------------------------------
+    # Layout API — geriye dönük shim
     # ------------------------------------------------------------------
 
     def set_annot_height(self, h: int) -> None:
-        """
-        Workspace per_row_annot_height değişince çağrılır.
-        Her item'ın üst boşluğunu ve Y pozisyonunu günceller.
-        Font boyutuna DOKUNMAZ.
-        """
+        """Uniform annotation yüksekliği (shim). Layout varken yoksayılır."""
+        if self._row_layout is not None:
+            return
         if self._annot_height == h:
             return
         self._annot_height = h
-        self.row_height    = h + self._char_height  # eski API uyumluluğu
+        self.row_height    = h + self._char_height
 
         stride = h + self._char_height
         for i, item in enumerate(self.header_items):
             item.set_annot_height(h)
-            item.setPos(0, i * stride)
+            item.setPos(0, float(i * stride))
 
         self._update_scene_rect()
 
     @property
-    def _row_stride(self) -> int:
+    def _row_stride_uniform(self) -> int:
         return self._annot_height + self._char_height
 
     # ------------------------------------------------------------------
-    # Row index → Y
+    # Row index ↔ Y  (variable stride destekli)
     # ------------------------------------------------------------------
 
     def _row_at_viewport_y(self, y: int) -> int:
         scene_y = self.mapToScene(0, y).y()
-        stride  = self._row_stride
+        layout  = self._row_layout
+        if layout is not None and layout.row_count > 0:
+            return layout.row_at_y(scene_y)
+        stride = self._row_stride_uniform
         if stride <= 0:
             return 0
         return int(math.floor(scene_y / stride))
 
     def _insert_pos_at_viewport_y(self, y: int) -> int:
         scene_y = self.mapToScene(0, y).y()
-        stride  = self._row_stride
+        layout  = self._row_layout
+        if layout is not None and layout.row_count > 0:
+            return layout.insert_pos_at_y(scene_y)
+        stride = self._row_stride_uniform
         if stride <= 0:
             return 0
-        insert  = int(round(scene_y / stride))
+        insert = int(round(scene_y / stride))
         return max(0, min(insert, len(self.header_items)))
 
     def _item_viewport_rect(self, row_index: int) -> QRectF:
-        stride = self._row_stride
-        scene_rect = QRectF(
-            0, row_index * stride,
-            self.viewport().width(), stride,
-        )
+        layout = self._row_layout
+        if layout is not None and row_index < layout.row_count:
+            y_start = float(layout.y_offsets[row_index])
+            height  = float(layout.row_strides[row_index])
+        else:
+            stride  = self._row_stride_uniform
+            y_start = float(row_index * stride)
+            height  = float(stride)
+        scene_rect = QRectF(0, y_start, self.viewport().width(), height)
         tl = self.mapFromScene(scene_rect.topLeft())
         br = self.mapFromScene(scene_rect.bottomRight())
         return QRectF(tl, br)
@@ -135,14 +161,23 @@ class HeaderViewerView(QGraphicsView):
         row_index  = len(self.header_items)
         item_width = self.viewport().width() or self.header_width
 
+        layout = self._row_layout
+        if layout is not None and row_index < layout.row_count:
+            ann_h   = layout.per_row_annot_heights[row_index]
+            y_start = float(layout.y_offsets[row_index])
+        else:
+            ann_h   = self._annot_height
+            stride  = self._row_stride_uniform
+            y_start = float(row_index * stride)
+
         item = HeaderRowItem(
             text=display_text,
             width=item_width,
             row_height=self._char_height,
-            annot_height=self._annot_height,
+            annot_height=ann_h,
             row_index=row_index,
         )
-        item.setPos(0, row_index * self._row_stride)
+        item.setPos(0, y_start)
         self.scene.addItem(item)
         self.header_items.append(item)
         self._update_scene_rect()
@@ -153,6 +188,7 @@ class HeaderViewerView(QGraphicsView):
         self._reset_drag_state()
         self.header_items.clear()
         self.scene.clear()
+        self._row_layout = None
         self._update_scene_rect()
 
     def apply_selection_to_items(self, changed_rows: FrozenSet[int]) -> None:
@@ -167,15 +203,19 @@ class HeaderViewerView(QGraphicsView):
     # ------------------------------------------------------------------
 
     def _update_scene_rect(self) -> None:
-        height = len(self.header_items) * self._row_stride
-        width  = self.viewport().width() or self.header_width
-        self.scene.setSceneRect(0, 0, width, height)
+        layout = self._row_layout
+        if layout is not None and layout.row_count > 0:
+            height = float(layout.total_height)
+        else:
+            height = float(len(self.header_items) * self._row_stride_uniform)
+        width = self.viewport().width() or self.header_width
+        self.scene.setSceneRect(0, 0, float(width), height)
 
     def compute_required_width(self) -> int:
         if not self.header_items:
             return 100
-        metrics   = QFontMetrics(self.header_items[0].font)
-        max_px    = max(
+        metrics = QFontMetrics(self.header_items[0].font)
+        max_px  = max(
             metrics.horizontalAdvance(item.full_text)
             for item in self.header_items
         )
@@ -202,11 +242,15 @@ class HeaderViewerView(QGraphicsView):
             return
         self._cancel_edit()
 
-        item     = self.header_items[row_index]
-        stride   = self._row_stride
-        # Edit sadece metin bölgesinde (alt char_height kısım)
-        top_y    = row_index * stride + self._annot_height
-        vp_top   = self.mapFromScene(0, top_y).y()
+        item    = self.header_items[row_index]
+        layout  = self._row_layout
+        if layout is not None and row_index < layout.row_count:
+            text_top_scene = float(layout.y_offsets[row_index]
+                                   + layout.per_row_annot_heights[row_index])
+        else:
+            text_top_scene = float(row_index * self._row_stride_uniform
+                                   + self._annot_height)
+        vp_top = self.mapFromScene(0, text_top_scene).y()
 
         t      = theme_manager.current
         editor = QLineEdit(self.viewport())
@@ -425,10 +469,20 @@ class HeaderViewerView(QGraphicsView):
         super().drawForeground(painter, rect)
         if not self._dragging or self._drag_insert_pos is None:
             return
-        insert_y_scene = self._drag_insert_pos * self._row_stride
-        vp_y           = self.mapFromScene(0, insert_y_scene).y()
-        vp_width       = self.viewport().width()
-        t              = theme_manager.current
+
+        layout = self._row_layout
+        if layout is not None and self._drag_insert_pos <= layout.row_count:
+            if self._drag_insert_pos < layout.row_count:
+                insert_y_scene = float(layout.y_offsets[self._drag_insert_pos])
+            else:
+                insert_y_scene = float(layout.total_height)
+        else:
+            stride         = self._row_stride_uniform
+            insert_y_scene = float(self._drag_insert_pos * stride)
+
+        vp_y     = self.mapFromScene(0, insert_y_scene).y()
+        vp_width = self.viewport().width()
+        t        = theme_manager.current
 
         painter.save()
         painter.resetTransform()

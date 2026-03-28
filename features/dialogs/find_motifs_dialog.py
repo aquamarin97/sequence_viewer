@@ -1,8 +1,13 @@
 # features/dialogs/find_motifs_dialog.py
+"""
+Adım 2: AnnotationStore kaldırıldı.
+Her eşleşme için model.add_annotation(row_index, ann) çağrılır.
+Sequences model'den alınır, dışarıdan geçilmez.
+"""
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -10,11 +15,11 @@ from PyQt5.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QFormLayout, QGroupBox, QHBoxLayout, QLabel,
     QLineEdit, QMessageBox, QPlainTextEdit,
-    QVBoxLayout, QWidget,
+    QSpinBox, QVBoxLayout, QWidget,
 )
 
+from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation, AnnotationType
-from model.annotation_store import AnnotationStore
 from model.motif_finder import MotifFinder
 
 _TYPE_OPTIONS = [
@@ -29,13 +34,11 @@ class FindMotifsDialog(QDialog):
 
     def __init__(
         self,
-        store: AnnotationStore,
-        sequences: List[str],
+        model: AlignmentDataModel,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
-        self._store     = store
-        self._sequences = sequences
+        self._model = model
         self.setWindowTitle("Find Motifs")
         self.setMinimumWidth(440)
         self.setModal(True)
@@ -46,7 +49,6 @@ class FindMotifsDialog(QDialog):
         root = QVBoxLayout(self)
         root.setSpacing(12)
 
-        # Sequence girişi
         seq_group = QGroupBox("Sequence")
         seq_layout = QVBoxLayout(seq_group)
         self._seq_edit = QPlainTextEdit()
@@ -62,8 +64,6 @@ class FindMotifsDialog(QDialog):
         seq_layout.addWidget(self._char_count_label)
         root.addWidget(seq_group)
 
-        # Parametreler
-        from PyQt5.QtWidgets import QSpinBox
         param_group = QGroupBox("Parameters")
         form = QFormLayout(param_group)
         form.setLabelAlignment(Qt.AlignRight)
@@ -85,7 +85,6 @@ class FindMotifsDialog(QDialog):
 
         root.addWidget(param_group)
 
-        # Arama yönü
         strand_group = QGroupBox("Search In")
         strand_layout = QHBoxLayout(strand_group)
         self._fwd_check = QCheckBox("Forward strand  (+)")
@@ -101,7 +100,7 @@ class FindMotifsDialog(QDialog):
         root.addWidget(self._result_label)
 
         self._buttons = QDialogButtonBox()
-        self._search_btn = self._buttons.addButton("Search", QDialogButtonBox.AcceptRole)
+        self._buttons.addButton("Search", QDialogButtonBox.AcceptRole)
         self._buttons.addButton(QDialogButtonBox.Close)
         root.addWidget(self._buttons)
 
@@ -116,8 +115,10 @@ class FindMotifsDialog(QDialog):
         self._char_count_label.setText(f"{len(clean)} nt")
 
     def _on_search(self) -> None:
-        query = (self._seq_edit.toPlainText()
-                 .replace("-", "").replace(" ", "").replace("\n", "").strip())
+        query = (
+            self._seq_edit.toPlainText()
+            .replace("-", "").replace(" ", "").replace("\n", "").strip()
+        )
         if not query:
             QMessageBox.warning(self, "Hata", "Lütfen bir dizi girin.")
             return
@@ -129,9 +130,12 @@ class FindMotifsDialog(QDialog):
         name     = self._name_edit.text().strip() or query[:12]
         ann_type = _TYPE_OPTIONS[self._type_combo.currentIndex()][1]
 
+        sequences = [self._model.get_sequence(i)
+                     for i in range(self._model.row_count())]
+
         finder = MotifFinder(query=query, max_mismatches=max_mm)
         hits   = finder.search(
-            self._sequences,
+            sequences,
             search_forward=self._fwd_check.isChecked(),
             search_reverse=self._rev_check.isChecked(),
         )
@@ -142,37 +146,30 @@ class FindMotifsDialog(QDialog):
             )
             return
 
-        # Pozisyon bazında grupla: {(start, end, strand): [seq_index, ...]}
-        groups: Dict[tuple, List[int]] = {}
-        for hit in hits:
-            key = (hit.start, hit.end, hit.strand)
-            groups.setdefault(key, []).append(hit.seq_index)
-
         added = 0
-        for (start, end, strand), seq_indices in groups.items():
-            # Strand'a göre tip override
+        for hit in hits:
             effective_type = ann_type
-            if strand == "-" and ann_type == AnnotationType.FORWARD_PRIMER:
+            if hit.strand == "-" and ann_type == AnnotationType.FORWARD_PRIMER:
                 effective_type = AnnotationType.REVERSE_PRIMER
-            elif strand == "+" and ann_type == AnnotationType.REVERSE_PRIMER:
+            elif hit.strand == "+" and ann_type == AnnotationType.REVERSE_PRIMER:
                 effective_type = AnnotationType.FORWARD_PRIMER
 
             ann = Annotation(
-                type        = effective_type,
-                start       = start,
-                end         = end,
-                label       = name,
-                strand      = strand,
-                notes       = f"Fuzzy search: max {max_mm} mismatch(es)",
-                # Her annotasyon sadece eşleşen satırlarda görünür
-                seq_indices = sorted(seq_indices),
+                type   = effective_type,
+                start  = hit.start,
+                end    = hit.end,
+                label  = name,
+                strand = hit.strand,
+                notes  = f"Fuzzy search: max {max_mm} mismatch(es)",
             )
-            self._store.add(ann)
-            added += 1
+            try:
+                self._model.add_annotation(hit.seq_index, ann)
+                added += 1
+            except (IndexError, ValueError):
+                pass
 
-        total_hits = len(hits)
         self._result_label.setText(
             f"<span style='color:green'>"
-            f"{total_hits} eşleşme bulundu, {added} annotasyon eklendi."
+            f"{len(hits)} eşleşme bulundu, {added} annotasyon eklendi."
             f"</span>"
         )

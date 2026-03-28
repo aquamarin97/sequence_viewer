@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple, Any
+from typing import TYPE_CHECKING, List, Optional, Tuple, Any
 
 from PyQt5.QtCore import Qt, QPointF, QRectF, QEasingCurve, QVariantAnimation
 from PyQt5.QtGui import QPainter, QPen, QColor
@@ -11,13 +11,10 @@ from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QScrollBar
 from graphics.sequence_item.sequence_item import SequenceGraphicsItem
 from settings.theme import theme_manager
 
-# Per-row annotation sabitleri — per_row_annotation_item ile senkron
-from features.annotation_layer.per_row_annotation_item import (
-    LANE_HEIGHT, LANE_PADDING,
-)
+if TYPE_CHECKING:
+    from widgets.row_layout import RowLayout
 
-# Kılavuz çizgisi görünümü
-_GUIDE_COLOR = QColor(80, 130, 220, 160)   # yarı saydam mavi
+_GUIDE_COLOR = QColor(80, 130, 220, 160)
 _GUIDE_WIDTH = 1
 
 
@@ -25,13 +22,10 @@ class SequenceViewerView(QGraphicsView):
     """
     Sekans satırlarını çizen view.
 
-    Yeni özellikler (v2)
-    --------------------
-    * Per-row annotation alanı: her satırın üstünde `_per_row_annot_h` px
-      boşluk bırakılır. Satır Y = row_index * row_stride.
-    * Kılavuz çizgileri: annotasyon tıklandığında start/end pozisyonlarında
-      dikey çizgi çizilir (drawForeground).
-    * _per_row_annot_h dışarıdan set edilir (workspace günceller).
+    Adım 2 değişikliği — variable stride
+    --------------------------------------
+    apply_row_layout(layout)  — workspace her annotation değişiminde çağırır.
+    set_per_row_annot_height(h) — geriye dönük shim, tüm satırlara aynı yükseklik.
     """
 
     def __init__(
@@ -46,11 +40,11 @@ class SequenceViewerView(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
-        self.char_width:   float = float(char_width)
-        self.char_height:  int   = int(round(char_height))
+        self.char_width:  float = float(char_width)
+        self.char_height: int   = int(round(char_height))
 
-        # Per-row annotation yüksekliği (dışarıdan ayarlanır)
-        self._per_row_annot_h: int = 0
+        self._per_row_annot_h: int = 0          # uniform shim
+        self._row_layout: Optional["RowLayout"] = None   # per-row layout
 
         self.trailing_padding_line_px: float = 80.0
         self.trailing_padding_text_px: float = 30.0
@@ -58,15 +52,13 @@ class SequenceViewerView(QGraphicsView):
         self.max_sequence_length: int = 0
         self.sequence_items: List[SequenceGraphicsItem] = []
 
-        # Kılavuz çizgisi state'i: (start_col, end_col) veya None
         self._guide_cols: Optional[Tuple[int, int]] = None
 
-        # Zoom animasyonu
         self._zoom_animation = QVariantAnimation(self)
         self._zoom_animation.setEasingCurve(QEasingCurve.OutCubic)
         self._zoom_animation.valueChanged.connect(self._on_zoom_value_changed)
 
-        self._zoom_center_nt:    Optional[float] = None
+        self._zoom_center_nt:     Optional[float] = None
         self._zoom_view_width_px: Optional[float] = None
 
         self.setRenderHint(QPainter.Antialiasing, False)
@@ -80,19 +72,29 @@ class SequenceViewerView(QGraphicsView):
         self._controller: Optional[Any] = None
 
     # ------------------------------------------------------------------
-    # Per-row annotation yüksekliği
+    # Per-row layout — yeni API
+    # ------------------------------------------------------------------
+
+    def apply_row_layout(self, layout: "RowLayout") -> None:
+        """Per-row değişken yükseklik uygular."""
+        self._row_layout       = layout
+        self._per_row_annot_h  = 0
+        self._reposition_items()
+        self._update_scene_rect()
+
+    # ------------------------------------------------------------------
+    # Per-row layout — geriye dönük shim
     # ------------------------------------------------------------------
 
     @property
     def row_stride(self) -> int:
-        """Bir satırın toplam Y alanı: annotation strip + char_height."""
+        if self._row_layout and self._row_layout.row_count > 0:
+            return self._row_layout.row_strides[0]
         return self._per_row_annot_h + self.char_height
 
     def set_per_row_annot_height(self, h: int) -> None:
-        """
-        Workspace / annotation store değişince çağrılır.
-        Tüm item'ların Y pozisyonlarını günceller.
-        """
+        if self._row_layout is not None:
+            return
         if self._per_row_annot_h == h:
             return
         self._per_row_annot_h = h
@@ -100,64 +102,52 @@ class SequenceViewerView(QGraphicsView):
         self._update_scene_rect()
 
     def _reposition_items(self) -> None:
-        """Tüm sequence item'larını yeni row_stride ile yeniden konumlandır."""
-        stride = self.row_stride
-        for i, item in enumerate(self.sequence_items):
-            item.setPos(0, i * stride + self._per_row_annot_h)
+        layout = self._row_layout
+        if layout is not None:
+            for i, item in enumerate(self.sequence_items):
+                if i < layout.row_count:
+                    item.setPos(0, float(layout.seq_y_offsets[i]))
+        else:
+            stride = self._per_row_annot_h + self.char_height
+            for i, item in enumerate(self.sequence_items):
+                item.setPos(0, float(i * stride + self._per_row_annot_h))
 
     # ------------------------------------------------------------------
     # Kılavuz çizgileri
     # ------------------------------------------------------------------
 
     def set_guide_cols(self, start_col: int, end_col: int) -> None:
-        """Annotasyon tıklandığında workspace çağırır."""
         self._guide_cols = (start_col, end_col)
         self.viewport().update()
 
     def clear_guide_cols(self) -> None:
         self._guide_cols = None
         self.viewport().update()
-        
+
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
         super().drawForeground(painter, rect)
- 
         if self._guide_cols is None:
             return
- 
         start_col, end_col = self._guide_cols
         cw = self._effective_char_width()
         if cw <= 0:
             return
- 
         hbar   = self.horizontalScrollBar()
         vp_h   = float(self.viewport().height())
         vp_w   = float(self.viewport().width())
         offset = float(hbar.value())
- 
-        # FIX: merkez yerine kenar pozisyonları
-        # start_col'un SOL kenarı   → annotasyonun başlangıcını soldan çerçevele
-        # end_col'un  SAĞ kenarı    → annotasyonun sonunu sağdan çerçevele
-        start_scene_x = start_col * cw               # sol kenar
-        end_scene_x   = (end_col + 1) * cw           # sağ kenar
- 
-        start_vp_x = start_scene_x - offset
-        end_vp_x   = end_scene_x   - offset
- 
+        start_vp_x = start_col * cw - offset
+        end_vp_x   = (end_col + 1) * cw - offset
         painter.save()
         painter.resetTransform()
- 
         pen = QPen(_GUIDE_COLOR, _GUIDE_WIDTH, Qt.DashLine)
         pen.setDashPattern([4, 3])
         painter.setPen(pen)
- 
         for vp_x in (start_vp_x, end_vp_x):
             if -10 <= vp_x <= vp_w + 10:
-                painter.drawLine(
-                    QPointF(vp_x, 0),
-                    QPointF(vp_x, vp_h),
-                )
- 
+                painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, vp_h))
         painter.restore()
+
     # ------------------------------------------------------------------
     # Controller
     # ------------------------------------------------------------------
@@ -176,8 +166,13 @@ class SequenceViewerView(QGraphicsView):
             char_width=self.char_width,
             char_height=self.char_height,
         )
-        # Y = annotation strip + sequence row
-        item.setPos(0, row_index * self.row_stride + self._per_row_annot_h)
+        layout = self._row_layout
+        if layout is not None and row_index < layout.row_count:
+            y = float(layout.seq_y_offsets[row_index])
+        else:
+            y = float(row_index * (self._per_row_annot_h + self.char_height)
+                      + self._per_row_annot_h)
+        item.setPos(0, y)
         self.scene.addItem(item)
         self.sequence_items.append(item)
         self._update_scene_rect()
@@ -187,6 +182,7 @@ class SequenceViewerView(QGraphicsView):
         self.sequence_items.clear()
         self.scene.clear()
         self.max_sequence_length = 0
+        self._row_layout         = None
         self.scene.setSceneRect(0, 0, 0, 0)
         self.scene.invalidate()
 
@@ -206,7 +202,7 @@ class SequenceViewerView(QGraphicsView):
         vp_w = self.viewport().width()
         if vp_w <= 0:
             return self.char_width
-        trailing = max(self.trailing_padding_line_px, self._current_trailing_padding())
+        trailing  = max(self.trailing_padding_line_px, self._current_trailing_padding())
         available = vp_w - trailing
         if available <= 0:
             return 0.000001
@@ -250,8 +246,8 @@ class SequenceViewerView(QGraphicsView):
             self._zoom_view_width_px = view_width_px
             self._zoom_animation.setEndValue(target_char_width)
             return
-        self._zoom_center_nt     = center_nt
-        self._zoom_view_width_px = view_width_px
+        self._zoom_center_nt      = center_nt
+        self._zoom_view_width_px  = view_width_px
         self._zoom_animation.setDuration(180)
         self._zoom_animation.setStartValue(current)
         self._zoom_animation.setEndValue(target_char_width)
@@ -264,8 +260,8 @@ class SequenceViewerView(QGraphicsView):
         if a == b:
             span_nt, center_nt = 1.0, a
         else:
-            span_nt    = max(abs(b - a), 1.0)
-            center_nt  = (min(a, b) + max(a, b)) / 2.0
+            span_nt   = max(abs(b - a), 1.0)
+            center_nt = (min(a, b) + max(a, b)) / 2.0
         vp_w = float(self.viewport().width())
         if vp_w <= 0:
             return
@@ -310,11 +306,18 @@ class SequenceViewerView(QGraphicsView):
             self.scene.setSceneRect(0, 0, 0, 0)
             self.max_sequence_length = 0
             return
-        max_len = max(len(item.sequence) for item in self.sequence_items)
+        max_len  = max(len(item.sequence) for item in self.sequence_items)
         self.max_sequence_length = max_len
         trailing = self._current_trailing_padding()
         width    = max_len * self.char_width + trailing
-        height   = len(self.sequence_items) * self.row_stride
+
+        layout = self._row_layout
+        if layout is not None and layout.row_count > 0:
+            height = float(layout.total_height)
+        else:
+            stride = self._per_row_annot_h + self.char_height
+            height = float(len(self.sequence_items) * stride)
+
         self.scene.setSceneRect(0, 0, width, height)
         self.scene.invalidate()
 
@@ -352,7 +355,7 @@ class SequenceViewerView(QGraphicsView):
             return
         if self.max_sequence_length > 0:
             center_nt = max(0.0, min(center_nt, float(self.max_sequence_length)))
-        cw        = self._effective_char_width()
+        cw         = self._effective_char_width()
         ideal_left = center_nt * cw - view_width_px / 2.0
         max_left   = max(0.0, scene_w - view_width_px)
         ideal_left = max(0.0, min(ideal_left, max_left))
@@ -373,14 +376,17 @@ class SequenceViewerView(QGraphicsView):
             pass
 
     # ------------------------------------------------------------------
-    # Koordinat dönüşümü
+    # Koordinat dönüşümü — variable stride destekli
     # ------------------------------------------------------------------
 
     def scene_pos_to_row_col(self, scene_pos: QPointF) -> Tuple[int, int]:
-        stride = self.row_stride
-        if stride <= 0:
-            return 0, 0
-        raw_row = int(scene_pos.y() // stride)
+        layout = self._row_layout
+        if layout is not None and layout.row_count > 0:
+            raw_row = layout.row_at_y(scene_pos.y())
+        else:
+            stride  = self._per_row_annot_h + self.char_height
+            raw_row = int(scene_pos.y() // stride) if stride > 0 else 0
+
         cw = self._get_current_char_width()
         if cw <= 0:
             cw = max(self.char_width, 0.000001)
@@ -399,6 +405,27 @@ class SequenceViewerView(QGraphicsView):
         super().wheelEvent(event)
 
     def mousePressEvent(self, event) -> None:
+        """
+        Annotation şerit alanına yapılan sol tıklamaları
+        sahne item'larına (AnnotationGraphicsItem) ilet.
+        Variable stride destekli.
+        """
+        if event.button() == Qt.LeftButton:
+            layout = self._row_layout
+            if layout is not None and layout.row_count > 0:
+                scene_pos = self.mapToScene(event.pos())
+                row       = layout.row_at_y(scene_pos.y())
+                if layout.is_in_annot_strip(scene_pos.y(), row):
+                    super().mousePressEvent(event)
+                    return
+            elif self._per_row_annot_h > 0:
+                scene_pos = self.mapToScene(event.pos())
+                stride    = self._per_row_annot_h + self.char_height
+                y_in_row  = scene_pos.y() % stride if stride > 0 else 0
+                if 0 <= y_in_row < self._per_row_annot_h:
+                    super().mousePressEvent(event)
+                    return
+
         if self._controller is not None:
             handled = getattr(self._controller, "handle_mouse_press", None)
             if callable(handled) and handled(event):

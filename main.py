@@ -1,15 +1,8 @@
-# main.py
-
 import sys
 from pathlib import Path
-
-from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu
+from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QFileDialog
 
 from widgets.workspace import SequenceWorkspaceWidget
-
-
-TARGETDIRECTORY = r"test_alignment"
-
 
 def load_fasta_files(fasta_paths):
     try:
@@ -22,7 +15,6 @@ def load_fasta_files(fasta_paths):
     for fasta_path in fasta_paths:
         path = Path(fasta_path)
         if not path.exists():
-            print(f"Uyarı: Dosya bulunamadı - {fasta_path}")
             continue
         try:
             print(f"FASTA okunuyor: {path.name}")
@@ -36,16 +28,6 @@ def load_fasta_files(fasta_paths):
     return sequences
 
 
-def find_fasta_files(directory_path):
-    directory = Path(directory_path)
-    if not directory.exists() or not directory.is_dir():
-        print(f"Hata: Klasör bulunamadı - {directory_path}")
-        return []
-    exts  = {".fasta", ".fa", ".fna", ".ffn", ".faa", ".frn"}
-    files = sorted({p for p in directory.iterdir() if p.suffix.lower() in exts})
-    return files
-
-
 class MainWindow(QMainWindow):
     def __init__(self, workspace: SequenceWorkspaceWidget) -> None:
         super().__init__()
@@ -57,9 +39,23 @@ class MainWindow(QMainWindow):
     def _build_menu(self) -> None:
         menubar = self.menuBar()
 
+        # ---- File Menüsü ----
+        file_menu: QMenu = menubar.addMenu("File")
+        
+        open_action = QAction("Open FASTA...", self)
+        open_action.setShortcut("Ctrl+O")
+        open_action.triggered.connect(self._import_fasta_dialog)
+        file_menu.addAction(open_action)
+        
+        file_menu.addSeparator()
+        
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
         # ---- Annotate menüsü ----
         annotate_menu: QMenu = menubar.addMenu("Annotate")
-
+        
         find_motifs_action = QAction("Find Motifs…", self)
         find_motifs_action.setShortcut("Ctrl+F")
         find_motifs_action.triggered.connect(self.workspace.open_find_motifs_dialog)
@@ -71,13 +67,27 @@ class MainWindow(QMainWindow):
         clear_ann_action.triggered.connect(self.workspace.clear_annotations)
         annotate_menu.addAction(clear_ann_action)
 
-        # ---- View menüsü (placeholder) ----
+        # ---- View menüsü ----
         view_menu: QMenu = menubar.addMenu("View")
-
         toggle_dark_action = QAction("Toggle Dark Mode", self)
         toggle_dark_action.setShortcut("Ctrl+D")
         toggle_dark_action.triggered.connect(self._toggle_dark_mode)
         view_menu.addAction(toggle_dark_action)
+
+    def _import_fasta_dialog(self) -> None:
+        """Kullanıcının dosya seçmesini sağlar ve workspace'e ekler."""
+        file_filter = "FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn);;All Files (*)"
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self, 
+            "FASTA Dosyası Seç", 
+            "", 
+            file_filter
+        )
+
+        if file_paths:
+            sequences = load_fasta_files(file_paths)
+            for header, sequence in sequences:
+                self.workspace.add_sequence(header, sequence)
 
     def _toggle_dark_mode(self) -> None:
         from settings.theme import theme_manager
@@ -92,31 +102,8 @@ def main():
 
     window = MainWindow(workspace)
     window.resize(1200, 650)
-
-    # FASTA yükle
-    print(f"FASTA taranıyor: {TARGETDIRECTORY}")
-    fasta_files = find_fasta_files(TARGETDIRECTORY)
-
-    if not fasta_files:
-        print("Hiç FASTA dosyası bulunamadı.")
-    else:
-        print(f"{len(fasta_files)} dosya bulundu.")
-        sequences = load_fasta_files([str(p) for p in fasta_files])
-
-        if not sequences:
-            print("Hiç sekans yüklenemedi.")
-        else:
-            print(f"\nToplam {len(sequences)} sekans yükleniyor...")
-            for header, sequence in sequences:
-                workspace.add_sequence(header, sequence)
-
-            lengths = [len(seq) for _, seq in sequences]
-            print(
-                f"Uzunluk: min={min(lengths)}, max={max(lengths)}, "
-                f"ort={sum(lengths)/len(lengths):.0f}"
-            )
-
     window.show()
+    
     return app.exec_()
 
 

@@ -9,6 +9,10 @@ Metin ve seçim rengi SADECE alt char_height kısmında çizilir.
 Bu sayede:
 - Header font boyutu değişmez — profesyonel görünüm korunur.
 - Header ve sequence satırları annotation varlığında da piksel-piksel hizalı.
+
+FIX 1.2: Annotation şeridinin arka plan rengi artık satırın kendi zebra
+indeksine göre belirlenir (row_bg_even / row_bg_odd). Önceden hep
+row_bg_odd sabit kullanılıyordu.
 """
 
 from __future__ import annotations
@@ -182,9 +186,11 @@ class HeaderRowItem(QGraphicsItem):
 
         # ---- Üst bölge: annotation şeridine karşılık gelen boş alan ----
         if ann_h > 0:
-            # Sequence viewer'daki annotation şerit arkaplanıyla uyumlu ton
-            ann_bg = QColor(t.row_bg_odd)
-            painter.fillRect(QRectF(0, 0, total_w, ann_h), QBrush(ann_bg))
+            # FIX 1.2: Satırın kendi zebra indeksine uygun renk kullan.
+            # Önceden hep t.row_bg_odd sabit kullanılıyordu; artık
+            # row_bg_even / row_bg_odd satır indeksine göre seçiliyor.
+            ann_bg = t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
+            painter.fillRect(QRectF(0, 0, total_w, ann_h), QBrush(QColor(ann_bg)))
 
             # Alt çizgi (annotation şeridini ayıran ince çizgi)
             painter.setPen(QPen(t.border_normal, 0))
