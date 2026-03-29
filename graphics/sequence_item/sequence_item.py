@@ -43,7 +43,7 @@ class SequenceGraphicsItem(QGraphicsItem):
             sequence=sequence,
             char_width=char_width,
             char_height=char_height,
-            color_map=color_map or default_nucleotide_color_map(),
+            color_map=color_map,
         )
 
         self.font = QFont("Courier New")
@@ -55,6 +55,12 @@ class SequenceGraphicsItem(QGraphicsItem):
 
         # Tema değişince yeniden çiz
         theme_manager.themeChanged.connect(self.update)
+        # Nükleotid renk paleti değişince color_map'i ve glyph cache'i güncelle
+        try:
+            from settings.color_styles import color_style_manager as _csm
+            _csm.stylesChanged.connect(self._on_color_styles_changed)
+        except Exception:
+            pass
 
     # ---- Model proxy ----
 
@@ -97,6 +103,13 @@ class SequenceGraphicsItem(QGraphicsItem):
 
     def set_lod_max_mode(self, mode: Optional[str]) -> None:
         self._model.set_lod_max_mode(mode)
+        self.update()
+
+    # ---- Renk stili yenileme ----
+
+    def _on_color_styles_changed(self) -> None:
+        """color_style_manager paleti değişince color_map'i yenile ve yeniden çiz."""
+        self._model.refresh_color_map()
         self.update()
 
     # ---- Font sync ----
@@ -166,12 +179,14 @@ class SequenceGraphicsItem(QGraphicsItem):
 
         # ---- TEXT / BOX ----
 
-        # Seçim arkaplanı
+        # Seçim arkaplanı — yarı saydam overlay: baz rengi altında görünür
         if sel_start is not None and sel_end is not None:
             sel_l = max(sel_start, start_index)
             sel_r = min(sel_end,   end_index)
             if sel_r > sel_l:
-                painter.setBrush(QBrush(t.seq_selection_bg))
+                sel_color = QColor(t.seq_selection_bg)
+                sel_color.setAlpha(100 if t.name == "dark" else 150)
+                painter.setBrush(QBrush(sel_color))
                 painter.setPen(Qt.NoPen)
                 for i in range(sel_l, sel_r):
                     painter.drawRect(QRectF(i * cw, 0, cw, ch))

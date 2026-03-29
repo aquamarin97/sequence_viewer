@@ -52,15 +52,32 @@ from model.annotation import AnnotationType
 # Varsayılan renk paletleri
 # ---------------------------------------------------------------------------
 
-_DEFAULT_NUCLEOTIDE_COLORS: Dict[str, QColor] = {
-    "A": QColor(  0, 180,   0),   # yeşil
-    "T": QColor(200,   0,   0),   # kırmızı
-    "U": QColor(200,   0,   0),   # kırmızı (RNA)
-    "C": QColor(52, 152, 219),   # mavi
-    "G": QColor(230, 140,   0),   # turuncu
-    "-": QColor(150, 150, 150),   # gri (gap)
-    "N": QColor(120, 120, 120),   # koyu gri (belirsiz)
+# Light mod: Jalview tarzı profesyonel, dengeli renkler
+# Her baz WCAG ≥4.5:1 beyaz arka plan üzerinde.
+_NUCLEOTIDE_COLORS_LIGHT: Dict[str, QColor] = {
+    "A": QColor( 21, 128,  61),   # yeşil   — orman tonu
+    "T": QColor(185,  28,  28),   # kırmızı — güçlü, aşırı değil
+    "U": QColor(185,  28,  28),   # kırmızı — RNA
+    "C": QColor( 29,  78, 216),   # mavi    — koyu kobalt
+    "G": QColor(161,  98,   7),   # turuncu — sıcak amber
+    "-": QColor(100, 116, 139),   # gri     — nötr boşluk
+    "N": QColor(107, 114, 128),   # gri     — belirsiz baz
 }
+
+# Dark mod: göz yormayan orta parlaklıkta renkler.
+# Parlak neon yerine sakin, doygun renkler tercih edildi.
+_NUCLEOTIDE_COLORS_DARK: Dict[str, QColor] = {
+    "A": QColor( 74, 199, 120),   # yeşil   — sakin parlak yeşil
+    "T": QColor(220,  90,  90),   # kırmızı — yumuşak mercan
+    "U": QColor(220,  90,  90),   # kırmızı — RNA
+    "C": QColor(135, 206, 250),   # mavi    — sakin gökyüzü
+    "G": QColor(230, 160, 0),   # turuncu — sıcak altın
+    "-": QColor(140, 148, 162),   # gri     — orta gri
+    "N": QColor(130, 140, 158),   # gri     — belirsiz baz
+}
+
+
+_DEFAULT_NUCLEOTIDE_COLORS = _NUCLEOTIDE_COLORS_LIGHT
 
 _DEFAULT_ANNOTATION_COLORS: Dict[AnnotationType, QColor] = {
     AnnotationType.PRIMER:          QColor( 52, 152, 219),  # mavi
@@ -118,6 +135,17 @@ class _ColorStyleManager(QObject):
         """
         return {k: QColor(v) for k, v in self._nucleotide.items()}
 
+    def apply_theme(self, theme_name: str) -> None:
+        """Tema değişince uygun nükleotid paletini aktif eder."""
+        palette = (
+            _NUCLEOTIDE_COLORS_DARK if theme_name == "dark"
+            else _NUCLEOTIDE_COLORS_LIGHT
+        )
+        new_nuc = {k: QColor(v) for k, v in palette.items()}
+        if new_nuc != self._nucleotide:
+            self._nucleotide = new_nuc
+            self.stylesChanged.emit()
+
     def set_nucleotide_color(self, base: str, color: QColor) -> None:
         """Bir nükleotid için rengi günceller."""
         key = base.upper()
@@ -126,10 +154,16 @@ class _ColorStyleManager(QObject):
             self.stylesChanged.emit()
 
     def reset_nucleotide_colors(self) -> None:
-        """Nükleotid renklerini fabrika ayarlarına döndürür."""
-        self._nucleotide = {
-            k: QColor(v) for k, v in _DEFAULT_NUCLEOTIDE_COLORS.items()
-        }
+        """Nükleotid renklerini aktif tema paletine döndürür."""
+        try:
+            from settings.theme import theme_manager
+            palette = (
+                _NUCLEOTIDE_COLORS_DARK if theme_manager.current.name == "dark"
+                else _NUCLEOTIDE_COLORS_LIGHT
+            )
+        except Exception:
+            palette = _NUCLEOTIDE_COLORS_LIGHT
+        self._nucleotide = {k: QColor(v) for k, v in palette.items()}
         self.stylesChanged.emit()
 
     # ------------------------------------------------------------------

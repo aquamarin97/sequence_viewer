@@ -241,12 +241,15 @@ class SequenceWorkspaceWidget(QWidget):
     def _on_theme_changed(self, theme) -> None:
         """Tema değişince tüm widget arka planlarını ve scrollbar stilini güncelle."""
         from PyQt5.QtGui import QPalette, QBrush as _B
+        from settings.color_styles import color_style_manager
         t_bg = theme.seq_bg
         for widget in (self, self.left_panel, self.splitter):
             p = widget.palette()
             p.setBrush(QPalette.Window, _B(t_bg))
             widget.setAutoFillBackground(True)
             widget.setPalette(p)
+        # Nükleotid paletini tema ile senkronize et
+        color_style_manager.apply_theme(theme.name)
         # Sequence viewer scrollbar'larına tema uyumlu stil uygula
         apply_scrollbar_style(self.sequence_viewer)
         self.update()
