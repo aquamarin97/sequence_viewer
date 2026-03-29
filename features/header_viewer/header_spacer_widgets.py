@@ -15,7 +15,7 @@ class HeaderTopWidget(QWidget):
     def __init__(self, height: int = 28, parent=None) -> None:
         super().__init__(parent)
         self.setFixedHeight(height)
-        theme_manager.themeChanged.connect(self.update)
+        theme_manager.themeChanged.connect(lambda _: self.update())
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -33,7 +33,7 @@ class HeaderPositionSpacerWidget(QWidget):
     def __init__(self, height: int = 24, parent=None) -> None:
         super().__init__(parent)
         self.setFixedHeight(height)
-        theme_manager.themeChanged.connect(self.update)
+        theme_manager.themeChanged.connect(lambda _: self.update())
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -59,7 +59,7 @@ class AnnotationSpacerWidget(QWidget):
     def __init__(self, height: int = 24, parent=None) -> None:
         super().__init__(parent)
         self.setFixedHeight(height)
-        theme_manager.themeChanged.connect(self.update)
+        theme_manager.themeChanged.connect(lambda _: self.update())
 
     def sync_height(self, height: int) -> None:
         if self.height() != height:
@@ -88,7 +88,7 @@ class ConsensusSpacerWidget(QWidget):
     def __init__(self, height: int = 20, parent=None) -> None:
         super().__init__(parent)
         self.setFixedHeight(height)
-        theme_manager.themeChanged.connect(self.update)
+        theme_manager.themeChanged.connect(lambda _: self.update())
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)

@@ -70,6 +70,10 @@ class SequenceViewerView(QGraphicsView):
         self.setDragMode(QGraphicsView.NoDrag)
         self.setMouseTracking(True)
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        # Frame kaldır: varsayılan 1px sunken border viewport'u içe iter
+        # → consensus widget ile hizalamayı bozar (zoom-out'ta belirginleşir)
+        from PyQt5.QtWidgets import QFrame
+        self.setFrameShape(QFrame.NoFrame)
 
         self._controller: Optional[Any] = None
 

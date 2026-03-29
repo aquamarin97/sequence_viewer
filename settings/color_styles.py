@@ -70,12 +70,39 @@ _NUCLEOTIDE_COLORS_DARK: Dict[str, QColor] = {
     "A": QColor( 74, 199, 120),   # yeşil   — sakin parlak yeşil
     "T": QColor(220,  90,  90),   # kırmızı — yumuşak mercan
     "U": QColor(220,  90,  90),   # kırmızı — RNA
-    "C": QColor(135, 206, 250),   # mavi    — sakin gökyüzü
-    "G": QColor(230, 160, 0),   # turuncu — sıcak altın
+    "C": QColor( 88, 152, 235),   # mavi    — sakin gökyüzü
+    "G": QColor(218, 160,  50),   # turuncu — sıcak altın
     "-": QColor(140, 148, 162),   # gri     — orta gri
     "N": QColor(130, 140, 158),   # gri     — belirsiz baz
 }
 
+# ---------------------------------------------------------------------------
+# Konsensüs satırına özel renkler — TÜM BAZLAR
+# ---------------------------------------------------------------------------
+# Konsensüs satırı diziden daha çok odaklanılan alan olduğu için
+# tüm bazlar sekans renklerinin aynı tonunda ama daha canlı/doygun versiyonları.
+# Light: S+20, L-8  → daha doygun ve koyu (beyaz zeminde daha güçlü)
+# Dark:  S+15, L+12 → daha parlak/vivid (koyu zeminde daha baskın)
+_CONSENSUS_COLORS: dict = {
+    "light": {
+        "A": QColor(  0, 170,  80),   # canlı orman yeşili
+        "T": QColor(220,  30,  30),   # derin güçlü kırmızı
+        "U": QColor(220,  30,  30),   # RNA
+        "C": QColor( 20, 100, 255),   # parlak elektrik mavisi
+        "G": QColor(255, 140,   0),   # canlı turuncu
+        "-": QColor( 75,  85, 105),   # koyu gri
+        "N": QColor(100, 110, 130),   # nötr koyu
+    },
+    "dark": {
+        "A": QColor( 40, 255, 110),   # neon yeşil
+        "T": QColor(255,  60,  60),   # elektrik kırmızısı
+        "U": QColor(255,  70, 160),   # magenta-pembe (RNA)
+        "C": QColor( 30, 220, 255),   # parlak cyan
+        "G": QColor(255, 190,  30),   # parlak altın
+        "-": QColor(110, 120, 140),   # orta gri
+        "N": QColor(140, 150, 170),   # yumuşak gri
+    },
+}
 
 _DEFAULT_NUCLEOTIDE_COLORS = _NUCLEOTIDE_COLORS_LIGHT
 
@@ -134,6 +161,21 @@ class _ColorStyleManager(QObject):
         bu metod kullanılmalıdır.
         """
         return {k: QColor(v) for k, v in self._nucleotide.items()}
+
+    def consensus_nucleotide_color_map(self) -> Dict[str, QColor]:
+        """
+        Konsensüs satırı için renk haritası.
+        Tüm bazlar sekans renklerinin aynı tonunda ama daha canlı/doygun
+        versiyonlarıdır — konsensüs satırı görsel odak noktasıdır.
+        """
+        base = {k: QColor(v) for k, v in self._nucleotide.items()}
+        try:
+            from settings.theme import theme_manager
+            overrides = _CONSENSUS_COLORS.get(theme_manager.current.name, {})
+        except Exception:
+            overrides = {}
+        base.update({k: QColor(v) for k, v in overrides.items()})
+        return base
 
     def apply_theme(self, theme_name: str) -> None:
         """Tema değişince uygun nükleotid paletini aktif eder."""

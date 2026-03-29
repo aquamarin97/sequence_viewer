@@ -28,7 +28,7 @@ class SequencePositionRulerWidget(QWidget):
         hbar.rangeChanged.connect(self._on_view_changed)
         self.viewer.selectionChanged.connect(self._on_view_changed)
 
-        theme_manager.themeChanged.connect(self.update)
+        theme_manager.themeChanged.connect(lambda _: self.update())
 
     def _on_view_changed(self, *_args) -> None:
         self.update()

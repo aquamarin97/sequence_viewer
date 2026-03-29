@@ -39,6 +39,9 @@ class SequenceGraphicsItem(QGraphicsItem):
 
         self.row_index = row_index   # zebra renk seçimi için
 
+        # color_map=None olarak iletilirse model _custom_color_map=False tutar
+        # ve refresh_color_map() / tema değişimi çalışır.
+        # Dışarıdan özel bir harita verilmişse o kullanılır.
         self._model = SequenceItemModel(
             sequence=sequence,
             char_width=char_width,
@@ -54,7 +57,7 @@ class SequenceGraphicsItem(QGraphicsItem):
         self._sync_font_from_model()
 
         # Tema değişince yeniden çiz
-        theme_manager.themeChanged.connect(self.update)
+        theme_manager.themeChanged.connect(lambda _: self.update())
         # Nükleotid renk paleti değişince color_map'i ve glyph cache'i güncelle
         try:
             from settings.color_styles import color_style_manager as _csm
@@ -174,6 +177,17 @@ class SequenceGraphicsItem(QGraphicsItem):
                 painter.setBrush(QBrush(t.seq_line_fg))
                 painter.setPen(Qt.NoPen)
                 painter.drawRect(QRectF(vis_l, y, vis_r - vis_l, line_h))
+
+            # Seçim overlay — çizginin üzerine yarı saydam bant
+            if sel_start is not None and sel_end is not None:
+                sx = max(sel_start * cw, vis_l)
+                ex = min((sel_end + 1) * cw, vis_r)
+                if ex > sx:
+                    sel_color = QColor(t.seq_selection_bg)
+                    sel_color.setAlpha(110 if t.name == "dark" else 120)
+                    painter.setBrush(QBrush(sel_color))
+                    painter.drawRect(QRectF(sx, 0, ex - sx, ch))
+
             painter.restore()
             return
 
@@ -185,7 +199,7 @@ class SequenceGraphicsItem(QGraphicsItem):
             sel_r = min(sel_end,   end_index)
             if sel_r > sel_l:
                 sel_color = QColor(t.seq_selection_bg)
-                sel_color.setAlpha(100 if t.name == "dark" else 150)
+                sel_color.setAlpha(110 if t.name == "dark" else 120)
                 painter.setBrush(QBrush(sel_color))
                 painter.setPen(Qt.NoPen)
                 for i in range(sel_l, sel_r):

@@ -66,6 +66,7 @@ class SequenceWorkspaceWidget(QWidget):
 
         # Sağ panel
         self.sequence_viewer = SequenceViewerWidget(parent=self, char_width=char_width, char_height=row_height)
+        self.sequence_viewer.set_alignment_model(self._model)
         self.ruler     = RulerWidget(self.sequence_viewer, parent=self)
         self.pos_ruler = SequencePositionRulerWidget(self.sequence_viewer, parent=self)
         self.annotation_layer = AnnotationLayerWidget(model=self._model, sequence_viewer=self.sequence_viewer, parent=self)
@@ -82,7 +83,7 @@ class SequenceWorkspaceWidget(QWidget):
         self.splitter.addWidget(self.left_panel)
         self.splitter.addWidget(right_panel)
         # Başlangıçta dizi yok — eşit bölüm (resize sonrası güncellenir)
-        self.splitter.setSizes([130, 500])
+        self.splitter.setSizes([500, 500])
         self.splitter.splitterMoved.connect(self._on_splitter_moved)
 
         ml = QHBoxLayout(self)
@@ -121,6 +122,11 @@ class SequenceWorkspaceWidget(QWidget):
 
         self._v_scroll_guard = _ScrollSyncGuard()
         self._connect_scroll_sync()
+
+        # Sequence viewer seçimi değişince consensus seçimini temizle
+        self.sequence_viewer.selectionChanged.connect(
+            self.consensus_row.clear_selection
+        )
 
         anim = getattr(self.sequence_viewer, "_zoom_animation", None)
         if anim is not None:
@@ -250,6 +256,9 @@ class SequenceWorkspaceWidget(QWidget):
             widget.setPalette(p)
         # Nükleotid paletini tema ile senkronize et
         color_style_manager.apply_theme(theme.name)
+        # Annotation görsel stillerini tema ile senkronize et
+        from settings.annotation_styles import annotation_style_manager as _asm
+        _asm.apply_theme(theme.name)
         # Sequence viewer scrollbar'larına tema uyumlu stil uygula
         apply_scrollbar_style(self.sequence_viewer)
         self.update()

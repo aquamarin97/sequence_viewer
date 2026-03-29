@@ -1,40 +1,43 @@
 # features/consensus_row/consensus_row_widget.py
 from __future__ import annotations
 import math
-from typing import Optional
+from typing import Optional, Tuple
 
 from PyQt5.QtCore import Qt, QRectF
-from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont, QFontMetrics
-from PyQt5.QtWidgets import QWidget, QScrollBar
+from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont
+from PyQt5.QtWidgets import QApplication, QWidget, QScrollBar
 
 from features.consensus_row.consensus_row_model import ConsensusRowModel
-from graphics.sequence_item.sequence_glyph_cache import default_nucleotide_color_map, GLYPH_CACHE
+from graphics.sequence_item.sequence_glyph_cache import GLYPH_CACHE
 from model.alignment_data_model import AlignmentDataModel
 from model.consensus_calculator import ConsensusMethod
 from settings.theme import theme_manager
-
-_TEXT_THRESHOLD = 8.0
-_BOX_THRESHOLD  = 5.0
-_ROW_HEIGHT     = 20
 
 
 class ConsensusRowWidget(QWidget):
     def __init__(self, alignment_model: AlignmentDataModel, sequence_viewer, parent=None):
         super().__init__(parent)
-        self._alignment_model    = alignment_model
-        self._sequence_viewer    = sequence_viewer
-        self._initial_char_width = float(sequence_viewer.char_width)
+        self._alignment_model = alignment_model
+        self._sequence_viewer = sequence_viewer
         self._model = ConsensusRowModel(method=ConsensusMethod.PLURALITY)
 
         self._font = QFont("Courier New")
         self._font.setStyleHint(QFont.Monospace)
         self._font.setFixedPitch(True)
 
-        # color_map — color_style_manager'dan alınır, stylesChanged'de yenilenir
-        self._color_map = default_nucleotide_color_map()
+        from settings.color_styles import color_style_manager as _csm
+        self._color_map = _csm.consensus_nucleotide_color_map()
 
-        self.setFixedHeight(_ROW_HEIGHT)
+        # Seçim konsensüse özgü — sequence viewer seçiminden BAĞIMSIZ
+        self._selection: Optional[Tuple[int, int]] = None
+        self._press_col: Optional[int] = None
+
+        # Yükseklik: sequence item'larla birebir eşleşmesi için char_height kullan
+        ch = int(round(sequence_viewer.char_height))
+        self.setFixedHeight(ch)
         self.setMinimumWidth(0)
+        self.setMouseTracking(True)
+        self.setFocusPolicy(Qt.ClickFocus)
 
         self._alignment_model.rowAppended.connect(self._on_data_changed)
         self._alignment_model.rowRemoved.connect(self._on_data_changed)
@@ -49,14 +52,19 @@ class ConsensusRowWidget(QWidget):
         if anim is not None:
             anim.valueChanged.connect(self.update)
 
-        theme_manager.themeChanged.connect(self._on_theme_changed)
+        theme_manager.themeChanged.connect(lambda _: self._on_theme_changed())
 
-        # Nükleotid paleti değişince color_map'i yenile
         try:
-            from settings.color_styles import color_style_manager as _csm
-            _csm.stylesChanged.connect(self._on_color_styles_changed)
+            from settings.color_styles import color_style_manager as _csm2
+            _csm2.stylesChanged.connect(self._on_color_styles_changed)
         except Exception:
             pass
+
+        # NOT: sequence viewer seçimine BAĞLANMIYORUZ — seçimler bağımsız
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def set_method(self, method, threshold=None):
         self._model.set_method(method, threshold)
@@ -67,9 +75,37 @@ class ConsensusRowWidget(QWidget):
     @property
     def current_threshold(self): return self._model.threshold
 
+    def clear_selection(self) -> None:
+        self._selection = None
+        self.update()
+
+    # ------------------------------------------------------------------
+    # Seçim yardımcıları
+    # ------------------------------------------------------------------
+
+    def _col_at_x(self, x: float) -> Optional[int]:
+        cw = self._get_char_width()
+        if cw <= 0:
+            return None
+        col = int((x + self._get_view_left()) / cw)
+        consensus = self._get_consensus()
+        if consensus is None:
+            return None
+        return max(0, min(col, len(consensus) - 1))
+
+    def _get_consensus(self) -> Optional[str]:
+        sequences = [seq for _, seq in self._alignment_model.all_rows()]
+        if not sequences:
+            return None
+        return self._model.get_consensus(sequences)
+
+    # ------------------------------------------------------------------
+    # Sinyal işleyiciler
+    # ------------------------------------------------------------------
+
     def _on_color_styles_changed(self) -> None:
-        """Nükleotid paleti değişince color_map'i yenile."""
-        self._color_map = default_nucleotide_color_map()
+        from settings.color_styles import color_style_manager as _csm
+        self._color_map = _csm.consensus_nucleotide_color_map()
         self._model.invalidate()
         self.update()
 
@@ -77,39 +113,109 @@ class ConsensusRowWidget(QWidget):
         self._model.invalidate()
         self.update()
 
-    def _on_theme_changed(self, _theme):
-        self.update()
+    def _on_theme_changed(self):
+        self._on_color_styles_changed()
 
-    def _get_char_width(self):
+    # ------------------------------------------------------------------
+    # Geometri
+    # ------------------------------------------------------------------
+
+    def _get_char_width(self) -> float:
         if hasattr(self._sequence_viewer, "_get_current_char_width"):
             return float(self._sequence_viewer._get_current_char_width())
         return float(self._sequence_viewer.char_width)
 
-    def _get_view_left(self):
+    def _get_view_left(self) -> float:
         return float(self._sequence_viewer.horizontalScrollBar().value())
 
-    def _effective_mode(self, char_width):
+    def _sync_font_from_viewer(self) -> None:
+        """Font boyutunu viewer'ın sequence item'larından oku — piksel-mükemmel hizalama."""
         items = getattr(self._sequence_viewer, "sequence_items", None)
         if items:
-            return items[0].display_mode
-        cw_default = self._initial_char_width or 12.0
-        scale = char_width / cw_default
-        if scale >= 1.8:   font_size = 12.0
-        elif scale >= 1.2: font_size = 10.0
-        elif scale >= 0.7: font_size = 8.0
-        else:              font_size = max(1.0, 18.0 * 0.6 * scale)
-        if font_size >= _TEXT_THRESHOLD: return "text"
-        if font_size >= _BOX_THRESHOLD:  return "box"
-        return "line"
-
-    def _sync_font_size(self, char_width):
-        cw_default = self._initial_char_width or 12.0
-        scale = char_width / cw_default
-        if scale >= 1.8:   size = 12.0
-        elif scale >= 1.2: size = 10.0
-        elif scale >= 0.7: size = 8.0
-        else:              size = max(1.0, 18.0 * 0.6 * scale)
+            size = float(items[0]._model.current_font_size)
+        else:
+            cw = self._get_char_width()
+            cw_default = float(getattr(self._sequence_viewer, "char_width", 12.0)) or 12.0
+            scale = cw / cw_default
+            if scale >= 1.8:   size = 12.0
+            elif scale >= 1.2: size = 10.0
+            elif scale >= 0.7: size = 8.0
+            else:              size = max(1.0, 18.0 * 0.6 * scale)
         self._font.setPointSizeF(size)
+
+    def _effective_mode(self) -> str:
+        items = getattr(self._sequence_viewer, "sequence_items", None)
+        if items:
+            return items[0]._model.get_effective_mode()
+        return "text"
+
+    # ------------------------------------------------------------------
+    # Mouse events
+    # ------------------------------------------------------------------
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.LeftButton:
+            self.setFocus()
+            # Consensus seçimi başlayınca sequence viewer seçimini iptal et
+            self._sequence_viewer.clear_visual_selection()
+            try:
+                self._sequence_viewer._model.clear_selection()
+                self._sequence_viewer.selectionChanged.emit()
+            except Exception:
+                pass
+            col = self._col_at_x(float(event.pos().x()))
+            if col is not None:
+                self._press_col = col
+                self._selection = (col, col)
+                self.update()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if event.buttons() & Qt.LeftButton and self._press_col is not None:
+            col = self._col_at_x(float(event.pos().x()))
+            if col is not None:
+                lo = min(self._press_col, col)
+                hi = max(self._press_col, col)
+                self._selection = (lo, hi)
+                self.update()
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.LeftButton:
+            self._press_col = None
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+    # ------------------------------------------------------------------
+    # Ctrl+C — sadece nükleotid string (header yok)
+    # ------------------------------------------------------------------
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key_C and event.modifiers() & Qt.ControlModifier:
+            self._copy_to_clipboard()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
+    def _copy_to_clipboard(self) -> None:
+        consensus = self._get_consensus()
+        if not consensus:
+            return
+        if self._selection is not None:
+            col_start, col_end = self._selection
+            fragment = consensus[col_start:col_end + 1]
+        else:
+            fragment = consensus
+        QApplication.clipboard().setText(fragment)
+
+    # ------------------------------------------------------------------
+    # paintEvent
+    # ------------------------------------------------------------------
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -144,29 +250,68 @@ class ConsensusRowWidget(QWidget):
             painter.end()
             return
 
-        self._sync_font_size(cw)
+        # Font — viewer'dan senkronize (hizalama için kritik)
+        self._sync_font_from_viewer()
         painter.setFont(self._font)
 
-        mode   = self._effective_mode(cw)
-        ch     = float(height)
+        mode   = self._effective_mode()
+        ch     = float(height)   # artık char_height ile eşit
         length = len(consensus)
 
         start_col = max(0, int(math.floor(view_left / cw)))
         end_col   = min(length, int(math.ceil((view_left + width) / cw)))
 
+        sel_start = sel_end = None
+        if self._selection is not None:
+            sel_start, sel_end = self._selection
+
+        sel_alpha = 110 if t.name == "dark" else 120
+
+        # ---- LINE MODE ----
         if mode == "line":
+            # line_h/y: sequence_item_model ile birebir aynı formül
             line_h = ch * 0.3
             y      = (ch - line_h) / 2.0
-            seq_end_x  = length * cw - view_left
-            draw_width = max(0.0, min(float(width), seq_end_x))
-            painter.setBrush(QBrush(t.seq_line_fg))   # tema rengi
+            # x: start_col/end_col bazlı hesap — text/box ile aynı mantık
+            x_start = max(0.0, start_col * cw - view_left)
+            x_end   = min(end_col * cw - view_left, float(width))
+            draw_width = max(0.0, x_end - x_start)
+            painter.setBrush(QBrush(t.seq_line_fg))
             painter.setPen(Qt.NoPen)
-            painter.drawRect(QRectF(0, y, draw_width, line_h))
+            painter.drawRect(QRectF(x_start, y, draw_width, line_h))
+
+            # Seçim overlay
+            if sel_start is not None and sel_end is not None:
+                sx = sel_start * cw - view_left
+                sw = (sel_end - sel_start + 1) * cw
+                sx2 = max(0.0, sx)
+                sw2 = min(sw - (sx2 - sx), float(width) - sx2)
+                if sw2 > 0:
+                    sel_color = QColor(t.seq_selection_bg)
+                    sel_color.setAlpha(sel_alpha)
+                    painter.setBrush(QBrush(sel_color))
+                    painter.drawRect(QRectF(sx2, 0, sw2, ch))
             painter.end()
             return
 
-        box_h = min(ch * 0.75, self._font.pointSizeF() * 1.4)
-        box_y = (ch - box_h) / 2.0
+        # ---- Seçim arkaplanı (text / box) ----
+        if sel_start is not None and sel_end is not None:
+            sel_l = max(sel_start, start_col)
+            sel_r = min(sel_end + 1, end_col)
+            if sel_r > sel_l:
+                sel_color = QColor(t.seq_selection_bg)
+                sel_color.setAlpha(sel_alpha)
+                painter.setBrush(QBrush(sel_color))
+                painter.setPen(Qt.NoPen)
+                for i in range(sel_l, sel_r):
+                    painter.drawRect(QRectF(i * cw - view_left, 0, cw, ch))
+
+        # ---- BOX / TEXT — sequence_item_model ile AYNI formül ----
+        font_pt = self._font.pointSizeF()
+        # Sequence item: box_ref = min(ch*0.7, font_pt), box_h = max(box_ref, 1.0)
+        box_ref = min(ch * 0.7, font_pt)
+        box_h   = max(box_ref, 1.0)
+        box_y   = (ch - box_h) / 2.0
 
         for col in range(start_col, end_col):
             base  = consensus[col].upper()

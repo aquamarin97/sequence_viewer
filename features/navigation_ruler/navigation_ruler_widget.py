@@ -65,7 +65,7 @@ class RulerWidget(QWidget):
         t = theme_manager.current   # ← tema tokenları
 
         pm = QPixmap(width, height)
-        pm.fill(t.ruler_bg)
+        pm.fill(t.nav_ruler_bg)
 
         p = QPainter(pm)
         p.setRenderHint(QPainter.Antialiasing, False)
@@ -134,7 +134,7 @@ class RulerWidget(QWidget):
 
         max_len = self._model.recompute_max_len_if_needed(self.viewer.sequence_items)
         if max_len <= 0 or width <= 0:
-            painter.fillRect(rect, QBrush(t.ruler_bg))
+            painter.fillRect(rect, QBrush(t.nav_ruler_bg))
             painter.setPen(QPen(t.ruler_border))
             painter.drawRect(rect.adjusted(0, 0, -1, -1))
             painter.end()
@@ -153,7 +153,7 @@ class RulerWidget(QWidget):
         if self._ruler_pixmap is not None:
             painter.drawPixmap(0, 0, self._ruler_pixmap)
         else:
-            painter.fillRect(rect, QBrush(t.ruler_bg))
+            painter.fillRect(rect, QBrush(t.nav_ruler_bg))
             painter.setPen(QPen(t.ruler_border))
             painter.drawRect(rect.adjusted(0, 0, -1, -1))
 

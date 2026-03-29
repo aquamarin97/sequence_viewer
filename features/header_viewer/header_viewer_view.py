@@ -54,6 +54,8 @@ class HeaderViewerView(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        from PyQt5.QtWidgets import QFrame
+        self.setFrameShape(QFrame.NoFrame)
         self.setMinimumWidth(60)
         # Maksimum genişlik dinamik olarak resizeEvent'te yönetilir.
         self.setMouseTracking(True)

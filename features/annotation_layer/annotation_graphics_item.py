@@ -34,7 +34,12 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self.setAcceptHoverEvents(True)
         self.setZValue(10.0)
         self._selected: bool = False
-        theme_manager.themeChanged.connect(self.update)
+        theme_manager.themeChanged.connect(lambda _: self.update())
+        try:
+            from settings.annotation_styles import annotation_style_manager as _asm
+            _asm.stylesChanged.connect(lambda: self.update())
+        except Exception:
+            pass
 
     def update_size(self, ann_width: float, ann_height: float) -> None:
         if abs(self._w - ann_width) < 0.01 and abs(self._h - ann_height) < 0.01:

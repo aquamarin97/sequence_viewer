@@ -47,7 +47,8 @@ class AppTheme:
     drop_indicator:       QColor
 
     # --- Ruler (navigation minimap + position cetvel) ---
-    ruler_bg:             QColor   # cetvel arkaplanı
+    ruler_bg:             QColor   # position cetvel arkaplanı (beyaz/koyu)
+    nav_ruler_bg:         QColor   # navigation minimap arkaplanı (position'dan koyu)
     ruler_fg:             QColor   # cetvel metin ve tick rengi
     ruler_border:         QColor   # cetvel çerçeve rengi
     ruler_selection_fg:   QColor   # seçili pozisyon label rengi (bold)
@@ -69,84 +70,71 @@ class AppTheme:
 LIGHT_THEME = AppTheme(
     name                  = "light",
 
-    # Zebra: daha temiz, daha profesyonel, düşük gürültü
     row_bg_even           = QColor(255, 255, 255),
-    row_bg_odd            = QColor(247, 249, 253),
+    row_bg_odd            = QColor(244, 246, 250),
+    row_bg_hover          = QColor(224, 235, 255),
+    row_bg_selected       = QColor(193, 214, 255),
+    row_bg_selected_hover = QColor(170, 200, 255),
+    row_bg_dragging       = QColor(200, 215, 245),
 
-    # Hover: selected ile karışmayacak kadar hafif
-    row_bg_hover          = QColor(232, 240, 255),
+    text_primary          = QColor( 30,  30,  30),
+    text_selected         = QColor(  0,  30,  90),
 
-    # Selected: net ve güçlü vurgu
-    row_bg_selected       = QColor(76, 125, 255),
-    row_bg_selected_hover = QColor(64, 110, 235),
+    border_normal         = QColor(210, 215, 225),
+    border_drag           = QColor(100, 140, 220),
+    drop_indicator        = QColor( 60, 120, 240),
 
-    # Dragging: selected’dan farklılaşan hafif morumsu mavi
-    row_bg_dragging       = QColor(108, 118, 245),
+    # Ruler — light
+    # position ruler beyaz, navigation ruler biraz gri → iki cetvel görsel ayrım kazanır
+    ruler_bg              = QColor(255, 255, 255),   # position: beyaz
+    nav_ruler_bg          = QColor(236, 238, 244),   # navigation: hafif kül grisi
+    ruler_fg              = QColor( 30,  30,  30),
+    ruler_border          = QColor(180, 185, 195),
+    ruler_selection_fg    = QColor(  0,   0, 200),
 
-    # Metin: daha dengeli kontrast
-    text_primary          = QColor(28, 32, 40),
-    text_selected         = QColor(255, 255, 255),
-
-    # Border: daha temiz separation
-    border_normal         = QColor(205, 211, 222),
-    border_drag           = QColor(88, 122, 245),
-    drop_indicator        = QColor(70, 110, 235),
-
-    # Ruler
-    ruler_bg              = QColor(255, 255, 255),
-    ruler_fg              = QColor(42, 46, 56),
-    ruler_border          = QColor(196, 202, 214),
-    ruler_selection_fg    = QColor(46, 92, 220),
-
-    # Sequence alanı
+    # Sequence hücresi — light: beyaz zemin
+    # seq_selection_bg yarı saydam kullanılır (alpha=120) — baz rengi altında görünür.
     seq_bg                = QColor(255, 255, 255),
-    seq_selection_bg      = QColor(76, 125, 255),
+    seq_selection_bg      = QColor(100, 160, 220),   # steel-blue, yarı saydam overlay
+    seq_line_fg           = QColor(160, 160, 160),
 
-    # Eskiye göre daha görünür line rengi
-    seq_line_fg           = QColor(112, 118, 130),
-
-    # Inline editor
-    editor_bg             = "#F4F7FF",
-    editor_border         = "#4C7DFF",
+    editor_bg             = "#EEF4FF",
+    editor_border         = "#5B8DEF",
 )
 
 DARK_THEME = AppTheme(
     name                  = "dark",
 
-    # Nötr koyu taban: saf siyah değil
-    row_bg_even           = QColor(26, 28, 34),
-    row_bg_odd            = QColor(32, 34, 42),
+    row_bg_even           = QColor( 30,  32,  38),
+    row_bg_odd            = QColor( 36,  38,  46),
+    row_bg_hover          = QColor( 50,  60,  90),
+    row_bg_selected       = QColor( 40,  80, 160),
+    row_bg_selected_hover = QColor( 50,  95, 180),
+    row_bg_dragging       = QColor( 45,  70, 140),
 
-    # Hover: selected’dan belirgin şekilde daha hafif
-    row_bg_hover          = QColor(43, 53, 80),
+    text_primary          = QColor(210, 215, 225),
+    text_selected         = QColor(220, 235, 255),
 
-    # Selected: güçlü ama göz yormayan mavi
-    row_bg_selected       = QColor(62, 102, 196),
-    row_bg_selected_hover = QColor(78, 122, 224),
+    border_normal         = QColor( 55,  60,  72),
+    border_drag           = QColor( 90, 140, 230),
+    drop_indicator        = QColor( 80, 150, 255),
 
-    # Dragging: selected’dan ayrışan ton
-    row_bg_dragging       = QColor(92, 96, 210),
+    # Ruler — dark
+    # position ruler orta koyu, navigation ruler maksimum koyu → derinlik hissi
+    ruler_bg              = QColor( 22,  24,  30),   # position: orta koyu
+    nav_ruler_bg          = QColor( 36,  38,  46),   # navigation: çok koyu / neredeyse siyah
+    ruler_fg              = QColor(190, 195, 210),
+    ruler_border          = QColor( 55,  60,  72),
+    ruler_selection_fg    = QColor(100, 160, 255),
 
-    text_primary          = QColor(220, 225, 235),
-    text_selected         = QColor(255, 255, 255),
-
-    border_normal         = QColor(61, 66, 80),
-    border_drag           = QColor(98, 132, 245),
-    drop_indicator        = QColor(112, 150, 255),
-
-    # Ruler
-    ruler_bg              = QColor(20, 22, 28),
-    ruler_fg              = QColor(192, 198, 212),
-    ruler_border          = QColor(61, 66, 80),
-    ruler_selection_fg    = QColor(122, 170, 255),
-
-    # Sequence alanı
-    seq_bg                = QColor(24, 26, 32),
+    # Sequence hücresi — dark: koyu zemin
+    # seq_selection_bg yarı saydam kullanılır (alpha=110) — baz rengi altında görünür.
+    seq_bg                = QColor( 28,  30,  36),
     seq_selection_bg      = QColor(62, 102, 196),
-    seq_line_fg           = QColor(122, 128, 142),
+    seq_line_fg           = QColor(100, 105, 120),
 
-    editor_bg             = "#1C2540",
-    editor_border         = "#5A8CFF",
+    editor_bg             = "#1E2A4A",
+    editor_border         = "#4A80E0",
 )
 
 

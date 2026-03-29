@@ -72,7 +72,12 @@ class AnnotationLayerWidget(QWidget):
         if anim is not None:
             anim.valueChanged.connect(self.update)
 
-        theme_manager.themeChanged.connect(self.update)
+        theme_manager.themeChanged.connect(lambda _: self.update())
+        try:
+            from settings.annotation_styles import annotation_style_manager as _asm
+            _asm.stylesChanged.connect(lambda: self.update())
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Model senkronizasyonu
