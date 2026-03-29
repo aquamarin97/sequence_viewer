@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from widgets.row_layout import RowLayout
 
 _DRAG_THRESHOLD_PX = 6
-_DROP_LINE_WIDTH   = 2
+_DROP_LINE_WIDTH = 2
 
 
 class HeaderViewerView(QGraphicsView):
@@ -42,11 +42,11 @@ class HeaderViewerView(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
 
-        self._char_height:  int   = int(round(row_height))
-        self._annot_height: int   = 0       # uniform shim
+        self._char_height: int = int(round(row_height))
+        self._annot_height: int = 0  # uniform shim
         self._row_layout: Optional["RowLayout"] = None
 
-        self.row_height:   int   = self._char_height
+        self.row_height: int = self._char_height
         self.header_width: float = float(initial_width)
 
         self.header_items: List[HeaderRowItem] = []
@@ -55,6 +55,7 @@ class HeaderViewerView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         from PyQt5.QtWidgets import QFrame
+
         self.setFrameShape(QFrame.NoFrame)
         self.setMinimumWidth(60)
         # Maksimum genişlik dinamik olarak resizeEvent'te yönetilir.
@@ -64,12 +65,12 @@ class HeaderViewerView(QGraphicsView):
         self._selection = RowSelectionModel()
 
         self._edit_widget: Optional[QLineEdit] = None
-        self._editing_row: Optional[int]       = None
+        self._editing_row: Optional[int] = None
 
-        self._press_pos:       Optional[QPoint] = None
-        self._drag_source_row: Optional[int]    = None
-        self._drag_insert_pos: Optional[int]    = None
-        self._dragging:        bool             = False
+        self._press_pos: Optional[QPoint] = None
+        self._drag_source_row: Optional[int] = None
+        self._drag_insert_pos: Optional[int] = None
+        self._dragging: bool = False
 
         theme_manager.themeChanged.connect(self._on_theme_changed)
         # Sahne arka planını tema ile senkronize et
@@ -84,7 +85,7 @@ class HeaderViewerView(QGraphicsView):
         Per-row değişken yükseklik uygular.
         Workspace her annotation değişiminde çağırır.
         """
-        self._row_layout   = layout
+        self._row_layout = layout
         self._annot_height = 0
 
         for i, item in enumerate(self.header_items):
@@ -106,7 +107,7 @@ class HeaderViewerView(QGraphicsView):
         if self._annot_height == h:
             return
         self._annot_height = h
-        self.row_height    = h + self._char_height
+        self.row_height = h + self._char_height
 
         stride = h + self._char_height
         for i, item in enumerate(self.header_items):
@@ -125,7 +126,7 @@ class HeaderViewerView(QGraphicsView):
 
     def _row_at_viewport_y(self, y: int) -> int:
         scene_y = self.mapToScene(0, y).y()
-        layout  = self._row_layout
+        layout = self._row_layout
         if layout is not None and layout.row_count > 0:
             return layout.row_at_y(scene_y)
         stride = self._row_stride_uniform
@@ -135,7 +136,7 @@ class HeaderViewerView(QGraphicsView):
 
     def _insert_pos_at_viewport_y(self, y: int) -> int:
         scene_y = self.mapToScene(0, y).y()
-        layout  = self._row_layout
+        layout = self._row_layout
         if layout is not None and layout.row_count > 0:
             return layout.insert_pos_at_y(scene_y)
         stride = self._row_stride_uniform
@@ -148,11 +149,11 @@ class HeaderViewerView(QGraphicsView):
         layout = self._row_layout
         if layout is not None and row_index < layout.row_count:
             y_start = float(layout.y_offsets[row_index])
-            height  = float(layout.row_strides[row_index])
+            height = float(layout.row_strides[row_index])
         else:
-            stride  = self._row_stride_uniform
+            stride = self._row_stride_uniform
             y_start = float(row_index * stride)
-            height  = float(stride)
+            height = float(stride)
         scene_rect = QRectF(0, y_start, self.viewport().width(), height)
         tl = self.mapFromScene(scene_rect.topLeft())
         br = self.mapFromScene(scene_rect.bottomRight())
@@ -163,16 +164,16 @@ class HeaderViewerView(QGraphicsView):
     # ------------------------------------------------------------------
 
     def add_header_item(self, display_text: str) -> HeaderRowItem:
-        row_index  = len(self.header_items)
+        row_index = len(self.header_items)
         item_width = self.viewport().width() or self.header_width
 
         layout = self._row_layout
         if layout is not None and row_index < layout.row_count:
-            ann_h   = layout.per_row_annot_heights[row_index]
+            ann_h = layout.per_row_annot_heights[row_index]
             y_start = float(layout.y_offsets[row_index])
         else:
-            ann_h   = self._annot_height
-            stride  = self._row_stride_uniform
+            ann_h = self._annot_height
+            stride = self._row_stride_uniform
             y_start = float(row_index * stride)
 
         layout = self._row_layout
@@ -206,9 +207,7 @@ class HeaderViewerView(QGraphicsView):
     def apply_selection_to_items(self, changed_rows: FrozenSet[int]) -> None:
         for row in changed_rows:
             if 0 <= row < len(self.header_items):
-                self.header_items[row].set_selected(
-                    self._selection.is_selected(row)
-                )
+                self.header_items[row].set_selected(self._selection.is_selected(row))
 
     # ------------------------------------------------------------------
     # Geometri
@@ -227,9 +226,8 @@ class HeaderViewerView(QGraphicsView):
         if not self.header_items:
             return 100
         metrics = QFontMetrics(self.header_items[0].font)
-        max_px  = max(
-            metrics.horizontalAdvance(item.full_text)
-            for item in self.header_items
+        max_px = max(
+            metrics.horizontalAdvance(item.full_text) for item in self.header_items
         )
         return max_px + 6 + 4 + 4
 
@@ -249,6 +247,7 @@ class HeaderViewerView(QGraphicsView):
 
     def _apply_scene_background(self) -> None:
         from PyQt5.QtGui import QBrush as _B
+
         t = theme_manager.current
         self.scene.setBackgroundBrush(_B(t.row_bg_even))
 
@@ -258,6 +257,7 @@ class HeaderViewerView(QGraphicsView):
 
     def _on_theme_changed(self, _theme) -> None:
         self._apply_scene_background()
+        self._refresh_active_editor_style()
         self.scene.invalidate()
         self.viewport().update()
 
@@ -270,41 +270,35 @@ class HeaderViewerView(QGraphicsView):
             return
         self._cancel_edit()
 
-        item    = self.header_items[row_index]
-        layout  = self._row_layout
+        item = self.header_items[row_index]
+        layout = self._row_layout
         if layout is not None and row_index < layout.row_count:
-            text_top_scene = float(layout.y_offsets[row_index]
-                                   + layout.per_row_annot_heights[row_index])
+            text_top_scene = float(
+                layout.y_offsets[row_index] + layout.per_row_annot_heights[row_index]
+            )
         else:
-            text_top_scene = float(row_index * self._row_stride_uniform
-                                   + self._annot_height)
+            text_top_scene = float(
+                row_index * self._row_stride_uniform + self._annot_height
+            )
         vp_top = self.mapFromScene(0, text_top_scene).y()
 
-        t      = theme_manager.current
+        t = theme_manager.current
         editor = QLineEdit(self.viewport())
 
-        full_text  = item.full_text
+        full_text = item.full_text
         raw_header = full_text.split(". ", 1)[1] if ". " in full_text else full_text
         editor.setText(raw_header)
         editor.selectAll()
 
         margin = 2
-        vp_w   = self.viewport().width()
+        vp_w = self.viewport().width()
         editor.setGeometry(
-            margin, int(vp_top) + margin,
+            margin,
+            int(vp_top) + margin,
             vp_w - margin * 2,
             self._char_height - margin * 2,
         )
-        editor.setStyleSheet(
-            f"QLineEdit {{"
-            f"  background: {t.editor_bg};"
-            f"  border: 1.5px solid {t.editor_border};"
-            f"  border-radius: 2px;"
-            f"  padding: 0px 4px;"
-            f"  font-family: Arial;"
-            f"  font-size: {int(item._model.compute_font_point_size())}pt;"
-            f"}}"
-        )
+        self._apply_editor_style(editor, item)
         editor.show()
         editor.setFocus()
         editor.returnPressed.connect(lambda: self._commit_edit(row_index))
@@ -313,6 +307,29 @@ class HeaderViewerView(QGraphicsView):
         self._edit_widget = editor
         self._editing_row = row_index
         item.set_hovered(True)
+
+    def _apply_editor_style(self, editor: QLineEdit, item: HeaderRowItem) -> None:
+        t = theme_manager.current
+        text_color = t.text_primary.name()
+        editor.setStyleSheet(
+            f"QLineEdit {{"
+            f"  color: {text_color};"
+            f"  background: {t.editor_bg};"
+            f"  border: 1.5px solid {t.editor_border};"
+            f"  border-radius: 2px;"
+            f"  padding: 0px 4px;"
+            f"  font-family: Arial;"
+            f"  font-size: {int(item._model.compute_font_point_size())}pt;"
+            f"}}"
+        )
+
+    def _refresh_active_editor_style(self) -> None:
+        if self._edit_widget is None or self._editing_row is None:
+            return
+        row = self._editing_row
+        if not (0 <= row < len(self.header_items)):
+            return
+        self._apply_editor_style(self._edit_widget, self.header_items[row])
 
     def _commit_edit(self, row_index: int) -> None:
         if self._edit_widget is None or self._editing_row != row_index:
@@ -347,8 +364,8 @@ class HeaderViewerView(QGraphicsView):
                 self.header_items[idx].set_dragging(False)
         self._drag_source_row = None
         self._drag_insert_pos = None
-        self._dragging        = False
-        self._press_pos       = None
+        self._dragging = False
+        self._press_pos = None
         self.viewport().update()
 
     def _update_drag(self, vp_pos: QPoint) -> None:
@@ -363,7 +380,7 @@ class HeaderViewerView(QGraphicsView):
         n = len(self.header_items)
         if n == 0:
             return
-        ctrl  = bool(modifiers & Qt.ControlModifier)
+        ctrl = bool(modifiers & Qt.ControlModifier)
         shift = bool(modifiers & Qt.ShiftModifier)
         if ctrl and shift:
             changed = self._selection.handle_shift_click(row, n)
@@ -402,7 +419,7 @@ class HeaderViewerView(QGraphicsView):
             if self._editing_row is not None and self._editing_row != row:
                 self._commit_edit(self._editing_row)
             if 0 <= row < len(self.header_items):
-                self._press_pos       = event.pos()
+                self._press_pos = event.pos()
                 self._drag_source_row = row
                 self._handle_selection(row, event.modifiers())
             else:
@@ -434,15 +451,17 @@ class HeaderViewerView(QGraphicsView):
     def mouseReleaseEvent(self, event) -> None:
         if event.button() == Qt.LeftButton:
             if self._dragging and self._drag_source_row is not None:
-                src    = self._drag_source_row
-                insert = self._drag_insert_pos if self._drag_insert_pos is not None else src
+                src = self._drag_source_row
+                insert = (
+                    self._drag_insert_pos if self._drag_insert_pos is not None else src
+                )
                 to_idx = insert if insert <= src else insert - 1
                 self._reset_drag_state()
                 self.viewport().unsetCursor()
                 if to_idx != src:
                     self._on_row_move_requested(src, to_idx)
             else:
-                self._press_pos       = None
+                self._press_pos = None
                 self._drag_source_row = None
             event.accept()
         else:
@@ -452,7 +471,7 @@ class HeaderViewerView(QGraphicsView):
         if event.button() == Qt.LeftButton:
             row = self._row_at_viewport_y(event.pos().y())
             if 0 <= row < len(self.header_items):
-                self._press_pos       = None
+                self._press_pos = None
                 self._drag_source_row = None
                 self._start_edit(row)
             event.accept()
@@ -464,9 +483,9 @@ class HeaderViewerView(QGraphicsView):
     # ------------------------------------------------------------------
 
     def keyPressEvent(self, event) -> None:
-        key  = event.key()
+        key = event.key()
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
-        n    = len(self.header_items)
+        n = len(self.header_items)
 
         if ctrl and key == Qt.Key_A:
             changed = self._selection.select_all(n)
@@ -505,12 +524,12 @@ class HeaderViewerView(QGraphicsView):
             else:
                 insert_y_scene = float(layout.total_height)
         else:
-            stride         = self._row_stride_uniform
+            stride = self._row_stride_uniform
             insert_y_scene = float(self._drag_insert_pos * stride)
 
-        vp_y     = self.mapFromScene(0, insert_y_scene).y()
+        vp_y = self.mapFromScene(0, insert_y_scene).y()
         vp_width = self.viewport().width()
-        t        = theme_manager.current
+        t = theme_manager.current
 
         painter.save()
         painter.resetTransform()
@@ -520,6 +539,7 @@ class HeaderViewerView(QGraphicsView):
         painter.setBrush(Qt.NoBrush)
         painter.drawLine(8, vp_y, vp_width - 4, vp_y)
         from PyQt5.QtGui import QBrush as _B
+
         r = 4
         painter.setBrush(_B(t.drop_indicator))
         painter.setPen(Qt.NoPen)
