@@ -83,7 +83,7 @@ class SequenceWorkspaceWidget(QWidget):
         self.splitter.addWidget(self.left_panel)
         self.splitter.addWidget(right_panel)
         # Başlangıçta dizi yok — eşit bölüm (resize sonrası güncellenir)
-        self.splitter.setSizes([500, 500])
+        self.splitter.setSizes([130, 500])
         self.splitter.splitterMoved.connect(self._on_splitter_moved)
 
         ml = QHBoxLayout(self)
