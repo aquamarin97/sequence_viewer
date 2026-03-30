@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QFileDialog
-
 from widgets.workspace import SequenceWorkspaceWidget
 
 def load_fasta_files(fasta_paths):
@@ -10,12 +9,10 @@ def load_fasta_files(fasta_paths):
     except ImportError:
         print("BioPython kurulu değil! 'pip install biopython' ile kurun.")
         return []
-
     sequences = []
     for fasta_path in fasta_paths:
         path = Path(fasta_path)
-        if not path.exists():
-            continue
+        if not path.exists(): continue
         try:
             print(f"FASTA okunuyor: {path.name}")
             count = 0
@@ -29,83 +26,91 @@ def load_fasta_files(fasta_paths):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, workspace: SequenceWorkspaceWidget) -> None:
+    def __init__(self, workspace):
         super().__init__()
         self.workspace = workspace
         self.setWindowTitle("MSA Viewer")
         self.setCentralWidget(workspace)
         self._build_menu()
 
-    def _build_menu(self) -> None:
+    def _build_menu(self):
         menubar = self.menuBar()
 
         # ---- File Menüsü ----
-        file_menu: QMenu = menubar.addMenu("File")
-        
+        file_menu = menubar.addMenu("File")
+
         open_action = QAction("Open FASTA...", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self._import_fasta_dialog)
         file_menu.addAction(open_action)
-        
+
+        # YENİ: Aligned FASTA açma — is_aligned=True yapılır
+        open_aligned_action = QAction("Open Aligned FASTA...", self)
+        open_aligned_action.setShortcut("Ctrl+Shift+O")
+        open_aligned_action.triggered.connect(self._import_aligned_fasta_dialog)
+        file_menu.addAction(open_aligned_action)
+
         file_menu.addSeparator()
-        
+
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
         # ---- Annotate menüsü ----
-        annotate_menu: QMenu = menubar.addMenu("Annotate")
-        
+        annotate_menu = menubar.addMenu("Annotate")
         find_motifs_action = QAction("Find Motifs…", self)
         find_motifs_action.setShortcut("Ctrl+F")
         find_motifs_action.triggered.connect(self.workspace.open_find_motifs_dialog)
         annotate_menu.addAction(find_motifs_action)
-
         annotate_menu.addSeparator()
-
         clear_ann_action = QAction("Clear All Annotations", self)
         clear_ann_action.triggered.connect(self.workspace.clear_annotations)
         annotate_menu.addAction(clear_ann_action)
 
         # ---- View menüsü ----
-        view_menu: QMenu = menubar.addMenu("View")
+        view_menu = menubar.addMenu("View")
         toggle_dark_action = QAction("Toggle Dark Mode", self)
         toggle_dark_action.setShortcut("Ctrl+D")
         toggle_dark_action.triggered.connect(self._toggle_dark_mode)
         view_menu.addAction(toggle_dark_action)
 
-    def _import_fasta_dialog(self) -> None:
-        """Kullanıcının dosya seçmesini sağlar ve workspace'e ekler."""
-        file_filter = "FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn);;All Files (*)"
-        file_paths, _ = QFileDialog.getOpenFileNames(
-            self, 
-            "FASTA Dosyası Seç", 
-            "", 
-            file_filter
-        )
-
+    def _import_fasta_dialog(self):
+        """Normal FASTA — is_aligned=False."""
+        file_filter = "FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn *.aln);;All Files (*)"
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "FASTA Dosyası Seç", "", file_filter)
         if file_paths:
             sequences = load_fasta_files(file_paths)
             for header, sequence in sequences:
                 self.workspace.add_sequence(header, sequence)
 
-    def _toggle_dark_mode(self) -> None:
+    def _import_aligned_fasta_dialog(self):
+        """Aligned FASTA — is_aligned=True yapılır, consensus görünür."""
+        file_filter = "FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn *.aln);;All Files (*)"
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "Aligned FASTA Dosyası Seç", "", file_filter)
+        if file_paths:
+            sequences = load_fasta_files(file_paths)
+            for header, sequence in sequences:
+                self.workspace.add_sequence(header, sequence)
+            # Hizalanmış olarak işaretle — consensus row görünür olur
+            if sequences:
+                from model.alignment_metadata import AlignmentMetadata
+                self.workspace.model.set_aligned(
+                    AlignmentMetadata(algorithm="imported", source="aligned FASTA file")
+                )
+
+    def _toggle_dark_mode(self):
         from settings.theme import theme_manager
         theme_manager.toggle()
 
 
 def main():
     app = QApplication(sys.argv)
-
     workspace = SequenceWorkspaceWidget()
     workspace.resize(1200, 600)
-
     window = MainWindow(workspace)
     window.resize(1200, 650)
     window.show()
-    
     return app.exec_()
-
 
 if __name__ == "__main__":
     sys.exit(main())

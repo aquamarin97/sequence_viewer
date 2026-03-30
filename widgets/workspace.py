@@ -1,18 +1,20 @@
 # widgets/workspace.py
+"""
+MODIFIED:
+- ConsensusSpacerWidget click → select all consensus
+- ConsensusSpacerWidget double-click → edit consensus label
+- Consensus row visibility synced with is_aligned
+- Consensus spacer visibility synced with consensus row
+"""
 from __future__ import annotations
-
 from typing import FrozenSet
-
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QHBoxLayout, QSplitter, QVBoxLayout, QWidget
-
 from features.annotation_layer.annotation_layer_widget import AnnotationLayerWidget
 from features.consensus_row.consensus_row_widget import ConsensusRowWidget
 from features.header_viewer.header_spacer_widgets import (
-    AnnotationSpacerWidget,
-    ConsensusSpacerWidget,
-    HeaderPositionSpacerWidget,
-    HeaderTopWidget,
+    AnnotationSpacerWidget, ConsensusSpacerWidget,
+    HeaderPositionSpacerWidget, HeaderTopWidget,
 )
 from features.header_viewer.header_viewer_widget import HeaderViewerWidget
 from features.navigation_ruler.navigation_ruler_widget import RulerWidget
@@ -25,12 +27,10 @@ from widgets import workspace_action_dialog_coordinator
 from widgets import workspace_annotation_presentation
 from widgets import workspace_layout_scroll_sync
 
-
 class SequenceWorkspaceWidget(QWidget):
     def __init__(self, parent=None, char_width=12.0, char_height=18.0):
         super().__init__(parent)
         row_height = int(round(char_height))
-
         self._model = AlignmentDataModel(parent=self)
 
         # Sol panel
@@ -42,15 +42,9 @@ class SequenceWorkspaceWidget(QWidget):
 
         self.left_panel = QWidget(self)
         ll = QVBoxLayout(self.left_panel)
-        ll.setContentsMargins(0, 0, 0, 0)
-        ll.setSpacing(0)
-        for w in [
-            self.header_top,
-            self.header_pos_spacer,
-            self.annotation_spacer,
-            self.consensus_spacer,
-            self.header_viewer,
-        ]:
+        ll.setContentsMargins(0,0,0,0); ll.setSpacing(0)
+        for w in [self.header_top, self.header_pos_spacer, self.annotation_spacer,
+                  self.consensus_spacer, self.header_viewer]:
             ll.addWidget(w)
 
         # Sağ panel
@@ -63,21 +57,17 @@ class SequenceWorkspaceWidget(QWidget):
 
         right_panel = QWidget(self)
         rl = QVBoxLayout(right_panel)
-        rl.setContentsMargins(0, 0, 0, 0)
-        rl.setSpacing(0)
+        rl.setContentsMargins(0,0,0,0); rl.setSpacing(0)
         for w in [self.ruler, self.pos_ruler, self.annotation_layer, self.consensus_row, self.sequence_viewer]:
             rl.addWidget(w)
 
         self.splitter = QSplitter(Qt.Horizontal, self)
-        self.splitter.addWidget(self.left_panel)
-        self.splitter.addWidget(right_panel)
+        self.splitter.addWidget(self.left_panel); self.splitter.addWidget(right_panel)
         self.splitter.setSizes([130, 500])
 
         ml = QHBoxLayout(self)
-        ml.setContentsMargins(0, 0, 0, 0)
-        ml.setSpacing(0)
-        ml.addWidget(self.splitter)
-        self.setLayout(ml)
+        ml.setContentsMargins(0,0,0,0); ml.setSpacing(0)
+        ml.addWidget(self.splitter); self.setLayout(ml)
 
         hsb_h = self.sequence_viewer.horizontalScrollBar().sizeHint().height()
         self.header_viewer.setViewportMargins(0, 0, 0, hsb_h)
@@ -113,154 +103,105 @@ class SequenceWorkspaceWidget(QWidget):
         self.header_viewer.rowsDeleteRequested.connect(self._on_rows_delete_requested)
         self.header_viewer.selectionChanged.connect(self._on_selection_changed)
 
-        self._connect_scroll_sync()
+        # Sinyaller — consensus spacer
+        self.consensus_spacer.clicked.connect(self._on_consensus_spacer_clicked)
 
+        # Alignment state → consensus visibility
+        self._model.alignmentStateChanged.connect(self._on_alignment_state_changed)
+
+        self._connect_scroll_sync()
         self.sequence_viewer.selectionChanged.connect(self.consensus_row.clear_selection)
 
         anim = getattr(self.sequence_viewer, "_zoom_animation", None)
-        if anim is not None:
-            anim.valueChanged.connect(self._on_zoom_changed)
+        if anim: anim.valueChanged.connect(self._on_zoom_changed)
         self.sequence_viewer.horizontalScrollBar().rangeChanged.connect(self._on_zoom_changed)
 
         from settings.theme import theme_manager
-
         theme_manager.themeChanged.connect(self._on_theme_changed)
         self._on_theme_changed(theme_manager.current)
 
+        # Initial consensus visibility sync
+        self._sync_consensus_visibility()
+
+    def _sync_consensus_visibility(self):
+        """Consensus spacer görünürlüğünü consensus_row ile senkronize et."""
+        # consensus_row kendi visibility'sini _update_visibility ile yönetir.
+        # isHidden() widget'ın kendi hide flag'ini kontrol eder (parent'tan bağımsız).
+        cr_active = not self.consensus_row.isHidden() and self.consensus_row.height() > 0
+        if not cr_active and self._model.is_aligned:
+            self.consensus_row._update_visibility()
+            cr_active = not self.consensus_row.isHidden() and self.consensus_row.height() > 0
+        if cr_active:
+            self.consensus_spacer.setFixedHeight(self.consensus_row.height())
+            self.consensus_spacer.setVisible(True)
+        else:
+            self.consensus_spacer.setFixedHeight(0)
+            self.consensus_spacer.setVisible(False)
+
+    def _on_alignment_state_changed(self, is_aligned):
+        self._sync_consensus_visibility()
+
+    def _on_consensus_spacer_clicked(self):
+        self._action_dialogs.on_consensus_spacer_clicked()
+
     def eventFilter(self, obj, event):
         from PyQt5.QtCore import QEvent
-
         if obj is self.annotation_layer and event.type() == QEvent.Resize:
             self.annotation_spacer.sync_height(self.annotation_layer.height())
         return super().eventFilter(obj, event)
 
-    def _on_theme_changed(self, theme) -> None:
-        """Tema değişince tüm widget arka planlarını ve scrollbar stilini güncelle."""
-        from PyQt5.QtGui import QBrush as _B
-        from PyQt5.QtGui import QPalette
+    def _on_theme_changed(self, theme):
+        from PyQt5.QtGui import QBrush as _B, QPalette
         from settings.color_styles import color_style_manager
-
         t_bg = theme.seq_bg
         for widget in (self, self.left_panel, self.splitter):
-            p = widget.palette()
-            p.setBrush(QPalette.Window, _B(t_bg))
-            widget.setAutoFillBackground(True)
-            widget.setPalette(p)
-
+            p = widget.palette(); p.setBrush(QPalette.Window, _B(t_bg))
+            widget.setAutoFillBackground(True); widget.setPalette(p)
         color_style_manager.apply_theme(theme.name)
-
         from settings.annotation_styles import annotation_style_manager as _asm
-
         _asm.apply_theme(theme.name)
-        apply_scrollbar_style(self.sequence_viewer)
-        self.update()
+        apply_scrollbar_style(self.sequence_viewer); self.update()
 
-    # Annotation callbacks
-    def _on_annotation_changed(self, *_):
-        self._annotation_presentation.on_annotation_changed()
+    def _on_annotation_changed(self, *_): self._annotation_presentation.on_annotation_changed()
+    def _on_zoom_changed(self, *_): self._annotation_presentation.on_zoom_changed()
+    def _on_annotation_layer_clicked(self, ann): self._action_dialogs.on_annotation_layer_clicked(ann)
+    def _on_annotation_layer_double_clicked(self, ann): self._action_dialogs.on_annotation_layer_double_clicked(ann)
+    def _on_ann_item_clicked(self, ann, row_index): self._action_dialogs.on_ann_item_clicked(ann, row_index)
+    def _on_ann_item_double_clicked(self, ann, row_index): self._action_dialogs.on_ann_item_double_clicked(ann, row_index)
 
-    def _on_zoom_changed(self, *_):
-        self._annotation_presentation.on_zoom_changed()
-
-    def _on_annotation_layer_clicked(self, annotation: Annotation):
-        self._action_dialogs.on_annotation_layer_clicked(annotation)
-
-    def _on_annotation_layer_double_clicked(self, annotation: Annotation):
-        self._action_dialogs.on_annotation_layer_double_clicked(annotation)
-
-    def _on_ann_item_clicked(self, annotation: Annotation, row_index: int):
-        self._action_dialogs.on_ann_item_clicked(annotation, row_index)
-
-    def _on_ann_item_double_clicked(self, annotation: Annotation, row_index: int):
-        self._action_dialogs.on_ann_item_double_clicked(annotation, row_index)
-
-    # Public annotation API
-    def add_annotation(self, row_index: int, annotation: Annotation):
-        self._model.add_annotation(row_index, annotation)
-
-    def remove_annotation(self, row_index: int, annotation_id: str):
-        self._model.remove_annotation(row_index, annotation_id)
-
+    def add_annotation(self, row_index, annotation): self._model.add_annotation(row_index, annotation)
+    def remove_annotation(self, row_index, annotation_id): self._model.remove_annotation(row_index, annotation_id)
     def clear_annotations(self):
         for i in range(self._model.row_count()):
-            try:
-                self._model.clear_annotations(i)
-            except IndexError:
-                pass
+            try: self._model.clear_annotations(i)
+            except: pass
 
-    def open_find_motifs_dialog(self):
-        self._action_dialogs.open_find_motifs_dialog()
-
-    def open_edit_annotation_dialog(self, annotation: Annotation):
-        self._action_dialogs.open_edit_annotation_dialog(annotation)
+    def open_find_motifs_dialog(self): self._action_dialogs.open_find_motifs_dialog()
+    def open_edit_annotation_dialog(self, ann): self._action_dialogs.open_edit_annotation_dialog(ann)
 
     @property
-    def model(self) -> AlignmentDataModel:
-        return self._model
+    def model(self): return self._model
 
-    # View → Model
-    def _on_header_edited(self, row_index, new_text):
-        self._action_dialogs.on_header_edited(row_index, new_text)
+    def _on_header_edited(self, row_index, new_text): self._action_dialogs.on_header_edited(row_index, new_text)
+    def _on_row_move_requested(self, from_index, to_index): self._action_dialogs.on_row_move_requested(from_index, to_index)
+    def _on_rows_delete_requested(self, rows): self._action_dialogs.on_rows_delete_requested(rows)
+    def _on_selection_changed(self, selected_rows): self._action_dialogs.on_selection_changed(selected_rows)
+    def _on_row_appended(self, index, header, sequence): self._action_dialogs.on_row_appended(index, header, sequence)
+    def _on_row_removed(self, index): self._action_dialogs.on_row_removed(index)
+    def _on_row_moved(self, from_index, to_index): self._action_dialogs.on_row_moved(from_index, to_index)
+    def _on_header_changed(self, index, new_header): self._action_dialogs.on_header_changed(index, new_header)
+    def _on_model_reset(self): self._action_dialogs.on_model_reset(); self._sync_consensus_visibility()
 
-    def _on_row_move_requested(self, from_index, to_index):
-        self._action_dialogs.on_row_move_requested(from_index, to_index)
+    def add_sequence(self, header, sequence): self._model.append_row(header, sequence)
+    def clear(self): self._model.clear()
+    def move_row(self, from_index, to_index): self._model.move_row(from_index, to_index)
+    def set_header(self, index, new_header): self._model.set_header(index, new_header)
+    def selected_rows(self): return self.header_viewer._selection.selected_rows()
 
-    def _on_rows_delete_requested(self, rows: FrozenSet[int]):
-        self._action_dialogs.on_rows_delete_requested(rows)
-
-    def _on_selection_changed(self, selected_rows):
-        self._action_dialogs.on_selection_changed(selected_rows)
-
-    # Model → View
-    def _on_row_appended(self, index, header, sequence):
-        self._action_dialogs.on_row_appended(index, header, sequence)
-
-    def _on_row_removed(self, index):
-        self._action_dialogs.on_row_removed(index)
-
-    def _on_row_moved(self, from_index, to_index):
-        self._action_dialogs.on_row_moved(from_index, to_index)
-
-    def _on_header_changed(self, index, new_header):
-        self._action_dialogs.on_header_changed(index, new_header)
-
-    def _on_model_reset(self):
-        self._action_dialogs.on_model_reset()
-
-    # Public API
-    def add_sequence(self, header, sequence):
-        self._model.append_row(header, sequence)
-
-    def clear(self):
-        self._model.clear()
-
-    def move_row(self, from_index, to_index):
-        self._model.move_row(from_index, to_index)
-
-    def set_header(self, index, new_header):
-        self._model.set_header(index, new_header)
-
-    def selected_rows(self) -> FrozenSet[int]:
-        return self.header_viewer._selection.selected_rows()
-
-    # Layout delegation
-    def _compute_row_layout(self):
-        return self._layout_sync.compute_row_layout()
-
-    def _apply_layout(self, layout):
-        self._layout_sync.apply_layout(layout)
-
-    def _remove_all_ann_items(self):
-        self._annotation_presentation.remove_all_ann_items()
-
-    def _rebuild_ann_items(self, layout):
-        self._annotation_presentation.rebuild_ann_items(layout)
-
-    def _connect_scroll_sync(self):
-        self._layout_sync.connect_scroll_sync()
-
-    def _on_splitter_moved(self, pos, index):
-        self._layout_sync.on_splitter_moved(pos, index)
-
-    def _update_header_max_width(self):
-        self._layout_sync.update_header_max_width()
+    def _compute_row_layout(self): return self._layout_sync.compute_row_layout()
+    def _apply_layout(self, layout): self._layout_sync.apply_layout(layout)
+    def _remove_all_ann_items(self): self._annotation_presentation.remove_all_ann_items()
+    def _rebuild_ann_items(self, layout): self._annotation_presentation.rebuild_ann_items(layout)
+    def _connect_scroll_sync(self): self._layout_sync.connect_scroll_sync()
+    def _on_splitter_moved(self, pos, index): self._layout_sync.on_splitter_moved(pos, index)
+    def _update_header_max_width(self): self._layout_sync.update_header_max_width()

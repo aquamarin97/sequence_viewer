@@ -1,111 +1,76 @@
-# graphics/sequence_item/sequence_item_model.py
-
 from typing import Optional, Tuple, Dict
-
 from PyQt5.QtGui import QColor
 from graphics.sequence_item.sequence_glyph_cache import default_nucleotide_color_map
 
-
 class SequenceItemModel:
     TEXT_MODE = "text"
-    BOX_MODE  = "box"
+    BOX_MODE = "box"
     LINE_MODE = "line"
-
     _TEXT_BOX_THRESHOLD = 8.0
     _BOX_LINE_THRESHOLD = 5.0
 
-    def __init__(
-        self,
-        sequence:    str,
-        char_width:  float = 12.0,
-        char_height: float = 18.0,
-        color_map:   Optional[Dict[str, QColor]] = None,
-    ) -> None:
-        self.sequence:       str = sequence
-        self.sequence_upper: str = sequence.upper()
-        self.length:         int = len(sequence)
-
-        self.char_width:  float = max(char_width, 0.001)
-        self.char_height: int   = max(1, int(round(char_height)))
-
-        # color_map: dışarıdan verilmişse sabit tutulur;
-        # verilmemişse color_style_manager'a referans kalır ve
-        # stylesChanged sinyalinde refresh_color_map() ile güncellenir.
-        self._custom_color_map: bool = color_map is not None
-        self.color_map: Dict[str, QColor] = color_map or default_nucleotide_color_map()
-
-        self.default_char_width: float = self.char_width
-        self.selection_range: Optional[Tuple[int, int]] = None
-
-        self.base_font_size:    float = self.char_height * 0.6
-        self.display_mode:      str   = self.TEXT_MODE
-        self.current_font_size: float = self.base_font_size
-        self.box_height:        float = self.char_height * 0.7
-        self.line_height:       float = self.char_height * 0.3
-
-        self._lod_max_mode: Optional[str] = None
+    def __init__(self, sequence, char_width=12.0, char_height=18.0, color_map=None):
+        self.sequence = sequence
+        self.sequence_upper = sequence.upper()
+        self.length = len(sequence)
+        self.char_width = max(char_width, 0.001)
+        self.char_height = max(1, int(round(char_height)))
+        self._custom_color_map = color_map is not None
+        self.color_map = color_map or default_nucleotide_color_map()
+        self.default_char_width = self.char_width
+        self.selection_range = None
+        self.base_font_size = self.char_height * 0.6
+        self.display_mode = self.TEXT_MODE
+        self.current_font_size = self.base_font_size
+        self.box_height = self.char_height * 0.7
+        self.line_height = self.char_height * 0.3
+        self._lod_max_mode = None
         self._update_display_state()
 
-    def refresh_color_map(self) -> None:
-        """
-        color_style_manager renk paleti değiştiğinde çağrılır.
-        Dışarıdan custom color_map verilmişse dokunulmaz.
-        """
+    def refresh_color_map(self):
         if not self._custom_color_map:
             self.color_map = default_nucleotide_color_map()
 
-    def set_char_width(self, new_width: float) -> None:
+    def set_char_width(self, new_width):
         self.char_width = max(new_width, 0.001)
         self._update_display_state()
 
-    def _update_display_state(self) -> None:
-        if self.default_char_width <= 0:
-            self.default_char_width = 12.0
-        cw      = max(self.char_width, 0.001)
+    def _update_display_state(self):
+        if self.default_char_width <= 0: self.default_char_width = 12.0
+        cw = max(self.char_width, 0.001)
         base_cw = max(self.default_char_width, 0.001)
-        scale   = cw / base_cw
-
-        if scale >= 1.8:   snapped_size = 12.0
+        scale = cw / base_cw
+        if scale >= 1.8: snapped_size = 12.0
         elif scale >= 1.2: snapped_size = 10.0
         elif scale >= 0.7: snapped_size = 8.0
-        else:              snapped_size = max(1.0, self.base_font_size * scale)
-
+        else: snapped_size = max(1.0, self.base_font_size * scale)
         self.current_font_size = snapped_size
-
-        if self.current_font_size >= self._TEXT_BOX_THRESHOLD:
-            self.display_mode = self.TEXT_MODE
-        elif self.current_font_size >= self._BOX_LINE_THRESHOLD:
-            self.display_mode = self.BOX_MODE
-        else:
-            self.display_mode = self.LINE_MODE
-
+        if self.current_font_size >= self._TEXT_BOX_THRESHOLD: self.display_mode = self.TEXT_MODE
+        elif self.current_font_size >= self._BOX_LINE_THRESHOLD: self.display_mode = self.BOX_MODE
+        else: self.display_mode = self.LINE_MODE
         box_ref = min(self.char_height * 0.7, self.current_font_size)
-        self.box_height  = max(box_ref, 1.0)
+        self.box_height = max(box_ref, 1.0)
         self.line_height = self.char_height * 0.3
 
-    def set_selection(self, start_col: int, end_col: int) -> None:
+    def set_selection(self, start_col, end_col):
         start = max(0, min(start_col, end_col))
-        end   = min(self.length, max(start_col, end_col) + 1)
+        end = min(self.length, max(start_col, end_col) + 1)
         self.selection_range = (start, end) if start < end else None
 
-    def clear_selection(self) -> None:
-        self.selection_range = None
+    def clear_selection(self): self.selection_range = None
 
     @staticmethod
-    def _mode_order(mode: str) -> int:
+    def _mode_order(mode):
         if mode == SequenceItemModel.TEXT_MODE: return 0
-        if mode == SequenceItemModel.BOX_MODE:  return 1
+        if mode == SequenceItemModel.BOX_MODE: return 1
         return 2
 
-    def set_lod_max_mode(self, mode: Optional[str]) -> None:
-        if mode not in (None, self.TEXT_MODE, self.BOX_MODE, self.LINE_MODE):
-            return
+    def set_lod_max_mode(self, mode):
+        if mode not in (None, self.TEXT_MODE, self.BOX_MODE, self.LINE_MODE): return
         self._lod_max_mode = mode
 
-    def get_effective_mode(self) -> str:
+    def get_effective_mode(self):
         base_mode = self.display_mode
-        if self._lod_max_mode is None:
-            return base_mode
-        if self._mode_order(base_mode) < self._mode_order(self._lod_max_mode):
-            return self._lod_max_mode
+        if self._lod_max_mode is None: return base_mode
+        if self._mode_order(base_mode) < self._mode_order(self._lod_max_mode): return self._lod_max_mode
         return base_mode

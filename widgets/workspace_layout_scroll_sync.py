@@ -1,39 +1,26 @@
 from __future__ import annotations
-
 from typing import TYPE_CHECKING, List
-
 from PyQt5.QtWidgets import QScrollBar
-
 from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
 from widgets.row_layout import RowLayout, strip_height
 
 if TYPE_CHECKING:
     from widgets.workspace import SequenceWorkspaceWidget
 
-
 class _ScrollSyncGuard:
-    def __init__(self):
-        self._locked = False
-
-    def sync(self, target: QScrollBar, value: int):
-        if self._locked:
-            return
+    def __init__(self): self._locked = False
+    def sync(self, target, value):
+        if self._locked: return
         self._locked = True
-        try:
-            target.setValue(value)
-        finally:
-            self._locked = False
-
+        try: target.setValue(value)
+        finally: self._locked = False
 
 class WorkspaceLayoutScrollSync:
-    def __init__(self, workspace: "SequenceWorkspaceWidget"):
-        self.workspace = workspace
-        self._v_scroll_guard = _ScrollSyncGuard()
+    def __init__(self, workspace): self.workspace = workspace; self._v_scroll_guard = _ScrollSyncGuard()
 
-    def compute_row_layout(self) -> RowLayout:
+    def compute_row_layout(self):
         ch = self.workspace.sequence_viewer.char_height
-        above_heights: List[int] = []
-        below_heights: List[int] = []
+        above_heights, below_heights = [], []
         for record in self.workspace.model.all_records():
             above_anns = [a for a in record.annotations if a.type.is_above_sequence()]
             below_anns = [a for a in record.annotations if not a.type.is_above_sequence()]
@@ -41,7 +28,7 @@ class WorkspaceLayoutScrollSync:
             below_heights.append(strip_height(lane_count(assign_lanes(below_anns))))
         return RowLayout.build(ch, above_heights, below_heights)
 
-    def apply_layout(self, layout: RowLayout):
+    def apply_layout(self, layout):
         self.workspace.sequence_viewer.apply_row_layout(layout)
         self.workspace.header_viewer.apply_row_layout(layout)
 
@@ -53,8 +40,7 @@ class WorkspaceLayoutScrollSync:
 
     def on_splitter_moved(self, _pos, _index):
         sizes = self.workspace.splitter.sizes()
-        if len(sizes) < 2 or not self.workspace.header_viewer.header_items:
-            return
+        if len(sizes) < 2 or not self.workspace.header_viewer.header_items: return
         left, right = sizes
         required = self.workspace.header_viewer.compute_required_width()
         if left > required:

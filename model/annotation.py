@@ -1,33 +1,15 @@
 # model/annotation.py
-"""
-Tek bir annotasyonun domain modeli.
-
-AnnotationType genişletme rehberi
-----------------------------------
-Yeni bir tip eklemek için:
-1. AnnotationType enum'una değer ekle.
-2. display_name() sözlüğüne ekle.
-3. default_color() sözlüğüne ekle.
-4. is_above_sequence() metodunu güncelle.
-5. annotation_painter.py içinde draw_* fonksiyonunu ekle/güncelle.
-6. annotation_graphics_item.py ve annotation_layer_widget.py
-   paint() metodlarını güncelle.
-"""
-
 from __future__ import annotations
-
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Optional
-
 from PyQt5.QtGui import QColor
 
-
 class AnnotationType(Enum):
-    PRIMER          = auto()   # Forward veya reverse primer; yön strand ile belirlenir
-    PROBE           = auto()   # Hibridizasyon probu; yön strand ile belirlenir
-    REPEATED_REGION = auto()   # Tekrarlayan bölge (alt şeritte gösterilir)
+    PRIMER          = auto()
+    PROBE           = auto()
+    REPEATED_REGION = auto()
 
     def display_name(self) -> str:
         return {
@@ -37,42 +19,17 @@ class AnnotationType(Enum):
         }[self]
 
     def default_color(self) -> QColor:
-        """
-        Varsayılan rengi color_style_manager'dan alır.
-        Bu sayede kullanıcı Settings üzerinden rengi değiştirebilir.
-        """
         from settings.color_styles import color_style_manager
         return color_style_manager.annotation_color(self)
 
     def is_above_sequence(self) -> bool:
-        """
-        True  → annotation dizinin ÜSTÜNDE render edilir (primer, probe).
-        False → annotation dizinin ALTINDA render edilir (repeated region, vb.).
-
-        Yeni bir tip eklendiğinde bu metod güncellenmeli.
-        """
-        return self in (
-            AnnotationType.PRIMER,
-            AnnotationType.PROBE,
-        )
+        return self in (AnnotationType.PRIMER, AnnotationType.PROBE,)
 
     def uses_strand(self) -> bool:
-        """True ise annotation yön (strand) bilgisi taşır ve ok şekli kullanır."""
-        return self in (
-            AnnotationType.PRIMER,
-            AnnotationType.PROBE,
-        )
-
+        return self in (AnnotationType.PRIMER, AnnotationType.PROBE,)
 
 @dataclass
 class Annotation:
-    """
-    Tek bir annotasyonun tam veri modeli.
-
-    strand : "+" → forward (sağa ok), "-" → reverse (sola ok).
-             uses_strand() False ise strand yoksayılır.
-    """
-
     type:        AnnotationType
     start:       int
     end:         int
