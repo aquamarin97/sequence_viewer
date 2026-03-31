@@ -33,6 +33,7 @@ class SequenceViewerView(QGraphicsView):
         self.sequence_items = []
         # Çoklu dikey guide (col index listesi)
         self._v_guide_cols: list = []
+        self._v_guide_observers: list = []
         self._h_guide_rows = frozenset()
         self._zoom_animation = QVariantAnimation(self)
         self._zoom_animation.setEasingCurve(QEasingCurve.OutCubic)
@@ -101,9 +102,18 @@ class SequenceViewerView(QGraphicsView):
 
     def set_v_guides(self, cols: list):
         """Dikey guide kolonlarını ayarla (boş liste = temizle)."""
-        self._v_guide_cols = list(cols); self.viewport().update()
+        self._v_guide_cols = list(cols)
+        self.viewport().update()
+        for cb in self._v_guide_observers: cb()
+
     def clear_v_guides(self):
-        self._v_guide_cols = []; self.viewport().update()
+        self._v_guide_cols = []
+        self.viewport().update()
+        for cb in self._v_guide_observers: cb()
+
+    def add_v_guide_observer(self, callback):
+        """Guide state değişince çağrılacak callback ekle."""
+        self._v_guide_observers.append(callback)
 
     # Geriye dönük uyumluluk — eski tek-guide API'si
     def set_guide_cols(self, start_col, end_col):
@@ -199,7 +209,24 @@ class SequenceViewerView(QGraphicsView):
                     pass
 
                 draw_top = min(ruler_bottom_in_vp, 0.0)  # viewport'un üstünden başla
+
+                # Consensus row'un altına kadar uzat
                 draw_bottom = float(self.viewport().height())
+                try:
+                    from features.consensus_row.consensus_row_widget import ConsensusRowWidget
+                    p = parent_widget
+                    while p is not None:
+                        for child in p.children():
+                            if isinstance(child, ConsensusRowWidget) and child.isVisible() and child.height() > 0:
+                                child_bottom_global = child.mapToGlobal(child.rect().bottomLeft())
+                                vp_top_global = self.viewport().mapToGlobal(self.viewport().rect().topLeft())
+                                consensus_bottom_in_vp = float(child_bottom_global.y() - vp_top_global.y())
+                                if consensus_bottom_in_vp > draw_bottom:
+                                    draw_bottom = consensus_bottom_in_vp
+                                raise StopIteration
+                        p = p.parent()
+                except StopIteration:
+                    pass
 
                 painter.save(); painter.resetTransform()
                 pen = QPen(_GUIDE_COLOR, _GUIDE_WIDTH, Qt.DashLine)

@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Optional, List
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont, QFontMetrics
 from PyQt5.QtWidgets import QWidget, QScrollBar
@@ -12,12 +12,25 @@ class SequencePositionRulerWidget(QWidget):
         super().__init__(parent); self.viewer = viewer
         self.setMinimumHeight(24); self.setMaximumHeight(24)
         self.font = QFont("Arial", 8); self._model = PositionRulerModel()
+        self._extra_special_positions: List[int] = []
         hbar = self.viewer.horizontalScrollBar()
         hbar.valueChanged.connect(self._on_view_changed); hbar.rangeChanged.connect(self._on_view_changed)
         self.viewer.selectionChanged.connect(self._on_view_changed)
+        # Guide kolonları değişince ruler'ı güncelle
+        self.viewer.add_v_guide_observer(self._on_guides_changed)
         theme_manager.themeChanged.connect(lambda _: self.update())
 
     def _on_view_changed(self, *_): self.update()
+
+    def _on_guides_changed(self):
+        """Guide kolonları değişince special pozisyonları güncelle ve repaint."""
+        ctrl = getattr(self.viewer, '_controller', None)
+        if ctrl is not None:
+            # Her guide kolonu sağındaki NA pozisyonunu gösterir (col + 1, 1-indexed)
+            self._extra_special_positions = [col + 1 for col in ctrl._v_guide_cols]
+        else:
+            self._extra_special_positions = []
+        self.update()
 
     def _update_model_from_viewer(self):
         max_len = getattr(self.viewer, "max_sequence_length", 0)
@@ -30,7 +43,13 @@ class SequencePositionRulerWidget(QWidget):
         else: char_width = float(self.viewer.char_width)
         selection_cols = getattr(self.viewer, "current_selection_cols", None)
         self._model.set_state(max_len=max_len, view_left=view_left, view_width=view_width, char_width=char_width, selection_cols=selection_cols)
-        return self._model.compute_layout()
+        layout = self._model.compute_layout()
+        # Guide pozisyonlarını special_positions'a ekle
+        if layout is not None and self._extra_special_positions:
+            for pos in self._extra_special_positions:
+                if pos not in layout.special_positions:
+                    layout.special_positions.append(pos)
+        return layout
 
     def paintEvent(self, event):
         painter = QPainter(self); rect = self.rect(); width = rect.width(); height = rect.height()

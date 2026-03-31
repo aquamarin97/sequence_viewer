@@ -110,12 +110,9 @@ class SequenceViewerController:
                 # Drag sırasında guide'ları canlı güncelle
                 col_start, col_end = sel_range[2], sel_range[3]
                 if col_end > col_start:
-                    live_guides = list(self._v_guide_cols)
                     left_b, right_b = col_start, col_end + 1
-                    # Geçici live guide'ları ekle (kalıcı listeyi değiştirme)
-                    live = [g for g in live_guides if g not in (left_b, right_b)]
-                    live += [left_b, right_b]
-                    self._view.set_v_guides(live)
+                    self._v_guide_cols = [left_b, right_b]
+                    self._view.set_v_guides(self._v_guide_cols)
                 else:
                     self._view.set_v_guides(self._v_guide_cols)
             else:

@@ -7,7 +7,7 @@ MODIFIED:
 from __future__ import annotations
 import math
 from typing import Optional, Tuple
-from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtCore import Qt, QRectF, QPointF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont
 from PyQt5.QtWidgets import QApplication, QWidget, QScrollBar
 from features.consensus_row.consensus_row_model import ConsensusRowModel
@@ -188,6 +188,14 @@ class ConsensusRowWidget(QWidget):
             self._drag_started = False
             self._is_selected = True
             self._notify_header_cleared()
+            # Position ruler'ı güncelle
+            try:
+                p = self.parent()
+                while p is not None:
+                    if hasattr(p, 'pos_ruler'):
+                        p.pos_ruler.update(); break
+                    p = p.parent()
+            except: pass
             event.accept()
         else: super().mousePressEvent(event)
 
@@ -200,32 +208,38 @@ class ConsensusRowWidget(QWidget):
 
         if not self._drag_started and delta >= _DRAG_THRESHOLD_PX:
             self._drag_started = True
-            # Ctrl yoksa guide'ları temizle
-            ctrl = getattr(self._get_controller(), '_v_guide_cols', None)
-            if not bool(event.modifiers() & Qt.ControlModifier):
-                c = self._get_controller()
-                if c is not None:
-                    c._v_guide_cols.clear()
-                    self._sequence_viewer.set_v_guides(c._v_guide_cols)
+            ctrl = bool(event.modifiers() & Qt.ControlModifier)
+            c = self._get_controller()
+            if not ctrl and c is not None:
+                c._v_guide_cols.clear()
+                self._sequence_viewer.set_v_guides(c._v_guide_cols)
             self.setCursor(Qt.SizeHorCursor)
+            # Drag başladığı anda başlangıç kolonu için guide'ı hemen göster
+            if c is not None and self._press_scene_col is not None:
+                col = self._scene_col_at_x(float(event.pos().x()))
+                lo, hi = min(self._press_scene_col, col), max(self._press_scene_col, col)
+                if hi > lo:
+                    self._selection = (lo, hi)
+                    left_b, right_b = lo, hi + 1
+                    c._v_guide_cols = [left_b, right_b]
+                    self._sequence_viewer.set_v_guides(c._v_guide_cols)
+                    self.update()
 
         if self._drag_started:
             col = self._scene_col_at_x(float(event.pos().x()))
             start = self._press_scene_col
             if start is not None:
                 lo, hi = min(start, col), max(start, col)
+                c = self._get_controller()
                 if hi > lo:
                     self._selection = (lo, hi)
-                    # Guide'ları canlı güncelle
-                    c = self._get_controller()
                     if c is not None:
                         left_b, right_b = lo, hi + 1
-                        live = [g for g in c._v_guide_cols if g not in (left_b, right_b)]
-                        live += [left_b, right_b]
-                        self._sequence_viewer.set_v_guides(live)
+                        # Drag aktifken sadece bu ikisini göster — önceki drag değerlerini biriktirme
+                        c._v_guide_cols = [left_b, right_b]
+                        self._sequence_viewer.set_v_guides(c._v_guide_cols)
                 else:
                     self._selection = None
-                    c = self._get_controller()
                     if c is not None:
                         self._sequence_viewer.set_v_guides(c._v_guide_cols)
                 self.update()
@@ -382,4 +396,20 @@ class ConsensusRowWidget(QWidget):
                 glyph = GLYPH_CACHE.get_glyph(base, self._font, color)
                 dx = x + (cw - glyph.width()) / 2.0; dy = (ch - glyph.height()) / 2.0
                 painter.drawPixmap(int(dx), int(dy), glyph)
+
+        # ---- Dikey kılavuz çizgileri ----
+        ctrl = self._get_controller()
+        if ctrl is not None and ctrl._v_guide_cols:
+            from PyQt5.QtGui import QColor as _QColor
+            _GUIDE_COLOR = _QColor(80, 130, 220, 160)
+            hbar = self._sequence_viewer.horizontalScrollBar()
+            offset = float(hbar.value())
+            vp_w = float(self.width())
+            pen = QPen(_GUIDE_COLOR, 1, Qt.DashLine)
+            pen.setDashPattern([4, 3]); painter.setPen(pen)
+            for gcol in ctrl._v_guide_cols:
+                vp_x = gcol * cw - offset
+                if -10 <= vp_x <= vp_w + 10:
+                    painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, ch))
+
         painter.end()

@@ -66,8 +66,9 @@ class WorkspaceActionDialogCoordinator:
             except IndexError: pass
 
     def on_selection_changed(self, selected_rows):
-        # Herhangi bir header seçilince consensus vurgusunu ve guide'ları kaldır
+        # Herhangi bir header seçilince consensus vurgusunu, seçimini ve guide'ları kaldır
         self.workspace.consensus_spacer.set_selected(False)
+        self.workspace.consensus_row.clear_selection()
         self.workspace.sequence_viewer.clear_v_guides()
         if not selected_rows:
             self.workspace.sequence_viewer.clear_h_guides()

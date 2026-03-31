@@ -113,6 +113,10 @@ class SequenceWorkspaceWidget(QWidget):
         self.sequence_viewer.selectionChanged.connect(self.consensus_row.clear_selection)
         self.sequence_viewer.selectionChanged.connect(
             lambda: self.consensus_spacer.set_selected(False))
+        # Consensus row guide çizgilerini sequence_viewer guide state'i ile senkronize et
+        self.sequence_viewer.add_v_guide_observer(self.consensus_row.update)
+        # Consensus tıklaması position ruler'ı güncelle
+        self.sequence_viewer.add_v_guide_observer(self.pos_ruler.update)
 
         anim = getattr(self.sequence_viewer, "_zoom_animation", None)
         if anim: anim.valueChanged.connect(self._on_zoom_changed)
