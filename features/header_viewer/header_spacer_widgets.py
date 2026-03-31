@@ -10,6 +10,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QBrush, QFont
 from PyQt5.QtWidgets import QWidget, QLineEdit
 from settings.theme import theme_manager
+from PyQt5.QtGui import QColor
 
 class HeaderTopWidget(QWidget):
     def __init__(self, height=28, parent=None):
@@ -71,6 +72,12 @@ class ConsensusSpacerWidget(QWidget):
         self.setFocusPolicy(Qt.ClickFocus)
         theme_manager.themeChanged.connect(lambda _: self.update())
 
+    def _label_font(self):
+        font = QFont("Arial")
+        font.setItalic(True)
+        font.setPointSizeF(max(1.0, self.height() * 0.5))
+        return font
+
     @property
     def label(self): return self._label
     @label.setter
@@ -83,15 +90,15 @@ class ConsensusSpacerWidget(QWidget):
     def paintEvent(self, event):
         if not self.isVisible() or self.height() == 0: return
         painter = QPainter(self); t = theme_manager.current; rect = self.rect()
+        painter.fillRect(rect, QBrush(t.row_bg_odd))
         if self._selected:
-            painter.fillRect(rect, QBrush(t.row_bg_selected))
-        else:
-            painter.fillRect(rect, QBrush(t.row_bg_odd))
+            band = QColor(t.row_band_highlight)
+            painter.fillRect(rect, QBrush(band))
         if self._selected:
             painter.setPen(Qt.NoPen)
             painter.setBrush(QBrush(t.drop_indicator))
             painter.drawRect(0, 0, 2, rect.height())
-        font = QFont("Arial", 8); font.setItalic(True)
+        font = self._label_font()
         painter.setFont(font)
         text_color = t.text_selected if self._selected else t.text_primary
         painter.setPen(QPen(text_color))
@@ -104,6 +111,15 @@ class ConsensusSpacerWidget(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.setFocus()
+            # Guide çizgilerini temizle
+            try:
+                p = self.parent()
+                while p is not None:
+                    if hasattr(p, 'sequence_viewer'):
+                        p.sequence_viewer.clear_v_guides()
+                        break
+                    p = p.parent()
+            except: pass
             self.clicked.emit()
             event.accept()
         else: super().mousePressEvent(event)

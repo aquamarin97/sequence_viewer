@@ -27,9 +27,11 @@ class ConsensusRowWidget(QWidget):
         from settings.color_styles import color_style_manager as _csm
         self._color_map = _csm.consensus_nucleotide_color_map()
         self._selection = None; self._press_col = None; self._is_selected = False
+        self._press_pos = None; self._drag_started = False; self._press_scene_col = None
         ch = int(round(sequence_viewer.char_height))
         self.setFixedHeight(ch)
         self.setMinimumWidth(0); self.setMouseTracking(True); self.setFocusPolicy(Qt.ClickFocus)
+        self.setCursor(Qt.IBeamCursor)
 
         self._alignment_model.rowAppended.connect(self._on_data_changed)
         self._alignment_model.rowRemoved.connect(self._on_data_changed)
@@ -135,45 +137,142 @@ class ConsensusRowWidget(QWidget):
         if items: return items[0]._model.get_effective_mode()
         return "text"
 
+    def _scene_col_at_x(self, vp_x: float) -> int:
+        """Viewport x → NA kolonu (tam NA, kesme yok)."""
+        cw = self._get_char_width()
+        if cw <= 0: return 0
+        scene_x = vp_x + self._get_view_left()
+        return int(scene_x / cw)
+
+    def _boundary_col_at_x(self, vp_x: float) -> int:
+        """Viewport x → en yakın NA sınırı (yarı-yarıya bölünmüş)."""
+        cw = self._get_char_width()
+        if cw <= 0: return 0
+        scene_x = vp_x + self._get_view_left()
+        return int(round(scene_x / cw))
+
+    def _get_controller(self):
+        ctrl = getattr(self._sequence_viewer, '_controller', None)
+        return ctrl
+
+    def _notify_header_cleared(self):
+        """Header seçimini temizle, workspace'e bildir — guide'ları etkileme."""
+        try:
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, 'consensus_spacer') and hasattr(p, 'header_viewer'):
+                    p.consensus_spacer.set_selected(True)
+                    changed = p.header_viewer._selection.clear()
+                    p.header_viewer.apply_selection_to_items(changed)
+                    # on_selection_changed'i ÇAĞIRMA — o clear_v_guides yapar
+                    # Sadece h_guides'ı temizle, v_guides'a dokunma
+                    p.sequence_viewer.clear_h_guides()
+                    for item in p.sequence_viewer.sequence_items:
+                        item.clear_selection()
+                    p.sequence_viewer.scene.invalidate()
+                    p.sequence_viewer.viewport().update()
+                    break
+                p = p.parent()
+        except: pass
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.setFocus()
-            # Sequence viewer seçimini temizle
             self._sequence_viewer.clear_visual_selection()
             try: self._sequence_viewer._model.clear_selection()
             except: pass
-            # Kendini seçili yap, tüm diziyi seç
+            # Drag threshold için press pozisyonunu sakla
+            from PyQt5.QtCore import QPoint
+            self._press_pos = QPoint(event.pos())
+            self._press_scene_col = self._scene_col_at_x(float(event.pos().x()))
+            self._drag_started = False
             self._is_selected = True
-            consensus = self._get_consensus()
-            if consensus:
-                self._selection = (0, len(consensus) - 1)
-            self.update()
-            # Workspace'e bildir — header seçimini temizletir
-            try:
-                p = self.parent()
-                while p is not None:
-                    if hasattr(p, 'consensus_spacer') and hasattr(p, 'header_viewer'):
-                        p.consensus_spacer.set_selected(True)
-                        changed = p.header_viewer._selection.clear()
-                        p.header_viewer.apply_selection_to_items(changed)
-                        p.header_viewer._on_selection_changed(frozenset())
-                        break
-                    p = p.parent()
-            except: pass
+            self._notify_header_cleared()
             event.accept()
         else: super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.LeftButton and self._press_col is not None:
-            col = self._col_at_x(float(event.pos().x()))
-            if col is not None:
-                lo, hi = min(self._press_col, col), max(self._press_col, col)
-                self._selection = (lo, hi); self.update()
+        if self._press_pos is None:
+            super().mouseMoveEvent(event); return
+
+        delta = (event.pos() - self._press_pos).manhattanLength()
+        _DRAG_THRESHOLD_PX = 4
+
+        if not self._drag_started and delta >= _DRAG_THRESHOLD_PX:
+            self._drag_started = True
+            # Ctrl yoksa guide'ları temizle
+            ctrl = getattr(self._get_controller(), '_v_guide_cols', None)
+            if not bool(event.modifiers() & Qt.ControlModifier):
+                c = self._get_controller()
+                if c is not None:
+                    c._v_guide_cols.clear()
+                    self._sequence_viewer.set_v_guides(c._v_guide_cols)
+            self.setCursor(Qt.SizeHorCursor)
+
+        if self._drag_started:
+            col = self._scene_col_at_x(float(event.pos().x()))
+            start = self._press_scene_col
+            if start is not None:
+                lo, hi = min(start, col), max(start, col)
+                if hi > lo:
+                    self._selection = (lo, hi)
+                    # Guide'ları canlı güncelle
+                    c = self._get_controller()
+                    if c is not None:
+                        left_b, right_b = lo, hi + 1
+                        live = [g for g in c._v_guide_cols if g not in (left_b, right_b)]
+                        live += [left_b, right_b]
+                        self._sequence_viewer.set_v_guides(live)
+                else:
+                    self._selection = None
+                    c = self._get_controller()
+                    if c is not None:
+                        self._sequence_viewer.set_v_guides(c._v_guide_cols)
+                self.update()
             event.accept()
-        else: super().mouseMoveEvent(event)
+        else:
+            super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton: self._press_col = None; event.accept()
+        if event.button() == Qt.LeftButton:
+            self.unsetCursor()
+            self.setCursor(Qt.IBeamCursor)
+
+            if self._drag_started:
+                # Drag bitti — guide'ları kalıcı hale getir
+                self._drag_started = False
+                self._press_pos = None
+                c = self._get_controller()
+                if c is not None and self._selection is not None:
+                    lo, hi = self._selection
+                    if hi > lo:
+                        ctrl = bool(event.modifiers() & Qt.ControlModifier)
+                        if not ctrl:
+                            c._v_guide_cols.clear()
+                        for b in (lo, hi + 1):
+                            if b not in c._v_guide_cols:
+                                c._v_guide_cols.append(b)
+                        self._sequence_viewer.set_v_guides(c._v_guide_cols)
+            else:
+                # Drag yok → boundary tıklama → guide
+                self._press_pos = None
+                self._drag_started = False
+                self._selection = None
+                boundary_col = self._boundary_col_at_x(float(event.pos().x()))
+                c = self._get_controller()
+                if c is not None:
+                    ctrl = bool(event.modifiers() & Qt.ControlModifier)
+                    if ctrl:
+                        if boundary_col in c._v_guide_cols:
+                            c._v_guide_cols.remove(boundary_col)
+                        else:
+                            c._v_guide_cols.append(boundary_col)
+                    else:
+                        c._v_guide_cols = [boundary_col]
+                    self._sequence_viewer.set_v_guides(c._v_guide_cols)
+
+            self.update()
+            event.accept()
         else: super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):
@@ -220,9 +319,12 @@ class ConsensusRowWidget(QWidget):
         painter.setRenderHint(QPainter.TextAntialiasing, True)
         rect = self.rect(); width = rect.width(); height = rect.height()
         t = theme_manager.current
-        # Seçim vurgusu: header seçimi veya kısmi seçim varsa
+        # Seçim vurgusu: her zaman row_bg_odd arka plan, seçimde hafif overlay
         is_selected = self._is_selected
-        painter.fillRect(rect, QBrush(t.row_bg_selected if is_selected else t.row_bg_odd))
+        painter.fillRect(rect, QBrush(t.row_bg_odd))
+        if is_selected:
+            band = QColor(t.row_band_highlight)
+            painter.fillRect(rect, QBrush(band))
         # Sol kenar çizgisi (seçili iken)
         if is_selected:
             painter.setPen(Qt.NoPen)
@@ -231,7 +333,9 @@ class ConsensusRowWidget(QWidget):
         painter.setPen(QPen(t.border_normal)); painter.drawLine(0, height-1, width, height-1)
         sequences = [seq for _, seq in self._alignment_model.all_rows()]
         if not sequences:
-            painter.setPen(QPen(t.text_primary)); painter.setFont(self._font)
+            label_font = QFont("Arial")
+            label_font.setPointSizeF(max(1.0, height * 0.5))
+            painter.setPen(QPen(t.text_primary)); painter.setFont(label_font)
             painter.drawText(rect.adjusted(6,0,0,0), Qt.AlignVCenter|Qt.AlignLeft, "—")
             painter.end(); return
         consensus = self._model.get_consensus(sequences)
