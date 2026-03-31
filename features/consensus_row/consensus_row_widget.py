@@ -31,6 +31,7 @@ class ConsensusRowWidget(QWidget):
         self._selection = None; self._press_col = None; self._is_selected = False
         self._press_pos = None; self._drag_started = False; self._press_scene_col = None
         self._hit_rects: list = []
+        self._press_on_annotation = False
         ch = int(round(sequence_viewer.char_height))
         self.setFixedHeight(ch)
         self.setMinimumWidth(0); self.setMouseTracking(True); self.setFocusPolicy(Qt.ClickFocus)
@@ -99,6 +100,8 @@ class ConsensusRowWidget(QWidget):
                     if h > 0:
                         p.consensus_spacer.setFixedHeight(h)
                         p.consensus_spacer.setVisible(True)
+                        above_h, ch, _ = self._compute_heights()
+                        p.consensus_spacer.sync_seq_region(float(above_h), float(ch))
                     else:
                         p.consensus_spacer.setFixedHeight(0)
                         p.consensus_spacer.setVisible(False)
@@ -218,6 +221,18 @@ class ConsensusRowWidget(QWidget):
                 p = p.parent()
         except: pass
 
+    def _notify_edit_annotation(self, ann):
+        """Consensus annotation düzenleme diyaloğunu workspace üzerinden aç."""
+        try:
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, 'open_edit_consensus_annotation_dialog'):
+                    p.open_edit_consensus_annotation_dialog(ann)
+                    return
+                p = p.parent()
+        except Exception:
+            pass
+
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
             ann = self._annotation_at(event.pos())
@@ -250,8 +265,10 @@ class ConsensusRowWidget(QWidget):
             # Annotation tıklaması — seçim + guide
             ann = self._annotation_at(event.pos())
             if ann:
+                self._press_on_annotation = True
                 self._select_annotation_range(ann)
                 event.accept(); return
+            self._press_on_annotation = False
             self.setFocus()
             self._sequence_viewer.clear_visual_selection()
             try: self._sequence_viewer._model.clear_selection()
@@ -351,9 +368,15 @@ class ConsensusRowWidget(QWidget):
                                 c._v_guide_cols.append(b)
                         self._sequence_viewer.set_v_guides(c._v_guide_cols)
             else:
-                # Drag yok → boundary tıklama → guide
                 self._press_pos = None
                 self._drag_started = False
+                if self._press_on_annotation:
+                    # Annotation click'i: selection press'te set edildi, temizleme
+                    self._press_on_annotation = False
+                    self.update()
+                    event.accept()
+                    return
+                # Drag yok → boundary tıklama → guide
                 self._selection = None
                 boundary_col = self._boundary_col_at_x(float(event.pos().x()))
                 c = self._get_controller()

@@ -7,10 +7,15 @@ from .sequence_viewer_controller import SequenceViewerController
 
 class SequenceViewerWidget(SequenceViewerView):
     selectionChanged = pyqtSignal()
+    rowClicked = pyqtSignal(int, int)  # (row_start, row_end)
     def __init__(self, parent=None, *, char_width=12.0, char_height=18.0):
         super().__init__(parent=parent, char_width=char_width, char_height=char_height)
         self._model = SequenceViewerModel()
-        self._controller = SequenceViewerController(model=self._model, view=self, on_selection_changed=self.selectionChanged.emit)
+        self._controller = SequenceViewerController(
+            model=self._model, view=self,
+            on_selection_changed=self.selectionChanged.emit,
+            on_row_clicked=self.rowClicked.emit,
+        )
         self.set_controller(self._controller)
         self._alignment_model = None
 

@@ -19,15 +19,49 @@ class WorkspaceActionDialogCoordinator:
         self.do_edit_dialog(annotation, row_index=None)
 
     def on_ann_item_clicked(self, annotation, row_index):
-        self.workspace.sequence_viewer.set_guide_cols(annotation.start, annotation.end)
-        n = self.workspace.model.row_count()
+        ws = self.workspace
+        n = ws.model.row_count()
+
+        # Header seçimini temizle + row_index'i vurgula (on_selection_changed tetiklenmeden)
+        clear_changed = ws.header_viewer._selection.clear()
         if 0 <= row_index < n:
-            self.workspace.sequence_viewer.set_visual_selection(row_index, row_index, annotation.start, annotation.end)
-            self.workspace.sequence_viewer._model.start_selection(row_index, annotation.start)
-            self.workspace.sequence_viewer._model.update_selection(row_index, annotation.end)
+            click_changed = ws.header_viewer._selection.handle_click(row_index, n)
+            ws.header_viewer.apply_selection_to_items(clear_changed | click_changed)
+        else:
+            ws.header_viewer.apply_selection_to_items(clear_changed)
+
+        # Consensus row/spacer temizle
+        ws.consensus_spacer.set_selected(False)
+        ws.consensus_row.clear_selection()
+
+        # H-guide: annotation satırını vurgula (bant + üst/alt çizgi)
+        if 0 <= row_index < n:
+            ws.sequence_viewer.set_h_guides(frozenset({row_index}))
+        else:
+            ws.sequence_viewer.clear_h_guides()
+
+        # V-guide: annotation sütun aralığı
+        ws.sequence_viewer.set_guide_cols(annotation.start, annotation.end)
+
+        # Görsel seçim: sadece annotation sütun aralığı
+        if 0 <= row_index < n:
+            ws.sequence_viewer.set_visual_selection(row_index, row_index, annotation.start, annotation.end)
+            ws.sequence_viewer._model.start_selection(row_index, annotation.start)
+            ws.sequence_viewer._model.update_selection(row_index, annotation.end)
 
     def on_ann_item_double_clicked(self, annotation, _row_index):
         self.workspace.open_edit_annotation_dialog(annotation)
+
+    def on_consensus_annotation_double_clicked(self, annotation):
+        from features.dialogs.edit_annotation_dialog import EditAnnotationDialog
+        dlg = EditAnnotationDialog(annotation=annotation, parent=self.workspace)
+        if dlg.exec_() == EditAnnotationDialog.Accepted:
+            updated = dlg.result_annotation()
+            if updated is None: return
+            try:
+                self.workspace.model.update_consensus_annotation(updated)
+            except Exception:
+                pass
 
     def open_find_motifs_dialog(self):
         from features.dialogs.find_motifs_dialog import FindMotifsDialog
@@ -87,6 +121,31 @@ class WorkspaceActionDialogCoordinator:
                         item.clear_selection()
                 self.workspace.sequence_viewer.scene.invalidate()
                 self.workspace.sequence_viewer.viewport().update()
+
+    def on_seq_row_clicked(self, row_start, row_end):
+        """Sequence view'da satır(lar)a tıklanınca: header highlight + h-guide, full selection yok."""
+        ws = self.workspace
+        n = ws.model.row_count()
+        rows = frozenset(range(row_start, row_end + 1)) if 0 <= row_start < n else frozenset()
+
+        # Header seçimini temizle + seçili satırları görsel olarak işaretle
+        # (on_selection_changed tetiklenmez → full sequence selection yapılmaz)
+        clear_changed = ws.header_viewer._selection.clear()
+        click_changed: frozenset = frozenset()
+        if rows:
+            for r in rows:
+                click_changed = click_changed | ws.header_viewer._selection.handle_ctrl_click(r, n)
+        ws.header_viewer.apply_selection_to_items(clear_changed | click_changed)
+
+        # Consensus state temizle
+        ws.consensus_spacer.set_selected(False)
+        ws.consensus_row.clear_selection()
+
+        # H-guide: seçili satırların tamamı
+        if rows:
+            ws.sequence_viewer.set_h_guides(rows)
+        else:
+            ws.sequence_viewer.clear_h_guides()
 
     def on_row_appended(self, index, header, sequence):
         self.workspace.header_viewer.add_header_item(f"{index + 1}. {header}")

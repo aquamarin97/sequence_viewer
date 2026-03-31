@@ -65,12 +65,19 @@ class ConsensusSpacerWidget(QWidget):
     def __init__(self, height=20, parent=None):
         super().__init__(parent)
         self.setFixedHeight(height)
-        self._char_height = height  # annotation eklenince değişmez
+        self._char_height = height
+        self._above_h = 0  # annotation lane yüksekliği (üstte)
         self._label = "Consensus"
         self._selected = False
         self._edit_widget: Optional[QLineEdit] = None
         self.setFocusPolicy(Qt.ClickFocus)
         theme_manager.themeChanged.connect(lambda _: self.update())
+
+    def sync_seq_region(self, above_h: float, char_h: float):
+        """Sequence satırının konumunu güncelle (annotation eklenince çağrılır)."""
+        self._above_h = above_h
+        self._char_height = char_h
+        self.update()
 
     def _label_font(self):
         font = QFont("Arial")
@@ -104,8 +111,8 @@ class ConsensusSpacerWidget(QWidget):
         painter.setPen(QPen(text_color))
         text_left = 9 if self._selected else 6
         # Metni _char_height alanının altına hizala (sequence ile aynı hiza)
-        text_rect = QRectF(text_left, 0, rect.width() - text_left, self._char_height)
-        painter.drawText(text_rect, Qt.AlignBottom | Qt.AlignLeft, self._label)
+        text_rect = QRectF(text_left, self._above_h, rect.width() - text_left, self._char_height)
+        painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, self._label)
         painter.setPen(QPen(t.border_normal))
         painter.drawLine(rect.left(), rect.bottom()-1, rect.right(), rect.bottom()-1)
         painter.end()

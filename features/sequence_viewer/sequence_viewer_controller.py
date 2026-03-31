@@ -10,7 +10,7 @@ _DRAG_THRESHOLD_PX = 4
 
 
 class SequenceViewerController:
-    def __init__(self, model, view, *, on_selection_changed=None):
+    def __init__(self, model, view, *, on_selection_changed=None, on_row_clicked=None):
         self._model = model; self._view = view
         self._is_selecting = False
         # drag-threshold takibi
@@ -18,9 +18,12 @@ class SequenceViewerController:
         self._press_scene_col: Optional[int] = None
         self._press_scene_row: Optional[int] = None
         self._drag_started = False
+        self._drag_end_row: Optional[int] = None
+        self._last_notified_row_range: Optional[tuple] = None
         self._wheel_zoom_streak_dir = None; self._wheel_zoom_streak_len = 0
         self._wheel_zoom_base_factor = 1.22; self._wheel_zoom_accel_factor = 1.06
         self._on_selection_changed = on_selection_changed
+        self._on_row_clicked = on_row_clicked
         # Çoklu dikey guide: her eleman bir col index (NA'nın solundaki sınır)
         self._v_guide_cols: List[int] = []
 
@@ -104,6 +107,7 @@ class SequenceViewerController:
         if self._drag_started and self._is_selecting:
             scene_pos = self._view.mapToScene(event.pos())
             row, col = self._view.scene_pos_to_row_col(scene_pos)
+            self._drag_end_row = row
             sel_range = self._model.update_selection(row, col)
             if sel_range:
                 self._view.set_visual_selection(*sel_range)
@@ -119,6 +123,12 @@ class SequenceViewerController:
                 self._view.clear_visual_selection()
                 self._view.set_v_guides(self._v_guide_cols)
             self._notify_selection_changed()
+            # Satır aralığı değiştiyse row highlight'ı canlı güncelle
+            r0 = self._press_scene_row
+            r1 = row
+            if (r0, r1) != self._last_notified_row_range:
+                self._last_notified_row_range = (r0, r1)
+                self._notify_row_clicked(r0, r1)
             return True
 
         return False
@@ -134,6 +144,10 @@ class SequenceViewerController:
         if self._drag_started:
             self._is_selecting = False
             self._drag_started = False
+            row_start = self._press_scene_row
+            row_end = self._drag_end_row if self._drag_end_row is not None else row_start
+            self._drag_end_row = None
+            self._last_notified_row_range = None
             self._press_pos = None
             sel = self._model.get_selection_column_range()
             if sel is not None:
@@ -149,6 +163,7 @@ class SequenceViewerController:
                             self._v_guide_cols.append(b)
             self._view.set_v_guides(self._v_guide_cols)
             self._notify_selection_changed()
+            self._notify_row_clicked(row_start, row_end)
             return True
 
         # Drag olmadan bırakıldı → boundary tıklama
@@ -156,6 +171,8 @@ class SequenceViewerController:
             scene_pos = self._view.mapToScene(event.pos())
             boundary_col = self._boundary_col_at(float(scene_pos.x()))
             ctrl = bool(event.modifiers() & Qt.ControlModifier)
+            row_start = self._press_scene_row
+            row_end = row_start
 
             if ctrl:
                 # Ctrl+tık: toggle — aynı col varsa kaldır, yoksa ekle
@@ -171,6 +188,7 @@ class SequenceViewerController:
             # Seçimi temizle
             self._model.clear_selection(); self._view.clear_visual_selection()
             self._notify_selection_changed()
+            self._notify_row_clicked(row_start, row_end)
 
         self._press_pos = None
         self._drag_started = False
@@ -203,3 +221,11 @@ class SequenceViewerController:
 
     def _notify_selection_changed(self):
         if self._on_selection_changed: self._on_selection_changed()
+
+    def _notify_row_clicked(self, row_start, row_end):
+        if self._on_row_clicked and row_start is not None:
+            row_count = self._model.get_row_count()
+            r0 = max(0, min(row_start, row_end) if row_end is not None else row_start)
+            r1 = min(row_count - 1, max(row_start, row_end) if row_end is not None else row_start)
+            if 0 <= r0 <= r1 < row_count:
+                self._on_row_clicked(r0, r1)

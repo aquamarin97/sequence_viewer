@@ -113,6 +113,7 @@ class SequenceWorkspaceWidget(QWidget):
         self.sequence_viewer.selectionChanged.connect(self.consensus_row.clear_selection)
         self.sequence_viewer.selectionChanged.connect(
             lambda: self.consensus_spacer.set_selected(False))
+        self.sequence_viewer.rowClicked.connect(self._on_seq_row_clicked)
         # Consensus row guide çizgilerini sequence_viewer guide state'i ile senkronize et
         self.sequence_viewer.add_v_guide_observer(self.consensus_row.update)
         # Consensus tıklaması position ruler'ı güncelle
@@ -184,6 +185,7 @@ class SequenceWorkspaceWidget(QWidget):
 
     def open_find_motifs_dialog(self): self._action_dialogs.open_find_motifs_dialog()
     def open_edit_annotation_dialog(self, ann): self._action_dialogs.open_edit_annotation_dialog(ann)
+    def open_edit_consensus_annotation_dialog(self, ann): self._action_dialogs.on_consensus_annotation_double_clicked(ann)
 
     @property
     def model(self): return self._model
@@ -192,6 +194,7 @@ class SequenceWorkspaceWidget(QWidget):
     def _on_row_move_requested(self, from_index, to_index): self._action_dialogs.on_row_move_requested(from_index, to_index)
     def _on_rows_delete_requested(self, rows): self._action_dialogs.on_rows_delete_requested(rows)
     def _on_selection_changed(self, selected_rows): self._action_dialogs.on_selection_changed(selected_rows)
+    def _on_seq_row_clicked(self, row_start, row_end): self._action_dialogs.on_seq_row_clicked(row_start, row_end)
     def _on_row_appended(self, index, header, sequence): self._action_dialogs.on_row_appended(index, header, sequence)
     def _on_row_removed(self, index): self._action_dialogs.on_row_removed(index)
     def _on_row_moved(self, from_index, to_index): self._action_dialogs.on_row_moved(from_index, to_index)
