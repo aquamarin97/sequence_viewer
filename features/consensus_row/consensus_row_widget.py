@@ -26,7 +26,7 @@ class ConsensusRowWidget(QWidget):
         self._font.setStyleHint(QFont.Monospace); self._font.setFixedPitch(True)
         from settings.color_styles import color_style_manager as _csm
         self._color_map = _csm.consensus_nucleotide_color_map()
-        self._selection = None; self._press_col = None
+        self._selection = None; self._press_col = None; self._is_selected = False
         ch = int(round(sequence_viewer.char_height))
         self.setFixedHeight(ch)
         self.setMinimumWidth(0); self.setMouseTracking(True); self.setFocusPolicy(Qt.ClickFocus)
@@ -74,13 +74,18 @@ class ConsensusRowWidget(QWidget):
     @property
     def current_threshold(self): return self._model.threshold
 
-    def clear_selection(self): self._selection = None; self.update()
+    def clear_selection(self): self._selection = None; self._is_selected = False; self.update()
+
+    def set_selected(self, selected: bool):
+        if self._is_selected == selected: return
+        self._is_selected = selected; self.update()
 
     def select_all(self):
         """Tüm konsensüs dizisini seçili hale getirir."""
         consensus = self._get_consensus()
         if consensus:
             self._selection = (0, len(consensus) - 1)
+            self._is_selected = True
             self.update()
 
     def _col_at_x(self, x):
@@ -133,14 +138,28 @@ class ConsensusRowWidget(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.setFocus()
+            # Sequence viewer seçimini temizle
             self._sequence_viewer.clear_visual_selection()
-            try:
-                self._sequence_viewer._model.clear_selection()
-                self._sequence_viewer.selectionChanged.emit()
+            try: self._sequence_viewer._model.clear_selection()
             except: pass
-            col = self._col_at_x(float(event.pos().x()))
-            if col is not None:
-                self._press_col = col; self._selection = (col, col); self.update()
+            # Kendini seçili yap, tüm diziyi seç
+            self._is_selected = True
+            consensus = self._get_consensus()
+            if consensus:
+                self._selection = (0, len(consensus) - 1)
+            self.update()
+            # Workspace'e bildir — header seçimini temizletir
+            try:
+                p = self.parent()
+                while p is not None:
+                    if hasattr(p, 'consensus_spacer') and hasattr(p, 'header_viewer'):
+                        p.consensus_spacer.set_selected(True)
+                        changed = p.header_viewer._selection.clear()
+                        p.header_viewer.apply_selection_to_items(changed)
+                        p.header_viewer._on_selection_changed(frozenset())
+                        break
+                    p = p.parent()
+            except: pass
             event.accept()
         else: super().mousePressEvent(event)
 
@@ -158,18 +177,41 @@ class ConsensusRowWidget(QWidget):
         else: super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_C and event.modifiers() & Qt.ControlModifier:
-            self._copy_to_clipboard(); event.accept()
+        ctrl = bool(event.modifiers() & Qt.ControlModifier)
+        shift = bool(event.modifiers() & Qt.ShiftModifier)
+        if ctrl and shift and event.key() == Qt.Key_C:
+            self._copy_fasta(); event.accept()
+        elif ctrl and not shift and event.key() == Qt.Key_C:
+            self._copy_sequence(); event.accept()
         else: super().keyPressEvent(event)
 
-    def _copy_to_clipboard(self):
+    def _copy_sequence(self):
         consensus = self._get_consensus()
         if not consensus: return
         if self._selection is not None:
             col_start, col_end = self._selection
             fragment = consensus[col_start:col_end + 1]
-        else: fragment = consensus
+        else:
+            fragment = consensus
         QApplication.clipboard().setText(fragment)
+
+    def _copy_fasta(self):
+        consensus = self._get_consensus()
+        if not consensus: return
+        label = "Consensus"
+        try:
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, 'consensus_spacer'):
+                    label = p.consensus_spacer.label; break
+                p = p.parent()
+        except: pass
+        if self._selection is not None:
+            col_start, col_end = self._selection
+            seq = consensus[col_start:col_end + 1]
+        else:
+            seq = consensus
+        QApplication.clipboard().setText(f">{label}\n{seq}")
 
     def paintEvent(self, event):
         if not self.isVisible() or self.height() == 0: return
@@ -178,7 +220,14 @@ class ConsensusRowWidget(QWidget):
         painter.setRenderHint(QPainter.TextAntialiasing, True)
         rect = self.rect(); width = rect.width(); height = rect.height()
         t = theme_manager.current
-        painter.fillRect(rect, QBrush(t.row_bg_odd))
+        # Seçim vurgusu: header seçimi veya kısmi seçim varsa
+        is_selected = self._is_selected
+        painter.fillRect(rect, QBrush(t.row_bg_selected if is_selected else t.row_bg_odd))
+        # Sol kenar çizgisi (seçili iken)
+        if is_selected:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(t.drop_indicator))
+            painter.drawRect(0, 0, 2, height)
         painter.setPen(QPen(t.border_normal)); painter.drawLine(0, height-1, width, height-1)
         sequences = [seq for _, seq in self._alignment_model.all_rows()]
         if not sequences:

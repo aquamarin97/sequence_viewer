@@ -66,7 +66,9 @@ class ConsensusSpacerWidget(QWidget):
         super().__init__(parent)
         self.setFixedHeight(height)
         self._label = "Consensus"
+        self._selected = False
         self._edit_widget: Optional[QLineEdit] = None
+        self.setFocusPolicy(Qt.ClickFocus)
         theme_manager.themeChanged.connect(lambda _: self.update())
 
     @property
@@ -74,22 +76,67 @@ class ConsensusSpacerWidget(QWidget):
     @label.setter
     def label(self, value): self._label = value; self.update()
 
+    def set_selected(self, selected: bool):
+        if self._selected == selected: return
+        self._selected = selected; self.update()
+
     def paintEvent(self, event):
         if not self.isVisible() or self.height() == 0: return
         painter = QPainter(self); t = theme_manager.current; rect = self.rect()
-        painter.fillRect(rect, QBrush(t.row_bg_odd))
+        if self._selected:
+            painter.fillRect(rect, QBrush(t.row_bg_selected))
+        else:
+            painter.fillRect(rect, QBrush(t.row_bg_odd))
+        if self._selected:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(t.drop_indicator))
+            painter.drawRect(0, 0, 2, rect.height())
         font = QFont("Arial", 8); font.setItalic(True)
-        painter.setFont(font); painter.setPen(QPen(t.text_primary))
-        painter.drawText(rect.adjusted(6,0,0,0), Qt.AlignVCenter|Qt.AlignLeft, self._label)
+        painter.setFont(font)
+        text_color = t.text_selected if self._selected else t.text_primary
+        painter.setPen(QPen(text_color))
+        text_left = 9 if self._selected else 6
+        painter.drawText(rect.adjusted(text_left, 0, 0, 0), Qt.AlignVCenter|Qt.AlignLeft, self._label)
         painter.setPen(QPen(t.border_normal))
         painter.drawLine(rect.left(), rect.bottom()-1, rect.right(), rect.bottom()-1)
         painter.end()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            self.setFocus()
             self.clicked.emit()
             event.accept()
         else: super().mousePressEvent(event)
+
+    def keyPressEvent(self, event):
+        ctrl = bool(event.modifiers() & Qt.ControlModifier)
+        shift = bool(event.modifiers() & Qt.ShiftModifier)
+        if ctrl and shift and event.key() == Qt.Key_C:
+            self._copy_fasta(); event.accept()
+        elif ctrl and not shift and event.key() == Qt.Key_C:
+            self._copy_sequence(); event.accept()
+        else: super().keyPressEvent(event)
+
+    def _get_consensus_row(self):
+        """Parent zincirinden ConsensusRowWidget'ı bul."""
+        p = self.parent()
+        while p is not None:
+            if hasattr(p, 'consensus_row'):
+                return p.consensus_row
+            p = p.parent()
+        return None
+
+    def _copy_sequence(self):
+        from PyQt5.QtWidgets import QApplication
+        row = self._get_consensus_row()
+        if row is None: return
+        row._copy_sequence()
+
+    def _copy_fasta(self):
+        from PyQt5.QtWidgets import QApplication
+        row = self._get_consensus_row()
+        if row is None: return
+        row._copy_fasta()
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -104,11 +151,13 @@ class ConsensusSpacerWidget(QWidget):
         editor.setText(self._label)
         editor.selectAll()
         margin = 2
-        editor.setGeometry(margin, margin, self.width() - margin*2, self.height() - margin*2)
-        text_color = t.text_primary.name()
+        editor_h = max(self.height() - margin * 2, 22)
+        # Editor widget yüksekten taşıyorsa yukarı kaydır
+        y_pos = max(0, (self.height() - editor_h) // 2)
+        editor.setGeometry(margin, y_pos, self.width() - margin * 2, editor_h)
         editor.setStyleSheet(
             f"QLineEdit {{"
-            f"  color: {text_color};"
+            f"  color: {t.text_primary.name()};"
             f"  background: {t.editor_bg};"
             f"  border: 1.5px solid {t.editor_border};"
             f"  border-radius: 2px;"

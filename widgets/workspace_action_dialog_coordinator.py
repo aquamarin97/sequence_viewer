@@ -66,6 +66,8 @@ class WorkspaceActionDialogCoordinator:
             except IndexError: pass
 
     def on_selection_changed(self, selected_rows):
+        # Herhangi bir header seçilince consensus vurgusunu kaldır
+        self.workspace.consensus_spacer.set_selected(False)
         if not selected_rows:
             self.workspace.sequence_viewer.clear_h_guides()
         else:
@@ -107,8 +109,21 @@ class WorkspaceActionDialogCoordinator:
     def on_model_reset(self): self.rebuild_views()
 
     def on_consensus_spacer_clicked(self):
-        """Consensus spacer'a tıklama → consensus dizisini tümüyle seçer."""
-        self.workspace.consensus_row.select_all()
+        """Consensus spacer'a tıklama → seçim vurgusu + consensus dizisini tümüyle seçer."""
+        ws = self.workspace
+        # Header seçimini temizle — ama on_selection_changed'i tetikleme
+        # (o fonksiyon consensus_spacer.set_selected(False) yapıyor)
+        changed = ws.header_viewer._selection.clear()
+        ws.header_viewer.apply_selection_to_items(changed)
+        ws.sequence_viewer.clear_h_guides()
+        ws.sequence_viewer.clear_visual_selection()
+        try: ws.sequence_viewer._model.clear_selection()
+        except: pass
+        # Şimdi consensus'u seçili yap
+        ws.consensus_spacer.set_selected(True)
+        ws.consensus_spacer.setFocus()
+        ws.consensus_row.set_selected(True)
+        ws.consensus_row.select_all()
 
     def rebuild_views(self):
         h_scroll = self.workspace.sequence_viewer.horizontalScrollBar().value()

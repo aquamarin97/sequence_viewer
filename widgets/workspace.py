@@ -111,6 +111,8 @@ class SequenceWorkspaceWidget(QWidget):
 
         self._connect_scroll_sync()
         self.sequence_viewer.selectionChanged.connect(self.consensus_row.clear_selection)
+        self.sequence_viewer.selectionChanged.connect(
+            lambda: self.consensus_spacer.set_selected(False))
 
         anim = getattr(self.sequence_viewer, "_zoom_animation", None)
         if anim: anim.valueChanged.connect(self._on_zoom_changed)
@@ -197,6 +199,64 @@ class SequenceWorkspaceWidget(QWidget):
     def move_row(self, from_index, to_index): self._model.move_row(from_index, to_index)
     def set_header(self, index, new_header): self._model.set_header(index, new_header)
     def selected_rows(self): return self.header_viewer._selection.selected_rows()
+
+    def keyPressEvent(self, event):
+        ctrl = bool(event.modifiers() & Qt.ControlModifier)
+        shift = bool(event.modifiers() & Qt.ShiftModifier)
+        if ctrl and shift and event.key() == Qt.Key_C:
+            self._copy_fasta(); event.accept(); return
+        if ctrl and not shift and event.key() == Qt.Key_C:
+            self._copy_sequences(); event.accept(); return
+        super().keyPressEvent(event)
+
+    def _copy_sequences(self):
+        """Ctrl+C — seçili satırların sadece dizilerini kopyalar."""
+        from PyQt5.QtWidgets import QApplication
+        lines = []
+        # Consensus seçili mi?
+        if self.consensus_spacer._selected:
+            from features.consensus_row.consensus_calculator import ConsensusCalculator
+            seqs = [seq for _, seq in self._model.all_rows()]
+            if seqs:
+                consensus = ConsensusCalculator.compute(seqs)
+                lines.append(consensus)
+        else:
+            # Header seçimi varsa ona göre, yoksa sequence viewer seçimine göre
+            selected = self.header_viewer._selection.selected_rows()
+            if selected:
+                for i, (_, sequence) in enumerate(self._model.all_rows()):
+                    if i in selected:
+                        lines.append(sequence)
+            else:
+                # Sequence viewer'da kısmi seçim
+                for item in self.sequence_viewer.sequence_items:
+                    if item.selection_range is not None:
+                        s, e = item.selection_range
+                        fragment = item.sequence[s:e]
+                        if fragment: lines.append(fragment)
+        if lines:
+            QApplication.clipboard().setText("\n".join(lines))
+
+    def _copy_fasta(self):
+        """Ctrl+Shift+C — seçili satırları FASTA formatında kopyalar."""
+        from PyQt5.QtWidgets import QApplication
+        blocks = []
+        selected = self.header_viewer._selection.selected_rows()
+        if selected:
+            for i, (header, sequence) in enumerate(self._model.all_rows()):
+                if i in selected:
+                    blocks.append(f">{header}\n{sequence}")
+        else:
+            # Sequence viewer seçimi varsa kısmi fasta
+            for i, (item) in enumerate(self.sequence_viewer.sequence_items):
+                if item.selection_range is not None:
+                    s, e = item.selection_range
+                    fragment = item.sequence[s:e]
+                    if fragment:
+                        header = self._model.get_header(i)
+                        blocks.append(f">{header}\n{fragment}")
+        if blocks:
+            QApplication.clipboard().setText("\n".join(blocks))
 
     def _compute_row_layout(self): return self._layout_sync.compute_row_layout()
     def _apply_layout(self, layout): self._layout_sync.apply_layout(layout)

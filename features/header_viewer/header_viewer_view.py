@@ -163,7 +163,8 @@ class HeaderViewerView(QGraphicsView):
         raw_header = full_text.split(". ", 1)[1] if ". " in full_text else full_text
         editor.setText(raw_header); editor.selectAll()
         margin = 2; vp_w = self.viewport().width()
-        editor.setGeometry(margin, int(vp_top)+margin, vp_w-margin*2, self._char_height-margin*2)
+        min_editor_h = max(self._char_height - margin * 2, 22)
+        editor.setGeometry(margin, int(vp_top) + margin, vp_w - margin * 2, min_editor_h)
         self._apply_editor_style(editor, item)
         editor.show(); editor.setFocus()
         editor.returnPressed.connect(lambda: self._commit_edit(row_index))
