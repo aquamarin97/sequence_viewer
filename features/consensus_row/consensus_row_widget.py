@@ -10,7 +10,9 @@ from typing import Optional, Tuple
 from PyQt5.QtCore import Qt, QRectF, QPointF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont
 from PyQt5.QtWidgets import QApplication, QWidget, QScrollBar
+from features.annotation_layer.annotation_painter import draw_primer, draw_probe, draw_repeated_region
 from features.consensus_row.consensus_row_model import ConsensusRowModel
+from model.annotation import AnnotationType
 from graphics.sequence_item.sequence_glyph_cache import GLYPH_CACHE
 from model.alignment_data_model import AlignmentDataModel
 from model.consensus_calculator import ConsensusMethod
@@ -28,6 +30,7 @@ class ConsensusRowWidget(QWidget):
         self._color_map = _csm.consensus_nucleotide_color_map()
         self._selection = None; self._press_col = None; self._is_selected = False
         self._press_pos = None; self._drag_started = False; self._press_scene_col = None
+        self._hit_rects: list = []
         ch = int(round(sequence_viewer.char_height))
         self.setFixedHeight(ch)
         self.setMinimumWidth(0); self.setMouseTracking(True); self.setFocusPolicy(Qt.ClickFocus)
@@ -37,6 +40,12 @@ class ConsensusRowWidget(QWidget):
         self._alignment_model.rowRemoved.connect(self._on_data_changed)
         self._alignment_model.rowMoved.connect(self._on_data_changed)
         self._alignment_model.modelReset.connect(self._on_data_changed)
+        self._alignment_model.globalAnnotationAdded.connect(lambda _: self._update_visibility())
+        self._alignment_model.globalAnnotationRemoved.connect(lambda _: self._update_visibility())
+        self._alignment_model.globalAnnotationUpdated.connect(lambda _: self._update_visibility())
+        self._alignment_model.consensusAnnotationAdded.connect(lambda _: self._update_visibility())
+        self._alignment_model.consensusAnnotationRemoved.connect(lambda _: self._update_visibility())
+        self._alignment_model.consensusAnnotationUpdated.connect(lambda _: self._update_visibility())
         # is_aligned durumuna göre görünürlüğü güncelle
         self._alignment_model.alignmentStateChanged.connect(self._on_alignment_changed)
 
@@ -53,15 +62,49 @@ class ConsensusRowWidget(QWidget):
         # Başlangıçta gizli
         self._update_visibility()
 
+    def _compute_heights(self):
+        """Üst annotation, dizi ve alt annotation yüksekliklerini hesapla."""
+        from widgets.row_layout import strip_height
+        from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
+        ch = int(round(self._sequence_viewer.char_height))
+        annotations = list(self._alignment_model.consensus_annotations) if self._alignment_model.is_aligned else []
+        above_anns = [a for a in annotations if a.type.is_above_sequence()]
+        below_anns = [a for a in annotations if not a.type.is_above_sequence()]
+        above_h = strip_height(lane_count(assign_lanes(above_anns)))
+        below_h = strip_height(lane_count(assign_lanes(below_anns)))
+        return above_h, ch, below_h
+
     def _update_visibility(self):
-        """is_aligned durumuna göre görünürlüğü ayarla."""
+        """is_aligned durumuna göre görünürlük ve yüksekliği ayarla."""
         if self._alignment_model.is_aligned:
-            ch = int(round(self._sequence_viewer.char_height))
-            self.setFixedHeight(ch)
+            above_h, ch, below_h = self._compute_heights()
+            total = above_h + ch + below_h
+            self.setFixedHeight(total)
             self.setVisible(True)
+            # Spacer'ı senkronize et
+            self._sync_spacer()
         else:
             self.setFixedHeight(0)
             self.setVisible(False)
+            self._sync_spacer()
+        self.update()
+
+    def _sync_spacer(self):
+        """Sol paneldeki ConsensusSpacerWidget'ı yükseklikle senkronize et."""
+        try:
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, 'consensus_spacer'):
+                    h = self.height()
+                    if h > 0:
+                        p.consensus_spacer.setFixedHeight(h)
+                        p.consensus_spacer.setVisible(True)
+                    else:
+                        p.consensus_spacer.setFixedHeight(0)
+                        p.consensus_spacer.setVisible(False)
+                    break
+                p = p.parent()
+        except: pass
 
     def _on_alignment_changed(self, is_aligned):
         self._update_visibility()
@@ -175,8 +218,40 @@ class ConsensusRowWidget(QWidget):
                 p = p.parent()
         except: pass
 
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            ann = self._annotation_at(event.pos())
+            if ann:
+                self._notify_edit_annotation(ann)
+                event.accept(); return
+        super().mouseDoubleClickEvent(event)
+
+    def _select_annotation_range(self, ann):
+        """Annotation aralığını seçili yap ve guide çizgileri oluştur."""
+        self._selection = (ann.start, ann.end)
+        self._is_selected = True
+        self.update()
+        # Guide çizgileri: ilk NA'nın solu ve son NA'nın sağı
+        c = self._get_controller()
+        if c is not None:
+            left_b = ann.start
+            right_b = ann.end + 1
+            c._v_guide_cols = [left_b, right_b]
+            self._sequence_viewer.set_v_guides(c._v_guide_cols)
+
+    def _annotation_at(self, pos):
+        p = QRectF(pos.x(), pos.y(), 1, 1)
+        for rect, ann in self._hit_rects:
+            if rect.intersects(p): return ann
+        return None
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            # Annotation tıklaması — seçim + guide
+            ann = self._annotation_at(event.pos())
+            if ann:
+                self._select_annotation_range(ann)
+                event.accept(); return
             self.setFocus()
             self._sequence_viewer.clear_visual_selection()
             try: self._sequence_viewer._model.clear_selection()
@@ -201,6 +276,14 @@ class ConsensusRowWidget(QWidget):
 
     def mouseMoveEvent(self, event):
         if self._press_pos is None:
+            # Annotation tooltip
+            ann = self._annotation_at(event.pos())
+            if ann:
+                from PyQt5.QtWidgets import QToolTip
+                QToolTip.showText(event.globalPos(), ann.tooltip_text(), self)
+            else:
+                from PyQt5.QtWidgets import QToolTip
+                QToolTip.hideText()
             super().mouseMoveEvent(event); return
 
         delta = (event.pos() - self._press_pos).manhattanLength()
@@ -346,9 +429,10 @@ class ConsensusRowWidget(QWidget):
             painter.drawRect(0, 0, 2, height)
         painter.setPen(QPen(t.border_normal)); painter.drawLine(0, height-1, width, height-1)
         sequences = [seq for _, seq in self._alignment_model.all_rows()]
+        _char_h = float(int(round(self._sequence_viewer.char_height)))
         if not sequences:
             label_font = QFont("Arial")
-            label_font.setPointSizeF(max(1.0, height * 0.5))
+            label_font.setPointSizeF(max(1.0, _char_h * 0.5))
             painter.setPen(QPen(t.text_primary)); painter.setFont(label_font)
             painter.drawText(rect.adjusted(6,0,0,0), Qt.AlignVCenter|Qt.AlignLeft, "—")
             painter.end(); return
@@ -357,14 +441,24 @@ class ConsensusRowWidget(QWidget):
         cw = self._get_char_width(); view_left = self._get_view_left()
         if cw <= 0: painter.end(); return
         self._sync_font_from_viewer(); painter.setFont(self._font)
-        mode = self._effective_mode(); ch = float(height); length = len(consensus)
+        mode = self._effective_mode()
+        # Annotation lane yüksekliklerini hesapla
+        from widgets.row_layout import strip_height
+        from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
+        _anns = list(self._alignment_model.consensus_annotations) if self._alignment_model.is_aligned else []
+        _above_anns = [a for a in _anns if a.type.is_above_sequence()]
+        _above_h = float(strip_height(lane_count(assign_lanes(_above_anns))))
+        seq_char_h = float(int(round(self._sequence_viewer.char_height)))
+        seq_top = _above_h  # dizi bu y'den başlar
+        length = len(consensus)
         start_col = max(0, int(math.floor(view_left / cw)))
         end_col = min(length, int(math.ceil((view_left + width) / cw)))
         sel_start = sel_end = None
         if self._selection: sel_start, sel_end = self._selection
         sel_alpha = 110 if t.name == "dark" else 120
+        ch = seq_char_h  # dizi satırının yüksekliği
         if mode == "line":
-            line_h = ch * 0.3; y = (ch - line_h) / 2.0
+            line_h = ch * 0.3; y = seq_top + (ch - line_h) / 2.0
             x_start = max(0.0, start_col * cw - view_left)
             x_end = min(end_col * cw - view_left, float(width))
             draw_width = max(0.0, x_end - x_start)
@@ -375,7 +469,7 @@ class ConsensusRowWidget(QWidget):
                 sx2 = max(0.0, sx); sw2 = min(sw - (sx2 - sx), float(width) - sx2)
                 if sw2 > 0:
                     sel_color = QColor(t.seq_selection_bg); sel_color.setAlpha(sel_alpha)
-                    painter.setBrush(QBrush(sel_color)); painter.drawRect(QRectF(sx2, 0, sw2, ch))
+                    painter.setBrush(QBrush(sel_color)); painter.drawRect(QRectF(sx2, seq_top, sw2, ch))
             painter.end(); return
         if sel_start is not None and sel_end is not None:
             sel_l = max(sel_start, start_col); sel_r = min(sel_end + 1, end_col)
@@ -383,9 +477,9 @@ class ConsensusRowWidget(QWidget):
                 sel_color = QColor(t.seq_selection_bg); sel_color.setAlpha(sel_alpha)
                 painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
                 for i in range(sel_l, sel_r):
-                    painter.drawRect(QRectF(i * cw - view_left, 0, cw, ch))
+                    painter.drawRect(QRectF(i * cw - view_left, seq_top, cw, ch))
         font_pt = self._font.pointSizeF()
-        box_ref = min(ch * 0.7, font_pt); box_h = max(box_ref, 1.0); box_y = (ch - box_h) / 2.0
+        box_ref = min(ch * 0.7, font_pt); box_h = max(box_ref, 1.0); box_y = seq_top + (ch - box_h) / 2.0
         for col in range(start_col, end_col):
             base = consensus[col].upper(); x = col * cw - view_left
             color = self._color_map.get(base, t.text_primary)
@@ -394,8 +488,50 @@ class ConsensusRowWidget(QWidget):
                 painter.drawRect(QRectF(x, box_y, cw, box_h))
             else:
                 glyph = GLYPH_CACHE.get_glyph(base, self._font, color)
-                dx = x + (cw - glyph.width()) / 2.0; dy = (ch - glyph.height()) / 2.0
+                dx = x + (cw - glyph.width()) / 2.0; dy = seq_top + (ch - glyph.height()) / 2.0
                 painter.drawPixmap(int(dx), int(dy), glyph)
+
+        # ---- Annotation overlay ----
+        self._hit_rects = []
+        annotations = list(self._alignment_model.consensus_annotations) if self._alignment_model.is_aligned else []
+        if annotations:
+            from widgets.row_layout import above_lane_y, below_lane_y, strip_height
+            from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
+            _LANE_H = 16
+            above_anns = [a for a in annotations if a.type.is_above_sequence()]
+            below_anns = [a for a in annotations if not a.type.is_above_sequence()]
+            above_assignment = assign_lanes(above_anns)
+            below_assignment = assign_lanes(below_anns)
+            above_h = strip_height(lane_count(above_assignment))
+            # dizi alanı above_h'den başlar
+            seq_top = float(above_h)
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            widget_w = float(width)
+            for ann in annotations:
+                x = ann.start * cw - view_left
+                w_ann = ann.length() * cw
+                if x + w_ann < 0 or x > widget_w: continue
+                clipped_x = max(x, 0.0)
+                clipped_w = min(w_ann - (clipped_x - x), widget_w - clipped_x)
+                if clipped_w <= 0: continue
+                ann_char_w = clipped_w / max(ann.length(), 1)
+                if ann.type.is_above_sequence():
+                    lane = above_assignment.get(ann.id, 0)
+                    ann_y = above_lane_y(lane)
+                else:
+                    lane = below_assignment.get(ann.id, 0)
+                    ann_y = seq_top + ch + below_lane_y(lane)
+                ann_h_draw = _LANE_H
+                painter.save()
+                if ann.type == AnnotationType.PRIMER:
+                    draw_primer(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann.resolved_color(), ann.label, strand=ann.strand, char_width=ann_char_w)
+                elif ann.type == AnnotationType.PROBE:
+                    draw_probe(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann.resolved_color(), ann.label, strand=ann.strand, char_width=ann_char_w)
+                else:
+                    draw_repeated_region(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann.resolved_color(), ann.label)
+                painter.restore()
+                self._hit_rects.append((QRectF(clipped_x, ann_y, clipped_w, ann_h_draw), ann))
+            painter.setRenderHint(QPainter.Antialiasing, False)
 
         # ---- Dikey kılavuz çizgileri ----
         ctrl = self._get_controller()
@@ -410,6 +546,6 @@ class ConsensusRowWidget(QWidget):
             for gcol in ctrl._v_guide_cols:
                 vp_x = gcol * cw - offset
                 if -10 <= vp_x <= vp_w + 10:
-                    painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, ch))
+                    painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, float(height)))
 
         painter.end()

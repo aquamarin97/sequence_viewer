@@ -53,13 +53,45 @@ class FindMotifsDialog(QDialog):
             QMessageBox.warning(self,"Error","Select at least one search direction."); return
         max_mm = self._mismatch_spin.value(); name = self._name_edit.text().strip() or query[:12]
         ann_type = _TYPE_OPTIONS[self._type_combo.currentIndex()][1]
+
+        # Row dizilerinde ara
         sequences = [self._model.get_sequence(i) for i in range(self._model.row_count())]
         finder = MotifFinder(query=query, max_mismatches=max_mm)
         hits = finder.search(sequences, search_forward=self._fwd_check.isChecked(), search_reverse=self._rev_check.isChecked())
-        if not hits: self._result_label.setText("<span style='color:crimson'>No matches found.</span>"); return
+
+        # Consensus dizisinde ara (aligned ise)
+        consensus_hits = []
+        if self._model.is_aligned:
+            try:
+                from model.consensus_calculator import ConsensusCalculator, ConsensusMethod
+                seqs = [self._model.get_sequence(i) for i in range(self._model.row_count())]
+                consensus_seq = ConsensusCalculator(ConsensusMethod.PLURALITY).compute(seqs)
+                if consensus_seq:
+                    consensus_finder = MotifFinder(query=query, max_mismatches=max_mm)
+                    consensus_hits = consensus_finder.search(
+                        [consensus_seq],
+                        search_forward=self._fwd_check.isChecked(),
+                        search_reverse=self._rev_check.isChecked()
+                    )
+            except: pass
+
+        if not hits and not consensus_hits:
+            self._result_label.setText("<span style='color:crimson'>No matches found.</span>"); return
+
         added = 0
         for hit in hits:
             ann = Annotation(type=ann_type, start=hit.start, end=hit.end, label=name, strand=hit.strand, notes=f"Fuzzy search: max {max_mm} mismatch(es)")
             try: self._model.add_annotation(hit.seq_index, ann); added += 1
             except: pass
-        self._result_label.setText(f"<span style='color:green'>{len(hits)} match(es) found, {added} annotation(s) added.</span>")
+
+        consensus_added = 0
+        for hit in consensus_hits:
+            ann = Annotation(type=ann_type, start=hit.start, end=hit.end, label=name, strand=hit.strand, notes=f"Fuzzy search (consensus): max {max_mm} mismatch(es)")
+            try: self._model.add_consensus_annotation(ann); consensus_added += 1
+            except: pass
+
+        msg = f"<span style='color:green'>{len(hits)} match(es) in sequences ({added} added)"
+        if self._model.is_aligned:
+            msg += f", {len(consensus_hits)} in consensus ({consensus_added} added)"
+        msg += ".</span>"
+        self._result_label.setText(msg)

@@ -19,6 +19,9 @@ class AlignmentDataModel(QObject):
     globalAnnotationAdded   = pyqtSignal(object)
     globalAnnotationRemoved = pyqtSignal(str)
     globalAnnotationUpdated = pyqtSignal(object)
+    consensusAnnotationAdded   = pyqtSignal(object)
+    consensusAnnotationRemoved = pyqtSignal(str)
+    consensusAnnotationUpdated = pyqtSignal(object)
     alignmentStateChanged = pyqtSignal(bool)
 
     def __init__(self, parent=None):
@@ -27,6 +30,7 @@ class AlignmentDataModel(QObject):
         self._is_aligned = False
         self._alignment_meta = None
         self._global_annotations: List[Annotation] = []
+        self._consensus_annotations: List[Annotation] = []
 
     @property
     def is_aligned(self): return self._is_aligned
@@ -42,6 +46,7 @@ class AlignmentDataModel(QObject):
         self._is_aligned = False
         self._alignment_meta = None
         self._global_annotations.clear()
+        self._consensus_annotations.clear()
         self.alignmentStateChanged.emit(False)
 
     def row_count(self): return len(self._rows)
@@ -87,6 +92,7 @@ class AlignmentDataModel(QObject):
     def clear(self):
         self._rows.clear()
         self._global_annotations.clear()
+        self._consensus_annotations.clear()
         self._is_aligned = False
         self._alignment_meta = None
         self.modelReset.emit()
@@ -158,3 +164,32 @@ class AlignmentDataModel(QObject):
                 self.globalAnnotationUpdated.emit(annotation)
                 return
         raise KeyError(f"Global annotation '{annotation.id}' not found.")
+
+    # ---- Consensus Annotation API ----
+    @property
+    def consensus_annotations(self): return list(self._consensus_annotations)
+
+    def add_consensus_annotation(self, annotation):
+        if any(a.id == annotation.id for a in self._consensus_annotations):
+            raise ValueError(f"Consensus annotation id '{annotation.id}' already exists.")
+        self._consensus_annotations.append(annotation)
+        self.consensusAnnotationAdded.emit(annotation)
+
+    def remove_consensus_annotation(self, annotation_id):
+        for i, ann in enumerate(self._consensus_annotations):
+            if ann.id == annotation_id:
+                del self._consensus_annotations[i]
+                self.consensusAnnotationRemoved.emit(annotation_id)
+                return
+        raise KeyError(f"Consensus annotation '{annotation_id}' not found.")
+
+    def update_consensus_annotation(self, annotation):
+        for i, ann in enumerate(self._consensus_annotations):
+            if ann.id == annotation.id:
+                self._consensus_annotations[i] = annotation
+                self.consensusAnnotationUpdated.emit(annotation)
+                return
+        raise KeyError(f"Consensus annotation '{annotation.id}' not found.")
+
+    def clear_consensus_annotations(self):
+        self._consensus_annotations.clear()

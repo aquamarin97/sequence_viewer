@@ -6,11 +6,10 @@ MODIFIED:
 """
 from __future__ import annotations
 from typing import Optional
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QPainter, QPen, QBrush, QFont
+from PyQt5.QtCore import Qt, pyqtSignal, QRectF
+from PyQt5.QtGui import QPainter, QPen, QBrush, QFont, QColor
 from PyQt5.QtWidgets import QWidget, QLineEdit
 from settings.theme import theme_manager
-from PyQt5.QtGui import QColor
 
 class HeaderTopWidget(QWidget):
     def __init__(self, height=28, parent=None):
@@ -66,6 +65,7 @@ class ConsensusSpacerWidget(QWidget):
     def __init__(self, height=20, parent=None):
         super().__init__(parent)
         self.setFixedHeight(height)
+        self._char_height = height  # annotation eklenince değişmez
         self._label = "Consensus"
         self._selected = False
         self._edit_widget: Optional[QLineEdit] = None
@@ -75,7 +75,7 @@ class ConsensusSpacerWidget(QWidget):
     def _label_font(self):
         font = QFont("Arial")
         font.setItalic(True)
-        font.setPointSizeF(max(1.0, self.height() * 0.5))
+        font.setPointSizeF(max(1.0, self._char_height * 0.5))
         return font
 
     @property
@@ -103,7 +103,9 @@ class ConsensusSpacerWidget(QWidget):
         text_color = t.text_selected if self._selected else t.text_primary
         painter.setPen(QPen(text_color))
         text_left = 9 if self._selected else 6
-        painter.drawText(rect.adjusted(text_left, 0, 0, 0), Qt.AlignVCenter|Qt.AlignLeft, self._label)
+        # Metni _char_height alanının altına hizala (sequence ile aynı hiza)
+        text_rect = QRectF(text_left, 0, rect.width() - text_left, self._char_height)
+        painter.drawText(text_rect, Qt.AlignBottom | Qt.AlignLeft, self._label)
         painter.setPen(QPen(t.border_normal))
         painter.drawLine(rect.left(), rect.bottom()-1, rect.right(), rect.bottom()-1)
         painter.end()
