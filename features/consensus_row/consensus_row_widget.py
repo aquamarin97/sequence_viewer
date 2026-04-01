@@ -17,6 +17,26 @@ from graphics.sequence_item.sequence_glyph_cache import GLYPH_CACHE
 from model.alignment_data_model import AlignmentDataModel
 from model.consensus_calculator import ConsensusMethod
 from settings.theme import theme_manager
+from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
+
+
+def _paint_dim_overlay(painter, sequence_viewer, cw, widget_w, widget_h, t):
+    """Seçim dışı sütunlar üzerine solduklaştırma katmanı çizer."""
+    dim_range = getattr(sequence_viewer, '_selection_dim_range', None)
+    if dim_range is None or cw <= 0:
+        return
+    left_col, right_col = dim_range
+    offset = float(sequence_viewer.horizontalScrollBar().value())
+    dim_color = QColor(t.selection_dim_color)
+    left_px = left_col * cw - offset
+    right_px = right_col * cw - offset
+    painter.setPen(Qt.NoPen)
+    if left_px > 0:
+        painter.fillRect(QRectF(0.0, 0.0, min(left_px, widget_w), widget_h), dim_color)
+    if right_px < widget_w:
+        r = max(right_px, 0.0)
+        painter.fillRect(QRectF(r, 0.0, widget_w - r, widget_h), dim_color)
+
 
 class ConsensusRowWidget(QWidget):
     def __init__(self, alignment_model, sequence_viewer, parent=None):
@@ -54,6 +74,8 @@ class ConsensusRowWidget(QWidget):
         hbar.valueChanged.connect(self.update); hbar.rangeChanged.connect(self.update)
         anim = getattr(self._sequence_viewer, "_zoom_animation", None)
         if anim: anim.valueChanged.connect(self.update)
+        if hasattr(sequence_viewer, 'add_v_guide_observer'):
+            sequence_viewer.add_v_guide_observer(self.update)
         theme_manager.themeChanged.connect(lambda _: self._on_theme_changed())
         try:
             from settings.color_styles import color_style_manager as _csm2
@@ -304,13 +326,12 @@ class ConsensusRowWidget(QWidget):
             super().mouseMoveEvent(event); return
 
         delta = (event.pos() - self._press_pos).manhattanLength()
-        _DRAG_THRESHOLD_PX = 4
 
-        if not self._drag_started and delta >= _DRAG_THRESHOLD_PX:
+        if not self._drag_started and delta >= mouse_binding_manager.drag_threshold("consensus_row"):
             self._drag_started = True
-            ctrl = bool(event.modifiers() & Qt.ControlModifier)
+            drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers())
             c = self._get_controller()
-            if not ctrl and c is not None:
+            if drag_action == MouseAction.DRAG_SELECT and c is not None:
                 c._v_guide_cols.clear()
                 self._sequence_viewer.set_v_guides(c._v_guide_cols)
             self.setCursor(Qt.SizeHorCursor)
@@ -360,8 +381,8 @@ class ConsensusRowWidget(QWidget):
                 if c is not None and self._selection is not None:
                     lo, hi = self._selection
                     if hi > lo:
-                        ctrl = bool(event.modifiers() & Qt.ControlModifier)
-                        if not ctrl:
+                        drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers())
+                        if drag_action == MouseAction.DRAG_SELECT:
                             c._v_guide_cols.clear()
                         for b in (lo, hi + 1):
                             if b not in c._v_guide_cols:
@@ -381,8 +402,8 @@ class ConsensusRowWidget(QWidget):
                 boundary_col = self._boundary_col_at_x(float(event.pos().x()))
                 c = self._get_controller()
                 if c is not None:
-                    ctrl = bool(event.modifiers() & Qt.ControlModifier)
-                    if ctrl:
+                    click_action = mouse_binding_manager.resolve_sequence_click(event.modifiers())
+                    if click_action == MouseAction.GUIDE_TOGGLE:
                         if boundary_col in c._v_guide_cols:
                             c._v_guide_cols.remove(boundary_col)
                         else:
@@ -493,6 +514,7 @@ class ConsensusRowWidget(QWidget):
                 if sw2 > 0:
                     sel_color = QColor(t.seq_selection_bg); sel_color.setAlpha(sel_alpha)
                     painter.setBrush(QBrush(sel_color)); painter.drawRect(QRectF(sx2, seq_top, sw2, ch))
+            _paint_dim_overlay(painter, self._sequence_viewer, cw, float(width), float(height), t)
             painter.end(); return
         if sel_start is not None and sel_end is not None:
             sel_l = max(sel_start, start_col); sel_r = min(sel_end + 1, end_col)
@@ -556,15 +578,16 @@ class ConsensusRowWidget(QWidget):
                 self._hit_rects.append((QRectF(clipped_x, ann_y, clipped_w, ann_h_draw), ann))
             painter.setRenderHint(QPainter.Antialiasing, False)
 
+        # ---- Seçim odak efekti ----
+        _paint_dim_overlay(painter, self._sequence_viewer, cw, float(width), float(height), t)
+
         # ---- Dikey kılavuz çizgileri ----
         ctrl = self._get_controller()
         if ctrl is not None and ctrl._v_guide_cols:
-            from PyQt5.QtGui import QColor as _QColor
-            _GUIDE_COLOR = _QColor(80, 130, 220, 160)
             hbar = self._sequence_viewer.horizontalScrollBar()
             offset = float(hbar.value())
             vp_w = float(self.width())
-            pen = QPen(_GUIDE_COLOR, 1, Qt.DashLine)
+            pen = QPen(theme_manager.current.guide_line_color, 1, Qt.DashLine)
             pen.setDashPattern([4, 3]); painter.setPen(pen)
             for gcol in ctrl._v_guide_cols:
                 vp_x = gcol * cw - offset

@@ -16,7 +16,6 @@ from settings.theme import theme_manager
 if TYPE_CHECKING:
     from widgets.row_layout import RowLayout
 
-_GUIDE_COLOR = QColor(80, 130, 220, 160)
 _GUIDE_WIDTH = 1
 
 class SequenceViewerView(QGraphicsView):
@@ -35,6 +34,8 @@ class SequenceViewerView(QGraphicsView):
         self._v_guide_cols: list = []
         self._v_guide_observers: list = []
         self._h_guide_rows = frozenset()
+        # Seçim odak efekti: (left_col, right_col) veya None
+        self._selection_dim_range = None
         self._zoom_animation = QVariantAnimation(self)
         self._zoom_animation.setEasingCurve(QEasingCurve.OutCubic)
         self._zoom_animation.valueChanged.connect(self._on_zoom_value_changed)
@@ -115,6 +116,19 @@ class SequenceViewerView(QGraphicsView):
         """Guide state değişince çağrılacak callback ekle."""
         self._v_guide_observers.append(callback)
 
+    def set_selection_dim_range(self, left_col: int, right_col: int):
+        """Seçim odak efekti: dışarıdaki alanları solduklaştır."""
+        self._selection_dim_range = (left_col, right_col)
+        self.viewport().update()
+        for cb in self._v_guide_observers: cb()
+
+    def clear_selection_dim_range(self):
+        """Seçim odak efektini kaldır."""
+        if self._selection_dim_range is not None:
+            self._selection_dim_range = None
+            self.viewport().update()
+            for cb in self._v_guide_observers: cb()
+
     # Geriye dönük uyumluluk — eski tek-guide API'si
     def set_guide_cols(self, start_col, end_col):
         self._v_guide_cols = [start_col, end_col + 1]; self.viewport().update()
@@ -160,7 +174,7 @@ class SequenceViewerView(QGraphicsView):
                     painter.fillRect(QRectF(0, t_vp, vp_w, b_vp - t_vp), QBrush(band_color))
 
             # Kılavuz çizgileri
-            h_pen = QPen(_GUIDE_COLOR, _GUIDE_WIDTH, Qt.SolidLine)
+            h_pen = QPen(theme_manager.current.guide_line_color, _GUIDE_WIDTH, Qt.SolidLine)
             painter.setPen(h_pen)
             for row in self._h_guide_rows:
                 if layout is not None and row < layout.row_count:
@@ -174,6 +188,28 @@ class SequenceViewerView(QGraphicsView):
                     if -2 <= vp_y <= vp_h + 2:
                         painter.drawLine(QPointF(0, vp_y), QPointF(vp_w, vp_y))
             painter.restore()
+
+        # ---- Seçim odak efekti: dışarıdaki sütunları solduklaştır ----
+        if self._selection_dim_range is not None:
+            left_col, right_col = self._selection_dim_range
+            cw_dim = self._effective_char_width()
+            if cw_dim > 0:
+                hbar_dim = self.horizontalScrollBar()
+                offset_dim = float(hbar_dim.value())
+                vp_w_dim = float(self.viewport().width())
+                vp_h_dim = float(self.viewport().height())
+                dim_color = QColor(t.selection_dim_color)
+                left_px = left_col * cw_dim - offset_dim
+                right_px = right_col * cw_dim - offset_dim
+                painter.save()
+                painter.resetTransform()
+                painter.setPen(Qt.NoPen)
+                if left_px > 0:
+                    painter.fillRect(QRectF(0.0, 0.0, min(left_px, vp_w_dim), vp_h_dim), dim_color)
+                if right_px < vp_w_dim:
+                    r = max(right_px, 0.0)
+                    painter.fillRect(QRectF(r, 0.0, vp_w_dim - r, vp_h_dim), dim_color)
+                painter.restore()
 
         # ---- Dikey kılavuz çizgileri (boundary tıklama) ----
         if self._v_guide_cols:
@@ -229,7 +265,7 @@ class SequenceViewerView(QGraphicsView):
                     pass
 
                 painter.save(); painter.resetTransform()
-                pen = QPen(_GUIDE_COLOR, _GUIDE_WIDTH, Qt.DashLine)
+                pen = QPen(theme_manager.current.guide_line_color, _GUIDE_WIDTH, Qt.DashLine)
                 pen.setDashPattern([4, 3]); painter.setPen(pen)
                 for col in self._v_guide_cols:
                     vp_x = col * cw - offset
@@ -255,6 +291,7 @@ class SequenceViewerView(QGraphicsView):
     def clear_items(self):
         self.sequence_items.clear(); self.scene.clear()
         self.max_sequence_length = 0; self._row_layout = None
+        self._selection_dim_range = None
         self.scene.setSceneRect(0, 0, 0, 0); self.scene.invalidate()
 
     def current_char_width(self): return self._effective_char_width()

@@ -33,14 +33,52 @@ class AppTheme:
     seq_line_fg:          QColor
     editor_bg:            str
     editor_border:        str
-    # YENİ: header/sequence satır seçiminde bant vurgusu
+    # header/sequence satır seçiminde bant vurgusu
     row_band_highlight:   QColor = None
+
+    # ── Kılavuz çizgileri (Guide Lines) ──────────────────────────────────────
+    # Dikey ve yatay kılavuz çizgilerinin rengi (yarı saydam mavi).
+    # Hem SequenceViewerView hem ConsensusRowWidget tarafından kullanılır.
+    guide_line_color:          QColor = None
+
+    # ── Seçim odak efekti: seçim dışı alan kararması ──────────────────────────
+    # Drag seçimi sırasında ve sonrasında, seçim aralığının dışındaki kolonlar
+    # üzerine yarı saydam bir overlay çizilerek arka plana itilir.
+    selection_dim_color:       QColor = None
+
+    # ── Navigation Ruler: Görünüm Penceresi ──────────────────────────────────
+    # Ekranda görünen bölgeyi mini harita üzerinde gösteren dikdörtgen.
+    nav_ruler_viewport_fill:   QColor = None   # iç dolgu (düşük alfa)
+    nav_ruler_viewport_border: QColor = None   # kenarlık
+
+    # ── Navigation Ruler: Sürükleme Seçimi ───────────────────────────────────
+    # Kullanıcı fare ile yeni bir görüntüleme aralığı sürüklerken çizilen geçici kutu.
+    nav_ruler_drag_fill:       QColor = None   # iç dolgu (düşük alfa)
+    nav_ruler_drag_border:     QColor = None   # kenarlık
 
     def __post_init__(self):
         if self.row_band_highlight is None:
             # frozen dataclass workaround
             object.__setattr__(self, 'row_band_highlight',
                 QColor(60, 100, 180, 45) if self.name == "dark" else QColor(70, 130, 220, 40))
+        if self.guide_line_color is None:
+            # Her iki temada da aynı renk; alfa kanalı saydamlığı sağlar
+            object.__setattr__(self, 'guide_line_color', QColor(80, 130, 220, 160))
+        if self.selection_dim_color is None:
+            object.__setattr__(self, 'selection_dim_color',
+                QColor(0, 0, 0, 155) if self.name == "dark" else QColor(255, 255, 255, 155))
+        if self.nav_ruler_viewport_fill is None:
+            object.__setattr__(self, 'nav_ruler_viewport_fill',
+                QColor(0, 180, 0, 55) if self.name == "dark" else QColor(0, 200, 0, 60))
+        if self.nav_ruler_viewport_border is None:
+            object.__setattr__(self, 'nav_ruler_viewport_border',
+                QColor(0, 140, 0) if self.name == "dark" else QColor(0, 150, 0))
+        if self.nav_ruler_drag_fill is None:
+            object.__setattr__(self, 'nav_ruler_drag_fill',
+                QColor(80, 80, 255, 50) if self.name == "dark" else QColor(0, 0, 255, 40))
+        if self.nav_ruler_drag_border is None:
+            object.__setattr__(self, 'nav_ruler_drag_border',
+                QColor(80, 80, 200) if self.name == "dark" else QColor(0, 0, 160))
 
 LIGHT_THEME = AppTheme(
     name="light",
@@ -58,6 +96,15 @@ LIGHT_THEME = AppTheme(
     seq_line_fg=QColor(160,160,160),
     editor_bg="#EEF4FF", editor_border="#5B8DEF",
     row_band_highlight=QColor(70, 130, 220, 40),
+    # Guide lines
+    guide_line_color=QColor(80, 130, 220, 160),
+    # Selection dim overlay
+    selection_dim_color=QColor(255, 255, 255, 155),
+    # Navigation ruler
+    nav_ruler_viewport_fill=QColor(0, 200, 0, 60),
+    nav_ruler_viewport_border=QColor(0, 150, 0),
+    nav_ruler_drag_fill=QColor(0, 0, 255, 40),
+    nav_ruler_drag_border=QColor(0, 0, 160),
 )
 
 DARK_THEME = AppTheme(
@@ -76,6 +123,15 @@ DARK_THEME = AppTheme(
     seq_line_fg=QColor(100,105,120),
     editor_bg="#1E2A4A", editor_border="#4A80E0",
     row_band_highlight=QColor(60, 100, 180, 45),
+    # Guide lines
+    guide_line_color=QColor(193, 16, 160),
+    # Selection dim overlay
+    selection_dim_color=QColor(0, 0, 0, 155),
+    # Navigation ruler
+    nav_ruler_viewport_fill=QColor(0, 180, 0, 55),
+    nav_ruler_viewport_border=QColor(0, 140, 0),
+    nav_ruler_drag_fill=QColor(80, 80, 255, 50),
+    nav_ruler_drag_border=QColor(80, 80, 200),
 )
 
 class _ThemeManager(QObject):

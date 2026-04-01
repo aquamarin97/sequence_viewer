@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "description": "Sequence Viewer — fare ve klavye eylem bağlamaları. Her 'modifier' değeri: None | Ctrl | Shift | Alt | Ctrl+Shift",
+
+  "sequence_view": {
+    "drag_select": {
+      "button": "Left",
+      "modifier": "None",
+      "gesture": "Drag",
+      "description": "Sol tık + sürükleme: kolon aralığını seçer, kılavuz çizgileri oluşturur ve diğerlerini temizler"
+    },
+    "drag_select_additive": {
+      "button": "Left",
+      "modifier": "Ctrl",
+      "gesture": "Drag",
+      "description": "Ctrl + Sol tık + sürükleme: mevcut kılavuz çizgilerini koruyarak yeni aralık ekler"
+    },
+    "guide_set": {
+      "button": "Left",
+      "modifier": "None",
+      "gesture": "Click",
+      "description": "Sol tık (sürükleme yok): kolon sınırına tek kılavuz çizgisi koyar, diğerlerini temizler"
+    },
+    "guide_toggle": {
+      "button": "Left",
+      "modifier": "Ctrl",
+      "gesture": "Click",
+      "description": "Ctrl + Sol tık (sürükleme yok): kılavuz çizgisini açar/kapatır (toggle)"
+    },
+    "zoom": {
+      "button": "Wheel",
+      "modifier": "Ctrl",
+      "gesture": "Scroll",
+      "description": "Ctrl + Fare tekerleği: yakınlaştırır/uzaklaştırır (seçim merkezli)"
+    },
+    "h_scroll": {
+      "button": "Wheel",
+      "modifier": "Shift",
+      "gesture": "Scroll",
+      "description": "Shift + Fare tekerleği: sequence viewer alanını yatay kaydırır"
+    }
+  },
+
+  "header_view": {
+    "row_select": {
+      "button": "Left",
+      "modifier": "None",
+      "gesture": "Click",
+      "description": "Sol tık: tek satır seçer"
+    },
+    "row_multi_select": {
+      "button": "Left",
+      "modifier": "Ctrl",
+      "gesture": "Click",
+      "description": "Ctrl + Sol tık: satır seçimini açar/kapatır (çoklu seçim)"
+    },
+    "row_range_select": {
+      "button": "Left",
+      "modifier": "Shift",
+      "gesture": "Click",
+      "description": "Shift + Sol tık: son seçimden bu satıra kadar aralık seçer"
+    },
+    "row_reorder": {
+      "button": "Left",
+      "modifier": "None",
+      "gesture": "Drag",
+      "description": "Sol tık + sürükleme (dikey): satır sırasını değiştirir"
+    }
+  },
+
+  "navigation_ruler": {
+    "zoom_to_range": {
+      "button": "Left",
+      "modifier": "None",
+      "gesture": "Drag",
+      "description": "Sol tık + sürükleme: seçilen NT aralığına zoom yapar"
+    },
+    "scroll_to": {
+      "button": "Left",
+      "modifier": "None",
+      "gesture": "Click",
+      "description": "Sol tık (sürükleme yok): tıklanan NT konumunu görünüm merkezine kaydırır"
+    }
+  },
+
+  "drag_thresholds_px": {
+    "sequence_viewer":  4,
+    "consensus_row":    4,
+    "header_viewer":    6,
+    "navigation_ruler": 3
+  },
+
+  "zoom": {
+    "base_factor":         1.22,
+    "acceleration_factor": 1.06,
+    "max_char_width":      90.0
+  },
+
+  "keyboard": {
+    "copy_selection": "Ctrl+C",
+    "copy_fasta":     "Ctrl+Shift+C",
+    "select_all_rows": "Ctrl+A",
+    "cancel_edit":    "Escape",
+    "delete_row":     "Delete"
+  }
+}

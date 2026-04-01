@@ -1,6 +1,6 @@
 from typing import Optional
 from PyQt5.QtCore import Qt, QRectF
-from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont, QPixmap
+from PyQt5.QtGui import QPainter, QPen, QBrush, QFont, QPixmap
 from PyQt5.QtWidgets import QWidget, QScrollBar
 from features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 from features.navigation_ruler.navigation_ruler_model import NavigationRulerModel
@@ -70,7 +70,7 @@ class RulerWidget(QWidget):
             if scene_width <= view_width: x1, x2 = 0, width
             else: x1 = int(max(0.0,(view_left/scene_width)*width)); x2 = int(min(width,(view_right/scene_width)*width))
             if x2 > x1:
-                painter.setBrush(QBrush(QColor(0,200,0,60))); painter.setPen(QPen(QColor(0,150,0)))
+                painter.setBrush(QBrush(t.nav_ruler_viewport_fill)); painter.setPen(QPen(t.nav_ruler_viewport_border))
                 painter.drawRect(QRectF(x1,1,x2-x1,height-2))
         if self._dragging_window and max_len > 0:
             a = max(0.0, min(self._drag_start_nt, self._drag_last_nt))
@@ -78,7 +78,7 @@ class RulerWidget(QWidget):
             if b > a:
                 x1 = int(a/max_len*width); x2 = int(b/max_len*width)
                 if x2 > x1+2:
-                    painter.setBrush(QBrush(QColor(0,0,255,40))); painter.setPen(QPen(QColor(0,0,160)))
+                    painter.setBrush(QBrush(t.nav_ruler_drag_fill)); painter.setPen(QPen(t.nav_ruler_drag_border))
                     painter.drawRect(QRectF(x1,1,x2-x1,height-2))
         painter.end()
 

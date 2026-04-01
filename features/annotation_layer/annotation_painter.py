@@ -7,6 +7,12 @@ from settings.annotation_styles import annotation_style_manager
 _LABEL_MARGIN = 4
 _MIN_TIP_PX = 5.0
 
+# ── Annotation Etiket Metin Renkleri ─────────────────────────────────────────
+# Arka plan parlaklığına (luminance) göre okunabilirlik için seçilen kontrast renkler.
+# Luminance < 140 → koyu zemin → beyaz metin; aksi halde koyu metin.
+_LABEL_TEXT_ON_DARK  = QColor(255, 255, 255)   # beyaz — koyu arka plan üzeri
+_LABEL_TEXT_ON_LIGHT = QColor(20,  20,  20)    # neredeyse siyah — açık arka plan üzeri
+
 def draw_primer(painter, x, y, w, h, color, label, strand="+", char_width=12.0):
     if w <= 0: return
     tip_w = min(max(2.0 * char_width, _MIN_TIP_PX), w)
@@ -62,7 +68,7 @@ def draw_repeated_region(painter, x, y, w, h, color, label):
 def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7):
     if not label or w < 4: return
     lum = 0.299*bg_color.red() + 0.587*bg_color.green() + 0.114*bg_color.blue()
-    text_color = QColor(255,255,255) if lum < 140 else QColor(20,20,20)
+    text_color = _LABEL_TEXT_ON_DARK if lum < 140 else _LABEL_TEXT_ON_LIGHT
     font = QFont("Arial", max(6, font_size)); font.setBold(True)
     painter.setFont(font); painter.setPen(QPen(text_color))
     metrics = QFontMetrics(font)

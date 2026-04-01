@@ -29,6 +29,8 @@ class AnnotationLayerWidget(QWidget):
         hbar.valueChanged.connect(self.update); hbar.rangeChanged.connect(self.update)
         anim = getattr(self._sequence_viewer, "_zoom_animation", None)
         if anim: anim.valueChanged.connect(self.update)
+        if hasattr(sequence_viewer, 'add_v_guide_observer'):
+            sequence_viewer.add_v_guide_observer(self.update)
         theme_manager.themeChanged.connect(lambda _: self.update())
         try:
             from settings.annotation_styles import annotation_style_manager as _asm
@@ -94,6 +96,21 @@ class AnnotationLayerWidget(QWidget):
             else:
                 draw_repeated_region(painter, vp.x(), vp.y(), vp.width(), vp.height(), ann.resolved_color(), ann.label)
             painter.restore(); self._hit_rects.append((vp, ann))
+        # ---- Seçim odak efekti ----
+        dim_range = getattr(self._sequence_viewer, '_selection_dim_range', None)
+        if dim_range is not None and cw > 0:
+            left_col, right_col = dim_range
+            offset = float(self._sequence_viewer.horizontalScrollBar().value())
+            ww = float(self.width()); wh = float(self.height())
+            dim_color = QColor(t.selection_dim_color)
+            left_px = left_col * cw - offset
+            right_px = right_col * cw - offset
+            painter.setPen(Qt.NoPen)
+            if left_px > 0:
+                painter.fillRect(QRectF(0.0, 0.0, min(left_px, ww), wh), dim_color)
+            if right_px < ww:
+                r = max(right_px, 0.0)
+                painter.fillRect(QRectF(r, 0.0, ww - r, wh), dim_color)
         painter.end()
 
     def _annotation_at(self, pos):
