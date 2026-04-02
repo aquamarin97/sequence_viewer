@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "description": "Sequence Viewer — görüntüleme ayarları. Ileride layout ve color bölümleri eklenecek.",
+
+  "font": {
+    "sequence_font_family": "Courier New",
+    "sequence_font_size": 12,
+    "consensus_font_family": "Courier New"
+  }
+}

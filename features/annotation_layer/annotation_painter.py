@@ -271,4 +271,4 @@ def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7):
     metrics   = QFontMetrics(font)
     text_rect = QRectF(x + _LABEL_MARGIN, y, w - _LABEL_MARGIN * 2, h)
     elided    = metrics.elidedText(label, Qt.ElideRight, int(text_rect.width()))
-    painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, elided)
+    painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignHCenter, elided)

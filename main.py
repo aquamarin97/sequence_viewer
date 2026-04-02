@@ -74,6 +74,12 @@ class MainWindow(QMainWindow):
         toggle_dark_action.triggered.connect(self._toggle_dark_mode)
         view_menu.addAction(toggle_dark_action)
 
+        # ---- Settings menüsü ----
+        settings_menu = menubar.addMenu("Settings")
+        display_settings_action = QAction("Display Settings...", self)
+        display_settings_action.triggered.connect(self._open_display_settings)
+        settings_menu.addAction(display_settings_action)
+
     def _import_fasta_dialog(self):
         """Normal FASTA — is_aligned=False."""
         file_filter = "FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn *.aln);;All Files (*)"
@@ -101,6 +107,11 @@ class MainWindow(QMainWindow):
     def _toggle_dark_mode(self):
         from settings.theme import theme_manager
         theme_manager.toggle()
+
+    def _open_display_settings(self):
+        from dialogs.display_settings_dialog import DisplaySettingsDialog
+        dlg = DisplaySettingsDialog(self)
+        dlg.exec_()
 
 
 def main():

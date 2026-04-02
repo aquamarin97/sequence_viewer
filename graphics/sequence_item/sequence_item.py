@@ -6,6 +6,7 @@ import math
 from graphics.sequence_item.sequence_glyph_cache import default_nucleotide_color_map, GLYPH_CACHE
 from graphics.sequence_item.sequence_item_model import SequenceItemModel
 from settings.theme import theme_manager
+from settings.display_settings_manager import display_settings_manager
 
 class SequenceGraphicsItem(QGraphicsItem):
     TEXT_MODE = SequenceItemModel.TEXT_MODE
@@ -17,7 +18,7 @@ class SequenceGraphicsItem(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemUsesExtendedStyleOption, True)
         self.row_index = row_index
         self._model = SequenceItemModel(sequence=sequence, char_width=char_width, char_height=char_height, color_map=color_map)
-        self.font = QFont("Courier New")
+        self.font = QFont(display_settings_manager.sequence_font_family)
         self.font.setStyleHint(QFont.Monospace)
         self.font.setFixedPitch(True)
         self._applied_font_size = -1.0
@@ -59,6 +60,14 @@ class SequenceGraphicsItem(QGraphicsItem):
         self._model.clear_selection(); self.update()
     def set_lod_max_mode(self, mode):
         self._model.set_lod_max_mode(mode); self.update()
+
+    def refresh_display_settings(self):
+        """Font family ve size'ı display_settings_manager'dan yeniden uygula."""
+        self.font.setFamily(display_settings_manager.sequence_font_family)
+        self._model._update_display_state()
+        self._applied_font_size = -1.0
+        self._sync_font_from_model()
+        self.update()
 
     def _on_color_styles_changed(self):
         self._model.refresh_color_map(); self.update()

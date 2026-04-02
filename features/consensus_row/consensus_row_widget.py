@@ -18,6 +18,7 @@ from model.alignment_data_model import AlignmentDataModel
 from model.consensus_calculator import ConsensusMethod
 from settings.theme import theme_manager
 from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
+from settings.display_settings_manager import display_settings_manager
 
 
 def _paint_dim_overlay(painter, sequence_viewer, cw, widget_w, widget_h, t):
@@ -44,7 +45,7 @@ class ConsensusRowWidget(QWidget):
         self._alignment_model = alignment_model
         self._sequence_viewer = sequence_viewer
         self._model = ConsensusRowModel(method=ConsensusMethod.PLURALITY)
-        self._font = QFont("Courier New")
+        self._font = QFont(display_settings_manager.consensus_font_family)
         self._font.setStyleHint(QFont.Monospace); self._font.setFixedPitch(True)
         from settings.color_styles import color_style_manager as _csm
         self._color_map = _csm.consensus_nucleotide_color_map()
@@ -77,6 +78,7 @@ class ConsensusRowWidget(QWidget):
         if hasattr(sequence_viewer, 'add_v_guide_observer'):
             sequence_viewer.add_v_guide_observer(self.update)
         theme_manager.themeChanged.connect(lambda _: self._on_theme_changed())
+        display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
         try:
             from settings.color_styles import color_style_manager as _csm2
             _csm2.stylesChanged.connect(self._on_color_styles_changed)
@@ -178,6 +180,9 @@ class ConsensusRowWidget(QWidget):
 
     def _on_data_changed(self, *_): self._model.invalidate(); self.update()
     def _on_theme_changed(self): self._on_color_styles_changed()
+    def _on_display_settings_changed(self):
+        self._font.setFamily(display_settings_manager.consensus_font_family)
+        self.update()
 
     def _get_char_width(self):
         if hasattr(self._sequence_viewer, "_get_current_char_width"):
@@ -189,16 +194,16 @@ class ConsensusRowWidget(QWidget):
     def _sync_font_from_viewer(self):
         items = getattr(self._sequence_viewer, "sequence_items", None)
         if items:
-            size = float(items[0]._model.current_font_size)
+            size = float(items[0]._model.current_font_size) + 1.0
         else:
             cw = self._get_char_width()
             cw_default = float(getattr(self._sequence_viewer, "char_width", 12.0)) or 12.0
             scale = cw / cw_default
-            if scale >= 1.8: size = 12.0
-            elif scale >= 1.2: size = 10.0
-            elif scale >= 0.7: size = 8.0
-            else: size = max(1.0, 18.0 * 0.6 * scale)
-        self._font.setPointSizeF(size)
+            if scale >= 1.8: size = 13.0
+            elif scale >= 1.2: size = 11.0
+            elif scale >= 0.7: size = 9.0
+            else: size = max(1.0, 18.0 * 0.6 * scale + 1.0)
+        self._font.setPointSizeF(max(1.0, size))
 
     def _effective_mode(self):
         items = getattr(self._sequence_viewer, "sequence_items", None)

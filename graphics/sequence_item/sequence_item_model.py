@@ -36,13 +36,15 @@ class SequenceItemModel:
         self._update_display_state()
 
     def _update_display_state(self):
+        from settings.display_settings_manager import display_settings_manager
         if self.default_char_width <= 0: self.default_char_width = 12.0
         cw = max(self.char_width, 0.001)
         base_cw = max(self.default_char_width, 0.001)
         scale = cw / base_cw
-        if scale >= 1.8: snapped_size = 12.0
-        elif scale >= 1.2: snapped_size = 10.0
-        elif scale >= 0.7: snapped_size = 8.0
+        max_fs = float(display_settings_manager.sequence_font_size)
+        if scale >= 1.8: snapped_size = max_fs
+        elif scale >= 1.2: snapped_size = max(1.0, max_fs * (10.0 / 12.0))
+        elif scale >= 0.7: snapped_size = max(1.0, max_fs * (8.0 / 12.0))
         else: snapped_size = max(1.0, self.base_font_size * scale)
         self.current_font_size = snapped_size
         if self.current_font_size >= self._TEXT_BOX_THRESHOLD: self.display_mode = self.TEXT_MODE
