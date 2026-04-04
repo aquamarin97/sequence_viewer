@@ -35,6 +35,8 @@ class HeaderViewerView(QGraphicsView):
         self._press_pos = None; self._drag_source_row = None
         self._drag_insert_pos = None; self._dragging = False
         theme_manager.themeChanged.connect(self._on_theme_changed)
+        from settings.display_settings_manager import display_settings_manager
+        display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
         self._apply_scene_background()
 
     def apply_row_layout(self, layout):
@@ -146,6 +148,18 @@ class HeaderViewerView(QGraphicsView):
     def _on_theme_changed(self, _theme):
         self._apply_scene_background(); self._refresh_active_editor_style()
         self.scene.invalidate(); self.viewport().update()
+
+    def _on_display_settings_changed(self):
+        from settings.display_settings_manager import display_settings_manager
+        new_ch = display_settings_manager.sequence_char_height
+        if self._char_height == new_ch:
+            return
+        self._char_height = new_ch
+        for item in self.header_items:
+            item.set_row_height(new_ch)
+        self._update_scene_rect()
+        self.scene.invalidate()
+        self.viewport().update()
 
     def _start_edit(self, row_index):
         if row_index < 0 or row_index >= len(self.header_items): return

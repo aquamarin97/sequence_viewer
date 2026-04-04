@@ -62,9 +62,14 @@ class SequenceGraphicsItem(QGraphicsItem):
         self._model.set_lod_max_mode(mode); self.update()
 
     def refresh_display_settings(self):
-        """Font family ve size'ı display_settings_manager'dan yeniden uygula."""
+        """Font family, char_height ve size'ı display_settings_manager'dan yeniden uygula."""
         self.font.setFamily(display_settings_manager.sequence_font_family)
-        self._model._update_display_state()
+        new_ch = display_settings_manager.sequence_char_height
+        if self._model.char_height != new_ch:
+            self.prepareGeometryChange()
+            self._model.set_char_height(new_ch)
+        else:
+            self._model._update_display_state()
         self._applied_font_size = -1.0
         self._sync_font_from_model()
         self.update()

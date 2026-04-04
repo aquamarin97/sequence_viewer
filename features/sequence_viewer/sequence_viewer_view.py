@@ -62,8 +62,12 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         self.viewport().update()
 
     def _on_display_settings_changed(self):
+        new_ch = display_settings_manager.sequence_char_height
+        self.char_height = new_ch
         for item in self.sequence_items:
             item.refresh_display_settings()
+        self._reposition_items()
+        self._update_scene_rect()
         self.scene.invalidate()
         self.viewport().update()
 

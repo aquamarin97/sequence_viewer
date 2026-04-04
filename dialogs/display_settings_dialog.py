@@ -1,7 +1,7 @@
 from __future__ import annotations
 from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtWidgets import (
-    QDialog, QFormLayout, QComboBox, QSpinBox,
+    QDialog, QFormLayout, QComboBox, QDoubleSpinBox,
     QDialogButtonBox, QVBoxLayout,
 )
 from settings.display_settings_manager import display_settings_manager
@@ -26,22 +26,24 @@ class DisplaySettingsDialog(QDialog):
         self._seq_combo = QComboBox()
         self._seq_combo.addItems(families)
 
-        self._seq_size_spin = QSpinBox()
-        self._seq_size_spin.setRange(6, 24)
-        self._seq_size_spin.setSuffix(" pt")
-
         self._con_combo = QComboBox()
         self._con_combo.addItems(families)
 
+        self._seq_base_spin = QDoubleSpinBox()
+        self._seq_base_spin.setRange(8.0, 32.0)
+        self._seq_base_spin.setSingleStep(1.0)
+        self._seq_base_spin.setDecimals(0)
+        self._seq_base_spin.setSuffix(" pt")
+
         # Mevcut değerleri set et
         self._select(self._seq_combo, display_settings_manager.sequence_font_family)
-        self._seq_size_spin.setValue(display_settings_manager.sequence_font_size)
         self._select(self._con_combo, display_settings_manager.consensus_font_family)
+        self._seq_base_spin.setValue(display_settings_manager.sequence_font_size_base)
 
         form = QFormLayout()
         form.addRow("Sequence font:", self._seq_combo)
-        form.addRow("Sequence font size:", self._seq_size_spin)
         form.addRow("Consensus font:", self._con_combo)
+        form.addRow("Sequence Font Size:", self._seq_base_spin)
 
         buttons = QDialogButtonBox()
         apply_btn = buttons.addButton("Uygula", QDialogButtonBox.AcceptRole)
@@ -64,9 +66,9 @@ class DisplaySettingsDialog(QDialog):
     def _apply(self):
         display_settings_manager.apply({
             "font": {
-                "sequence_font_family":  self._seq_combo.currentText(),
-                "sequence_font_size":    self._seq_size_spin.value(),
-                "consensus_font_family": self._con_combo.currentText(),
+                "sequence_font_family":    self._seq_combo.currentText(),
+                "consensus_font_family":   self._con_combo.currentText(),
+                "sequence_font_size_base": self._seq_base_spin.value(),
             }
         })
         self.accept()

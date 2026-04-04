@@ -4,7 +4,7 @@
 
   "font": {
     "sequence_font_family": "Courier New",
-    "sequence_font_size": 12,
-    "consensus_font_family": "Courier New"
+    "consensus_font_family": "Courier New",
+    "sequence_font_size_base": 11.0
   }
 }

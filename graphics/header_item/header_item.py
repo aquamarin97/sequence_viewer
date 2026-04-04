@@ -54,6 +54,14 @@ class HeaderRowItem(QGraphicsItem):
     def set_width(self, width):
         if abs(width - self.width) < 0.5: return
         self.prepareGeometryChange(); self.width = float(width); self.update()
+    def set_row_height(self, height):
+        h = int(round(height))
+        if self.row_height == h: return
+        self.prepareGeometryChange()
+        self.row_height = h
+        self._model.row_height = h
+        self.font.setPointSizeF(self._model.compute_font_point_size())
+        self.update()
     def _on_theme_changed(self, _theme): self.update()
 
     def _resolve_bg_color(self):

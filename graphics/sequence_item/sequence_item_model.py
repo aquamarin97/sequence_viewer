@@ -17,7 +17,9 @@ class SequenceItemModel:
         self.char_height = max(1, int(round(char_height)))
         self._custom_color_map = color_map is not None
         self.color_map = color_map or default_nucleotide_color_map()
-        self.default_char_width = self.char_width
+        # default_char_width / 1.8 ile LOD referans noktası kaydırılır:
+        # başlangıç scale = char_width / (char_width/1.8) = 1.8 → TEXT MODE garantisi.
+        self.default_char_width = self.char_width / 1.8
         self.selection_range = None
         self.base_font_size = self.char_height * 0.6
         self.display_mode = self.TEXT_MODE
@@ -35,13 +37,20 @@ class SequenceItemModel:
         self.char_width = max(new_width, 0.001)
         self._update_display_state()
 
+    def set_char_height(self, new_height):
+        self.char_height = max(1, int(round(new_height)))
+        self.base_font_size = self.char_height * 0.6
+        self.box_height = self.char_height * 0.7
+        self.line_height = self.char_height * 0.3
+        self._update_display_state()
+
     def _update_display_state(self):
         from settings.display_settings_manager import display_settings_manager
         if self.default_char_width <= 0: self.default_char_width = 12.0
         cw = max(self.char_width, 0.001)
         base_cw = max(self.default_char_width, 0.001)
         scale = cw / base_cw
-        max_fs = float(display_settings_manager.sequence_font_size)
+        max_fs = display_settings_manager.sequence_font_size_base
         if scale >= 1.8: snapped_size = max_fs
         elif scale >= 1.2: snapped_size = max(1.0, max_fs * (10.0 / 12.0))
         elif scale >= 0.7: snapped_size = max(1.0, max_fs * (8.0 / 12.0))

@@ -182,6 +182,7 @@ class ConsensusRowWidget(QWidget):
     def _on_theme_changed(self): self._on_color_styles_changed()
     def _on_display_settings_changed(self):
         self._font.setFamily(display_settings_manager.consensus_font_family)
+        self._update_visibility()
         self.update()
 
     def _get_char_width(self):
@@ -199,10 +200,11 @@ class ConsensusRowWidget(QWidget):
             cw = self._get_char_width()
             cw_default = float(getattr(self._sequence_viewer, "char_width", 12.0)) or 12.0
             scale = cw / cw_default
-            if scale >= 1.8: size = 13.0
-            elif scale >= 1.2: size = 11.0
-            elif scale >= 0.7: size = 9.0
-            else: size = max(1.0, 18.0 * 0.6 * scale + 1.0)
+            con_base = display_settings_manager.consensus_font_size_base
+            if scale >= 1.8: size = con_base
+            elif scale >= 1.2: size = max(1.0, con_base * (10.0 / 12.0))
+            elif scale >= 0.7: size = max(1.0, con_base * (8.0 / 12.0))
+            else: size = max(1.0, display_settings_manager.consensus_char_height * 0.6 * scale)
         self._font.setPointSizeF(max(1.0, size))
 
     def _effective_mode(self):

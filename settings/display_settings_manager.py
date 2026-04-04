@@ -10,11 +10,11 @@ Kullanım:
     from settings.display_settings_manager import display_settings_manager
 
     family  = display_settings_manager.sequence_font_family
-    fs      = display_settings_manager.sequence_font_size
+    base_fs = display_settings_manager.sequence_font_size_base
     display_settings_manager.displaySettingsChanged.connect(my_slot)
 
     # Disk'e yazmadan bellek içi güncelleme + sinyal:
-    display_settings_manager.apply({"font": {"sequence_font_size": 14}})
+    display_settings_manager.apply({"font": {"sequence_font_size_base": 12.0}})
 
     # Disk'ten yeniden yükle:
     display_settings_manager.reload()
@@ -33,9 +33,9 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 _BUILT_IN_DEFAULTS: dict = {
     "font": {
-        "sequence_font_family": "Courier New",
-        "sequence_font_size":   12,
-        "consensus_font_family": "Courier New",
+        "sequence_font_family":    "Courier New",
+        "consensus_font_family":   "Courier New",
+        "sequence_font_size_base": 10.8,   # char_height = round(10.8 / 0.6) = 18
     }
 }
 
@@ -89,18 +89,6 @@ class DisplaySettingsManager(QObject):
         )
 
     @property
-    def sequence_font_size(self) -> int:
-        """
-        Tam zoom'da dizi satırları için maksimum font boyutu (punto).
-        LOD zoom-out adımları bu değere orantılı olarak hesaplanır.
-        """
-        raw = self._data.get("font", {}).get(
-            "sequence_font_size",
-            _BUILT_IN_DEFAULTS["font"]["sequence_font_size"],
-        )
-        return max(1, int(raw))
-
-    @property
     def consensus_font_family(self) -> str:
         """Konsensüs satırı için kullanılacak font ailesi."""
         return str(
@@ -109,6 +97,35 @@ class DisplaySettingsManager(QObject):
                 _BUILT_IN_DEFAULTS["font"]["consensus_font_family"],
             )
         )
+
+    @property
+    def sequence_font_size_base(self) -> float:
+        """
+        Sequence satırı için baz font boyutu (punto, float).
+        char_height = round(sequence_font_size_base / 0.6) formülüyle türetilir.
+        LOD zoom adımları bu değere orantılı hesaplanır.
+        Sınır: 8.0 – 32.0 pt.
+        """
+        raw = self._data.get("font", {}).get(
+            "sequence_font_size_base",
+            _BUILT_IN_DEFAULTS["font"]["sequence_font_size_base"],
+        )
+        return max(8.0, min(32.0, float(raw)))
+
+    @property
+    def consensus_font_size_base(self) -> float:
+        """Konsensüs satırı için baz font boyutu: daima sequence_font_size_base + 1.0 pt."""
+        return self.sequence_font_size_base + 1.0
+
+    @property
+    def sequence_char_height(self) -> int:
+        """sequence_font_size_base'den türetilen piksel yüksekliği."""
+        return round(self.sequence_font_size_base / 0.6)
+
+    @property
+    def consensus_char_height(self) -> int:
+        """consensus_font_size_base'den türetilen piksel yüksekliği."""
+        return round(self.consensus_font_size_base / 0.6)
 
     # ------------------------------------------------------------------
     # Güncelleme — disk'e dokunmaz
@@ -119,7 +136,7 @@ class DisplaySettingsManager(QObject):
         Bellek içi ayarları günceller ve displaySettingsChanged sinyali yayar.
         Disk'e yazma yapmaz; reload() ile disk ezmez.
 
-        overrides — iç içe dict, örn. {"font": {"sequence_font_size": 14}}
+        overrides — iç içe dict, örn. {"font": {"sequence_font_size_base": 12.0}}
         """
         self._deep_update(self._data, overrides)
         self.displaySettingsChanged.emit()

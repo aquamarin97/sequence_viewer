@@ -11,7 +11,7 @@ class AnnotationTypeStyle:
     border_alpha: int
     border_width: float
     label_min_width: int
-    label_font_size: int = 18
+    label_font_size: int = 12
 
 _STYLES_LIGHT = {
     AnnotationType.PRIMER: AnnotationTypeStyle(255,0,0.0,20,7),

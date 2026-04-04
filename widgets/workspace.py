@@ -22,14 +22,17 @@ from features.position_ruler.position_ruler_widget import SequencePositionRulerW
 from features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation
+from settings.display_settings_manager import display_settings_manager
 from settings.scrollbar_style import apply_scrollbar_style
 from widgets import workspace_action_dialog_coordinator
 from widgets import workspace_annotation_presentation
 from widgets import workspace_layout_scroll_sync
 
 class SequenceWorkspaceWidget(QWidget):
-    def __init__(self, parent=None, char_width=12.0, char_height=18.0):
+    def __init__(self, parent=None, char_width=12.0, char_height=None):
         super().__init__(parent)
+        if char_height is None:
+            char_height = display_settings_manager.sequence_char_height
         row_height = int(round(char_height))
         self._model = AlignmentDataModel(parent=self)
 
@@ -126,6 +129,7 @@ class SequenceWorkspaceWidget(QWidget):
         from settings.theme import theme_manager
         theme_manager.themeChanged.connect(self._on_theme_changed)
         self._on_theme_changed(theme_manager.current)
+        display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
 
         # Initial consensus visibility sync
         self._sync_consensus_visibility()
@@ -264,6 +268,10 @@ class SequenceWorkspaceWidget(QWidget):
                         blocks.append(f">{header}\n{fragment}")
         if blocks:
             QApplication.clipboard().setText("\n".join(blocks))
+
+    def _on_display_settings_changed(self):
+        layout = self._compute_row_layout()
+        self._apply_layout(layout)
 
     def _compute_row_layout(self): return self._layout_sync.compute_row_layout()
     def _apply_layout(self, layout): self._layout_sync.apply_layout(layout)
