@@ -1,3 +1,4 @@
+# main.py
 import sys
 from pathlib import Path
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMenu, QFileDialog

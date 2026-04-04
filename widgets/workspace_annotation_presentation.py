@@ -1,3 +1,4 @@
+# widgets/workspace_annotation_presentation.py
 from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List

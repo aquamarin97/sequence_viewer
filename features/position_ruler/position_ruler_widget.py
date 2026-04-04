@@ -1,3 +1,4 @@
+# features/position_ruler/position_ruler_widget.py
 import math
 from typing import Optional, List
 from PyQt5.QtCore import Qt, QRectF

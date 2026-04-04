@@ -1,3 +1,4 @@
+# graphics/sequence_item/sequence_item_model.py
 from typing import Optional, Tuple, Dict
 from PyQt5.QtGui import QColor
 from graphics.sequence_item.sequence_glyph_cache import default_nucleotide_color_map

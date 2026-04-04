@@ -1,3 +1,4 @@
+# features/annotation_layer/annotation_painter.py
 from __future__ import annotations
 import math
 from PyQt5.QtCore import Qt, QRectF, QPointF

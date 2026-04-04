@@ -1,3 +1,4 @@
+# repositories/base_repository.py
 from abc import ABC, abstractmethod
 from typing import Iterable, Mapping, Protocol
 

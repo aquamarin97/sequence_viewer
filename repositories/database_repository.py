@@ -1,3 +1,4 @@
+# repositories/database_repository.py
 from .base_repository import AbstractSequenceRepository
 class DatabaseRepository(AbstractSequenceRepository):
     def __init__(self, connection_string): self.connection_string = connection_string

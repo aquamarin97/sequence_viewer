@@ -1,3 +1,4 @@
+# features/sequence_viewer/sequence_viewer_overlay.py
 from __future__ import annotations
 from PyQt5.QtCore import Qt, QPointF, QRectF
 from PyQt5.QtGui import QPainter, QPen, QColor, QBrush

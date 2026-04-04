@@ -1,3 +1,4 @@
+# features/navigation_ruler/navigation_ruler_widget.py
 from typing import Optional
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QFont, QPixmap

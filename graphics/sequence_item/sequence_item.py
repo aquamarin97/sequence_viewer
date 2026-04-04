@@ -1,3 +1,4 @@
+# graphics/sequence_item/sequence_item.py
 from typing import Optional
 import weakref
 from PyQt5.QtCore import Qt, QRectF, QPointF

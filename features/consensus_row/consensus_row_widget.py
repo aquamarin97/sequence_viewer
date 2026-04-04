@@ -274,6 +274,7 @@ class ConsensusRowWidget(QWidget):
         """Annotation aralığını seçili yap ve guide çizgileri oluştur."""
         self._selection = (ann.start, ann.end)
         self._is_selected = True
+        self._sequence_viewer.set_selection_dim_range(ann.start, ann.end + 1)
         self.update()
         # Guide çizgileri: ilk NA'nın solu ve son NA'nın sağı
         c = self._get_controller()

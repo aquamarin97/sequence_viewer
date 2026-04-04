@@ -1,3 +1,4 @@
+# widgets/row_layout.py
 from __future__ import annotations
 import bisect
 from dataclasses import dataclass, field

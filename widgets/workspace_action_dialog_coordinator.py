@@ -1,3 +1,4 @@
+# widgets/workspace_action_dialog_coordinator.py
 from __future__ import annotations
 from typing import FrozenSet, Optional, TYPE_CHECKING
 from model.annotation import Annotation
@@ -9,6 +10,7 @@ class WorkspaceActionDialogCoordinator:
 
     def on_annotation_layer_clicked(self, annotation):
         self.workspace.sequence_viewer.set_guide_cols(annotation.start, annotation.end)
+        self.workspace.sequence_viewer.set_selection_dim_range(annotation.start, annotation.end + 1)
         n = self.workspace.model.row_count()
         if n > 0:
             self.workspace.sequence_viewer.set_visual_selection(0, n-1, annotation.start, annotation.end)
@@ -42,6 +44,7 @@ class WorkspaceActionDialogCoordinator:
 
         # V-guide: annotation sütun aralığı
         ws.sequence_viewer.set_guide_cols(annotation.start, annotation.end)
+        ws.sequence_viewer.set_selection_dim_range(annotation.start, annotation.end + 1)
 
         # Görsel seçim: sadece annotation sütun aralığı
         if 0 <= row_index < n:

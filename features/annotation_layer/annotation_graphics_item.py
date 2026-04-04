@@ -1,3 +1,4 @@
+# features/annotation_layer/annotation_graphics_item.py
 from __future__ import annotations
 import weakref
 from typing import Callable, Optional

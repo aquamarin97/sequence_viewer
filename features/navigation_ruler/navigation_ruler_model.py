@@ -1,3 +1,4 @@
+# features/navigation_ruler/navigation_ruler_model.py
 from dataclasses import dataclass
 from typing import List, Sequence, Optional
 import math

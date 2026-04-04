@@ -1,3 +1,4 @@
+# graphics/header_item/header_item_model.py
 from dataclasses import dataclass
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFontMetrics

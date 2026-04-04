@@ -1,3 +1,4 @@
+# features/dialogs/edit_annotation_dialog.py
 from __future__ import annotations
 from typing import Optional
 from PyQt5.QtCore import Qt

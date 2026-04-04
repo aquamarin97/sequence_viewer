@@ -1,3 +1,4 @@
+# features/annotation_layer/annotation_layout_engine.py
 from __future__ import annotations
 from typing import Dict, List
 from model.annotation import Annotation

@@ -1,3 +1,4 @@
+# features/header_viewer/header_viewer_widget.py
 from __future__ import annotations
 from typing import FrozenSet, List
 from PyQt5.QtCore import pyqtSignal

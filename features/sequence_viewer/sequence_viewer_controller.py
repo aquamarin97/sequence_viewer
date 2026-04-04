@@ -1,3 +1,4 @@
+# features/sequence_viewer/sequence_viewer_controller.py
 from typing import Optional, Callable, List
 from math import pow
 from PyQt5.QtCore import Qt, QPoint

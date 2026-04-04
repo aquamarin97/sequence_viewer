@@ -1,3 +1,4 @@
+# features/annotation_layer/annotation_layer_widget.py
 from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 from PyQt5.QtCore import Qt, QRectF, QPoint, pyqtSignal
