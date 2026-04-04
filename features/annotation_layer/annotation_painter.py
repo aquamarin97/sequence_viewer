@@ -171,7 +171,8 @@ def draw_primer(painter, x, y, w, h, color, label, strand="+",
 
     if label_w >= style.label_min_width:
         _draw_label(painter, label_x, y, label_w, h, label, color,
-                    font_size=style.label_font_size)
+                    font_size=style.label_font_size,
+                    font_family=style.label_font_family)
 
 
 def draw_probe(painter, x, y, w, h, color, label, strand="+",
@@ -222,7 +223,8 @@ def draw_probe(painter, x, y, w, h, color, label, strand="+",
 
     if label_w >= style.label_min_width:
         _draw_label(painter, label_x, y, label_w, h, label, color,
-                    font_size=style.label_font_size)
+                    font_size=style.label_font_size,
+                    font_family=style.label_font_family)
 
 
 def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"):
@@ -254,17 +256,18 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
 
     if w >= style.label_min_width:
         _draw_label(painter, x, y, w, h, label, color,
-                    font_size=style.label_font_size)
+                    font_size=style.label_font_size,
+                    font_family=style.label_font_family)
 
 
 # ── Label ──────────────────────────────────────────────────────────────────────
 
-def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7):
+def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="Arial"):
     if not label or w < 4:
         return
     lum        = 0.299 * bg_color.red() + 0.587 * bg_color.green() + 0.114 * bg_color.blue()
     text_color = _LABEL_TEXT_ON_DARK if lum < 140 else _LABEL_TEXT_ON_LIGHT
-    font       = QFont("Arial", max(6, font_size))
+    font       = QFont(font_family, max(6, font_size))
     font.setBold(True)
     painter.setFont(font)
     painter.setPen(QPen(text_color))

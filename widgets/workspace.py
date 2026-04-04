@@ -130,6 +130,8 @@ class SequenceWorkspaceWidget(QWidget):
         theme_manager.themeChanged.connect(self._on_theme_changed)
         self._on_theme_changed(theme_manager.current)
         display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
+        from settings.annotation_styles import annotation_style_manager as _asm
+        _asm.stylesChanged.connect(self._on_annotation_changed)
 
         # Initial consensus visibility sync
         self._sync_consensus_visibility()

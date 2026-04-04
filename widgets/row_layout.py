@@ -5,12 +5,24 @@ from typing import List
 
 PAD_FAR = 10; PAD_NEAR = 0; LANE_GAP = 2
 
-def strip_height(n_lanes):
-    if n_lanes == 0: return 0
-    return PAD_FAR + n_lanes * 16 + (n_lanes - 1) * LANE_GAP + PAD_NEAR
+def _lane_h(lane_height):
+    if lane_height is not None:
+        return int(lane_height)
+    from settings.annotation_styles import annotation_style_manager
+    return annotation_style_manager.get_lane_height()
 
-def above_lane_y(lane): return PAD_FAR + lane * (16 + LANE_GAP)
-def below_lane_y(lane): return PAD_NEAR + lane * (16 + LANE_GAP)
+def strip_height(n_lanes, lane_height=None):
+    if n_lanes == 0: return 0
+    lh = _lane_h(lane_height)
+    return PAD_FAR + n_lanes * lh + (n_lanes - 1) * LANE_GAP + PAD_NEAR
+
+def above_lane_y(lane, lane_height=None):
+    lh = _lane_h(lane_height)
+    return PAD_FAR + lane * (lh + LANE_GAP)
+
+def below_lane_y(lane, lane_height=None):
+    lh = _lane_h(lane_height)
+    return PAD_NEAR + lane * (lh + LANE_GAP)
 
 @dataclass
 class RowLayout:

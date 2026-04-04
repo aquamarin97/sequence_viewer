@@ -1,4 +1,5 @@
 from __future__ import annotations
+import weakref
 from typing import Callable, Optional
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter
@@ -19,10 +20,11 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self.setAcceptedMouseButtons(Qt.LeftButton)
         self.setAcceptHoverEvents(True); self.setZValue(10.0)
         self._selected = False
-        theme_manager.themeChanged.connect(lambda _: self.update())
+        _ref = weakref.ref(self)
+        theme_manager.themeChanged.connect(lambda _, r=_ref: (s := r()) and s.update())
         try:
             from settings.annotation_styles import annotation_style_manager as _asm
-            _asm.stylesChanged.connect(lambda: self.update())
+            _asm.stylesChanged.connect(lambda r=_ref: (s := r()) and s.update())
         except: pass
 
     def update_size(self, ann_width, ann_height):

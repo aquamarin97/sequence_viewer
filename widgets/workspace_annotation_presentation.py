@@ -3,12 +3,11 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List
 from features.annotation_layer.annotation_graphics_item import AnnotationGraphicsItem
 from features.annotation_layer.annotation_layout_engine import assign_lanes
+from settings.annotation_styles import annotation_style_manager
 from widgets.row_layout import RowLayout, above_lane_y, below_lane_y
 
 if TYPE_CHECKING:
     from widgets.workspace import SequenceWorkspaceWidget
-
-_LANE_HEIGHT = 16
 
 class WorkspaceAnnotationPresentation:
     def __init__(self, workspace): self.workspace = workspace; self.ann_items = {}
@@ -36,7 +35,7 @@ class WorkspaceAnnotationPresentation:
         if not flat or layout.row_count == 0: return
         assignment = self.per_row_lane_assignment(flat)
         cw = float(self.workspace.sequence_viewer.current_char_width())
-        ann_h = float(_LANE_HEIGHT); scene = self.workspace.sequence_viewer.scene
+        ann_h = float(annotation_style_manager.get_lane_height()); scene = self.workspace.sequence_viewer.scene
         for row_index, ann in flat:
             if row_index >= layout.row_count: continue
             lane = assignment.get(ann.id, 0); scene_x = ann.start * cw
@@ -52,7 +51,7 @@ class WorkspaceAnnotationPresentation:
         flat = self.workspace.model.all_annotations_flat()
         if not flat: return
         assignment = self.per_row_lane_assignment(flat)
-        cw = float(self.workspace.sequence_viewer.current_char_width()); ann_h = float(_LANE_HEIGHT)
+        cw = float(self.workspace.sequence_viewer.current_char_width()); ann_h = float(annotation_style_manager.get_lane_height())
         for row_index, ann in flat:
             items = self.ann_items.get(ann.id, [])
             if not items or row_index >= layout.row_count: continue

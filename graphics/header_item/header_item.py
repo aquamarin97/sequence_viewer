@@ -4,6 +4,7 @@ Header satır item'ı — v4: seçim durumunda annotation boşluklarını da
 row_band_highlight ile boyar.
 """
 from __future__ import annotations
+import weakref
 from typing import Optional
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter, QFont, QPen, QBrush, QFontMetrics, QColor
@@ -26,7 +27,8 @@ class HeaderRowItem(QGraphicsItem):
         self._selected = False
         self._dragging = False
         self.setAcceptHoverEvents(True)
-        theme_manager.themeChanged.connect(self._on_theme_changed)
+        _ref = weakref.ref(self)
+        theme_manager.themeChanged.connect(lambda theme, r=_ref: (s := r()) and s._on_theme_changed(theme))
 
     @property
     def total_height(self): return self.annot_height + self.row_height + self.below_ann_height

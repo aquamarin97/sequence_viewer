@@ -1,4 +1,5 @@
 from typing import Optional
+import weakref
 from PyQt5.QtCore import Qt, QRectF, QPointF
 from PyQt5.QtGui import QPainter, QFont, QColor, QPen, QBrush
 from PyQt5.QtWidgets import QGraphicsItem
@@ -23,10 +24,11 @@ class SequenceGraphicsItem(QGraphicsItem):
         self.font.setFixedPitch(True)
         self._applied_font_size = -1.0
         self._sync_font_from_model()
-        theme_manager.themeChanged.connect(lambda _: self.update())
+        _ref = weakref.ref(self)
+        theme_manager.themeChanged.connect(lambda _, r=_ref: (s := r()) and s.update())
         try:
             from settings.color_styles import color_style_manager as _csm
-            _csm.stylesChanged.connect(self._on_color_styles_changed)
+            _csm.stylesChanged.connect(lambda r=_ref: (s := r()) and s._on_color_styles_changed())
         except: pass
 
     @property
