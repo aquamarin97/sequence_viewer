@@ -30,6 +30,9 @@ class MainWindow(QMainWindow):
     def __init__(self, workspace):
         super().__init__()
         self.workspace = workspace
+        self._theme_dev_dialog = None
+        self._nucleotide_dev_dialog = None
+        self._annotation_dev_dialog = None
         self.setWindowTitle("MSA Viewer")
         self.setCentralWidget(workspace)
         self._build_menu()
@@ -81,6 +84,17 @@ class MainWindow(QMainWindow):
         display_settings_action.triggered.connect(self._open_display_settings)
         settings_menu.addAction(display_settings_action)
 
+        development_menu = menubar.addMenu("Development")
+        theme_dev_action = QAction("Theme Colors", self)
+        theme_dev_action.triggered.connect(self._open_theme_development_tool)
+        development_menu.addAction(theme_dev_action)
+        nucleotide_dev_action = QAction("Nucleotide Colors", self)
+        nucleotide_dev_action.triggered.connect(self._open_nucleotide_development_tool)
+        development_menu.addAction(nucleotide_dev_action)
+        annotation_dev_action = QAction("Annotation Colors", self)
+        annotation_dev_action.triggered.connect(self._open_annotation_development_tool)
+        development_menu.addAction(annotation_dev_action)
+
     def _import_fasta_dialog(self):
         """Normal FASTA — is_aligned=False."""
         file_filter = "FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn *.aln);;All Files (*)"
@@ -113,6 +127,33 @@ class MainWindow(QMainWindow):
         from dialogs.display_settings_dialog import DisplaySettingsDialog
         dlg = DisplaySettingsDialog(self)
         dlg.exec_()
+
+    def _open_theme_development_tool(self):
+        from development.theme_devtool import ThemeDevelopmentDialog
+        if self._theme_dev_dialog is None:
+            self._theme_dev_dialog = ThemeDevelopmentDialog(self)
+            self._theme_dev_dialog.finished.connect(lambda _: setattr(self, "_theme_dev_dialog", None))
+        self._theme_dev_dialog.show()
+        self._theme_dev_dialog.raise_()
+        self._theme_dev_dialog.activateWindow()
+
+    def _open_nucleotide_development_tool(self):
+        from development.nucleotide_devtool import NucleotideDevToolDialog
+        if self._nucleotide_dev_dialog is None:
+            self._nucleotide_dev_dialog = NucleotideDevToolDialog(self)
+            self._nucleotide_dev_dialog.finished.connect(lambda _: setattr(self, "_nucleotide_dev_dialog", None))
+        self._nucleotide_dev_dialog.show()
+        self._nucleotide_dev_dialog.raise_()
+        self._nucleotide_dev_dialog.activateWindow()
+
+    def _open_annotation_development_tool(self):
+        from development.annotation_devtool import AnnotationDevToolDialog
+        if self._annotation_dev_dialog is None:
+            self._annotation_dev_dialog = AnnotationDevToolDialog(self)
+            self._annotation_dev_dialog.finished.connect(lambda _: setattr(self, "_annotation_dev_dialog", None))
+        self._annotation_dev_dialog.show()
+        self._annotation_dev_dialog.raise_()
+        self._annotation_dev_dialog.activateWindow()
 
 
 def main():

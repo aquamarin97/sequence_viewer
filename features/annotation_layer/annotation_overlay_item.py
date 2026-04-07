@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem
 from model.annotation import Annotation
 from model.annotation_store import AnnotationStore
 
-_OVERLAY_ALPHA = 35; _OVERLAY_Z = 5.0
+_OVERLAY_Z = 5.0
 
 class AnnotationOverlayItem(QGraphicsItem):
     def __init__(self, store, parent=None):
@@ -36,6 +36,6 @@ class AnnotationOverlayItem(QGraphicsItem):
         for ann in self._annotations:
             x = ann.start * cw; w = ann.length() * cw
             if x + w < vis_left or x > vis_right: continue
-            color = QColor(ann.resolved_color()); color.setAlpha(_OVERLAY_ALPHA)
+            color = QColor(ann.resolved_color())
             painter.setBrush(QBrush(color))
             painter.drawRect(QRectF(x, 0, w, self._scene_height))

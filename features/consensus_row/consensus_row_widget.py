@@ -507,7 +507,6 @@ class ConsensusRowWidget(QWidget):
         end_col = min(length, int(math.ceil((view_left + width) / cw)))
         sel_start = sel_end = None
         if self._selection: sel_start, sel_end = self._selection
-        sel_alpha = 110 if t.name == "dark" else 120
         ch = seq_char_h  # dizi satırının yüksekliği
         if mode == "line":
             line_h = ch * 0.3; y = seq_top + (ch - line_h) / 2.0
@@ -520,14 +519,14 @@ class ConsensusRowWidget(QWidget):
                 sx = sel_start * cw - view_left; sw = (sel_end - sel_start + 1) * cw
                 sx2 = max(0.0, sx); sw2 = min(sw - (sx2 - sx), float(width) - sx2)
                 if sw2 > 0:
-                    sel_color = QColor(t.seq_selection_bg); sel_color.setAlpha(sel_alpha)
+                    sel_color = QColor(t.seq_selection_bg)
                     painter.setBrush(QBrush(sel_color)); painter.drawRect(QRectF(sx2, seq_top, sw2, ch))
             _paint_dim_overlay(painter, self._sequence_viewer, cw, float(width), float(height), t)
             painter.end(); return
         if sel_start is not None and sel_end is not None:
             sel_l = max(sel_start, start_col); sel_r = min(sel_end + 1, end_col)
             if sel_r > sel_l:
-                sel_color = QColor(t.seq_selection_bg); sel_color.setAlpha(sel_alpha)
+                sel_color = QColor(t.seq_selection_bg)
                 painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
                 for i in range(sel_l, sel_r):
                     painter.drawRect(QRectF(i * cw - view_left, seq_top, cw, ch))

@@ -117,13 +117,13 @@ class SequenceGraphicsItem(QGraphicsItem):
             if sel_start is not None and sel_end is not None:
                 sx = max(sel_start * cw, vis_l); ex = min((sel_end + 1) * cw, vis_r)
                 if ex > sx:
-                    sel_color = QColor(t.seq_selection_bg); sel_color.setAlpha(110 if t.name == "dark" else 120)
+                    sel_color = QColor(t.seq_selection_bg)
                     painter.setBrush(QBrush(sel_color)); painter.drawRect(QRectF(sx, 0, ex - sx, ch))
             painter.restore(); return
         if sel_start is not None and sel_end is not None:
             sel_l, sel_r = max(sel_start, start_index), min(sel_end, end_index)
             if sel_r > sel_l:
-                sel_color = QColor(t.seq_selection_bg); sel_color.setAlpha(110 if t.name == "dark" else 120)
+                sel_color = QColor(t.seq_selection_bg)
                 painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
                 for i in range(sel_l, sel_r): painter.drawRect(QRectF(i * cw, 0, cw, ch))
         if effective_mode == SequenceItemModel.TEXT_MODE:
