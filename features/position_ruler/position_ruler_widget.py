@@ -27,8 +27,21 @@ class SequencePositionRulerWidget(QWidget):
         """Guide kolonları değişince special pozisyonları güncelle ve repaint."""
         ctrl = getattr(self.viewer, '_controller', None)
         if ctrl is not None:
-            # Her guide kolonu sağındaki NA pozisyonunu gösterir (col + 1, 1-indexed)
-            self._extra_special_positions = [col + 1 for col in ctrl._v_guide_cols]
+            # Seçim sınırlarındaki guide'lar için model zaten selection_cols'dan
+            # doğru pozisyonları ekliyor; burada tekrar col+1 yapmak sağ sınır için
+            # col_end+2 üretir (bir sonraki seçili olmayan NA). Bu guide'ları atla.
+            selection_cols = getattr(self.viewer, 'current_selection_cols', None)
+            sel_boundaries: set = set()
+            if selection_cols:
+                s, e = selection_cols
+                if s > e: s, e = e, s
+                sel_boundaries = {s, e + 1}  # sol ve sağ guide sütunları
+            extra = []
+            for col in ctrl._v_guide_cols:
+                if col in sel_boundaries:
+                    continue
+                extra.append(col + 1)
+            self._extra_special_positions = extra
         else:
             self._extra_special_positions = []
         self.update()
