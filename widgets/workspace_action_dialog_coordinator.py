@@ -207,3 +207,9 @@ class WorkspaceActionDialogCoordinator:
         self.workspace._rebuild_ann_items(layout)
         self.workspace.sequence_viewer.horizontalScrollBar().setValue(h_scroll)
         self.workspace.sequence_viewer.verticalScrollBar().setValue(v_scroll)
+        # clear() sırasında sıfırlanan h_guide'ları mevcut seçime göre yeniden uygula
+        selected_rows = self.workspace.header_viewer._selection.selected_rows()
+        if selected_rows:
+            self.workspace.sequence_viewer.set_h_guides(frozenset(selected_rows))
+        else:
+            self.workspace.sequence_viewer.clear_h_guides()
