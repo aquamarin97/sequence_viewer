@@ -133,6 +133,7 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         else:
             y = float(row_index * (self._per_row_annot_h + self.char_height) + self._per_row_annot_h)
         item.setPos(0, y)
+        item.set_row_highlighted(row_index in self._h_guide_rows)
         self.scene.addItem(item)
         self.sequence_items.append(item)
         self._update_scene_rect()

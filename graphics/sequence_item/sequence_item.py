@@ -19,6 +19,7 @@ class SequenceGraphicsItem(QGraphicsItem):
         super().__init__(parent)
         self.setFlag(QGraphicsItem.ItemUsesExtendedStyleOption, True)
         self.row_index = row_index
+        self._row_highlighted = False
         self._model = SequenceItemModel(sequence=sequence, char_width=char_width, char_height=char_height, color_map=color_map)
         self.font = QFont(display_settings_manager.sequence_font_family)
         self.font.setStyleHint(QFont.Monospace)
@@ -61,6 +62,12 @@ class SequenceGraphicsItem(QGraphicsItem):
         self._model.set_selection(start_col, end_col); self.update()
     def clear_selection(self):
         self._model.clear_selection(); self.update()
+    def set_row_highlighted(self, highlighted):
+        highlighted = bool(highlighted)
+        if self._row_highlighted == highlighted:
+            return
+        self._row_highlighted = highlighted
+        self.update()
     def set_lod_max_mode(self, mode):
         self._model.set_lod_max_mode(mode); self.update()
 
@@ -98,7 +105,10 @@ class SequenceGraphicsItem(QGraphicsItem):
         cw, ch = self.char_width, self.char_height
         length = self.length
         seq, seq_upper, color_map = self.sequence, self.sequence_upper, self.color_map
-        row_bg = t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
+        if self._row_highlighted:
+            row_bg = QColor(t.row_band_highlight)
+        else:
+            row_bg = t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
         painter.setPen(Qt.NoPen); painter.setBrush(QBrush(row_bg)); painter.drawRect(exposed)
         total_width = length * cw
         visible_left = max(exposed.left(), 0.0)
@@ -130,7 +140,8 @@ class SequenceGraphicsItem(QGraphicsItem):
             painter.setPen(Qt.NoPen); painter.setBrush(Qt.NoBrush)
             for i in range(start_index, end_index):
                 base, base_u, x = seq[i], seq_upper[i], i * cw
-                color = color_map.get(base_u, QColor(50,50,50))
+                is_selected = sel_start is not None and sel_end is not None and sel_start <= i < sel_end
+                color = QColor(255, 255, 255) if is_selected else color_map.get(base_u, QColor(50,50,50))
                 glyph = GLYPH_CACHE.get_glyph(base, self.font, color)
                 dx = x + (cw - glyph.width()) / 2.0; dy = (ch - glyph.height()) / 2.0
                 painter.drawPixmap(QPointF(dx, dy), glyph)

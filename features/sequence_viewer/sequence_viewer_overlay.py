@@ -67,11 +67,15 @@ class OverlayMixin:
 
     def set_h_guides(self, row_indices):
         self._h_guide_rows = row_indices
+        for i, item in enumerate(getattr(self, "sequence_items", [])):
+            item.set_row_highlighted(i in self._h_guide_rows)
         self.viewport().update()
 
     def clear_h_guides(self):
         if self._h_guide_rows:
             self._h_guide_rows = frozenset()
+            for item in getattr(self, "sequence_items", []):
+                item.set_row_highlighted(False)
             self.viewport().update()
 
     # ------------------------------------------------------------------
@@ -108,13 +112,17 @@ class OverlayMixin:
             y_bottom = y_top + float(layout.row_strides[i])
             if y_bottom < vis_top or y_top > vis_bottom:
                 continue
-            row_bg = t.row_bg_even if i % 2 == 0 else t.row_bg_odd
+            # Seçili satır ise row_band_highlight, değilse normal arka plan
+            if i in self._h_guide_rows:
+                row_bg = QColor(t.row_band_highlight)
+            else:
+                row_bg = t.row_bg_even if i % 2 == 0 else t.row_bg_odd
             painter.fillRect(QRectF(rect.left(), y_top, rect.width(), y_bottom - y_top), row_bg)
 
     def drawForeground(self, painter, rect):
         super().drawForeground(painter, rect)
         t = theme_manager.current
-        self._draw_row_band_highlight(painter, t)
+        self._draw_row_band_border_lines(painter, t)
         self._draw_selection_dim_overlay(painter, t)
         self._draw_vertical_guides(painter, t)
 
@@ -122,7 +130,8 @@ class OverlayMixin:
     # drawForeground sub-renderers
     # ------------------------------------------------------------------
 
-    def _draw_row_band_highlight(self, painter, t):
+    def _draw_row_band_border_lines(self, painter, t):
+        """Seçili satırların üst ve alt kenar çizgilerini çizer."""
         if not self._h_guide_rows:
             return
         layout = self._row_layout
@@ -133,16 +142,7 @@ class OverlayMixin:
         painter.save()
         painter.resetTransform()
 
-        band_color = QColor(t.row_band_highlight)
-        for row in self._h_guide_rows:
-            top_scene, bottom_scene = self._row_scene_extent(row, layout)
-            top_vp = top_scene - v_off
-            bottom_vp = bottom_scene - v_off
-            t_vp = max(0.0, top_vp)
-            b_vp = min(vp_h, bottom_vp)
-            if b_vp > t_vp:
-                painter.fillRect(QRectF(0, t_vp, vp_w, b_vp - t_vp), QBrush(band_color))
-
+        # Sadece kenar çizgilerini çiz
         h_pen = QPen(theme_manager.current.guide_line_color, _GUIDE_WIDTH, Qt.SolidLine)
         painter.setPen(h_pen)
         for row in self._h_guide_rows:

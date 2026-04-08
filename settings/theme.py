@@ -15,7 +15,6 @@ class AppTheme:
     row_bg_even:          QColor
     row_bg_odd:           QColor
     row_bg_hover:         QColor
-    row_bg_selected:      QColor
     row_bg_selected_hover:QColor
     row_bg_dragging:      QColor
     text_primary:         QColor
@@ -98,7 +97,7 @@ def default_theme_for(name: str) -> AppTheme:
 LIGHT_THEME = AppTheme(
     name="light",
     row_bg_even=QColor(255,255,255), row_bg_odd=QColor(244,246,250),
-    row_bg_hover=QColor(224,235,255), row_bg_selected=QColor(193,214,255),
+    row_bg_hover=QColor(224,235,255),
     row_bg_selected_hover=QColor(170,200,255), row_bg_dragging=QColor(200,215,245),
     text_primary=QColor(30,30,30), text_selected=QColor(0,30,90),
     border_normal=QColor(210,215,225), border_drag=QColor(100,140,220),
@@ -107,7 +106,7 @@ LIGHT_THEME = AppTheme(
     ruler_fg=QColor(30,30,30), ruler_border=QColor(130,134,141),
     ruler_selection_fg=QColor(0,0,200),
     seq_bg=QColor(255,255,255),
-    seq_selection_bg=QColor(100,160,220,90),
+    seq_selection_bg=QColor(62,102,196,225),
     seq_line_fg=QColor(160,160,160),
     editor_bg="#EEF4FF", editor_border="#5B8DEF",
     row_band_highlight=QColor(70, 130, 220, 50),
@@ -125,7 +124,7 @@ LIGHT_THEME = AppTheme(
 DARK_THEME = AppTheme(
     name="dark",
     row_bg_even=QColor(35, 35, 35), row_bg_odd=QColor(55, 55, 55),
-    row_bg_hover=QColor(50,60,90), row_bg_selected=QColor(40,80,160),
+    row_bg_hover=QColor(50,60,90),
     row_bg_selected_hover=QColor(50,95,180), row_bg_dragging=QColor(45,70,140),
     text_primary=QColor(210,215,225), text_selected=QColor(220,235,255),
     border_normal=QColor(55,60,72), border_drag=QColor(90,140,230),
@@ -134,7 +133,7 @@ DARK_THEME = AppTheme(
     ruler_fg=QColor(190,195,210), ruler_border=QColor(55,60,72),
     ruler_selection_fg=QColor(100,160,255),
     seq_bg=QColor(28,30,36),
-    seq_selection_bg=QColor(62,102,196,90),
+    seq_selection_bg=QColor(62,102,196,225),
     seq_line_fg=QColor(100,105,120),
     editor_bg="#1E2A4A", editor_border="#4A80E0",
     row_band_highlight=QColor(60, 100, 180, 45),

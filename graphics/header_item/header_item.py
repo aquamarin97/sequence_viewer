@@ -69,7 +69,7 @@ class HeaderRowItem(QGraphicsItem):
     def _resolve_bg_color(self):
         t = theme_manager.current
         if self._dragging: return t.row_bg_dragging
-        if self._selected: return t.row_bg_selected_hover if self._hovered else t.row_bg_selected
+        if self._selected: return QColor(t.row_band_highlight)
         if self._hovered: return t.row_bg_hover
         return t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
 

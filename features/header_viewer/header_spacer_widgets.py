@@ -97,10 +97,8 @@ class ConsensusSpacerWidget(QWidget):
     def paintEvent(self, event):
         if not self.isVisible() or self.height() == 0: return
         painter = QPainter(self); t = theme_manager.current; rect = self.rect()
-        painter.fillRect(rect, QBrush(t.row_bg_odd))
-        if self._selected:
-            band = QColor(t.row_band_highlight)
-            painter.fillRect(rect, QBrush(band))
+        bg = QColor(t.row_band_highlight) if self._selected else t.row_bg_odd
+        painter.fillRect(rect, QBrush(bg))
         if self._selected:
             painter.setPen(Qt.NoPen)
             painter.setBrush(QBrush(t.drop_indicator))

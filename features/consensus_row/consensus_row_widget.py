@@ -468,12 +468,10 @@ class ConsensusRowWidget(QWidget):
         painter.setRenderHint(QPainter.TextAntialiasing, True)
         rect = self.rect(); width = rect.width(); height = rect.height()
         t = theme_manager.current
-        # Seçim vurgusu: her zaman row_bg_odd arka plan, seçimde hafif overlay
+        # Seçim vurgusu: seçiliyse row_band_highlight, değilse row_bg_odd
         is_selected = self._is_selected
-        painter.fillRect(rect, QBrush(t.row_bg_odd))
-        if is_selected:
-            band = QColor(t.row_band_highlight)
-            painter.fillRect(rect, QBrush(band))
+        bg_color = QColor(t.row_band_highlight) if is_selected else t.row_bg_odd
+        painter.fillRect(rect, QBrush(bg_color))
         # Sol kenar çizgisi (seçili iken)
         if is_selected:
             painter.setPen(Qt.NoPen)
@@ -534,7 +532,8 @@ class ConsensusRowWidget(QWidget):
         box_ref = min(ch * 0.7, font_pt); box_h = max(box_ref, 1.0); box_y = seq_top + (ch - box_h) / 2.0
         for col in range(start_col, end_col):
             base = consensus[col].upper(); x = col * cw - view_left
-            color = self._color_map.get(base, t.text_primary)
+            is_selected = sel_start is not None and sel_end is not None and sel_start <= col <= sel_end
+            color = QColor(255, 255, 255) if is_selected else self._color_map.get(base, t.text_primary)
             if mode == "box":
                 painter.setBrush(QBrush(color)); painter.setPen(Qt.NoPen)
                 painter.drawRect(QRectF(x, box_y, cw, box_h))
