@@ -264,11 +264,6 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
 
 # ── Seçim ve hover outline ─────────────────────────────────────────────────────
 
-# Hover: nötr beyaz/açık overlay
-_HOVER_OVERLAY_COLOR   = QColor(255, 255, 255,  45)  # üstüne bindirilen açık katman
-_HOVER_BORDER_COLOR    = QColor(255, 255, 255, 160)  # hover kenarlığı
-
-
 def _build_primer_probe_path(x, y, w, h, strand, char_width):
     tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
     body_w = max(0.0, w - tip_w)
@@ -287,48 +282,84 @@ def _build_repeated_region_path(x, y, w, h):
     return path
 
 
-_SELECTION_GLOW_COLOR   = QColor(255, 255, 255, 80)   # dış parlama (geniş, yarı saydam)
-_SELECTION_BORDER_COLOR = QColor(255, 255, 255, 220)  # iç keskin kenarlık
+def _selection_colors(base_color):
+    """
+    Annotation renginden seçim halo ve iç kenar renklerini türetir.
+
+    Halo: annotation renginin doygunluğu artırılmış, parlatılmış versiyonu.
+    Kenar: annotation rengine göre kontrast sağlayan beyaz ya da koyu ton.
+    """
+    h = base_color.hsvHueF()
+    s = min(1.0, base_color.hsvSaturationF() * 1.15 + 0.25)
+    # Parlaklık: koyu renkler için daha aydınlık, zaten açık renkler için koru
+    v_base = base_color.valueF()
+    v_halo = min(1.0, v_base * 0.6 + 0.55)
+    halo = QColor.fromHsvF(h if h >= 0 else 0.0, s, v_halo, 0.72)
+    # İç kenar: luminans yüksekse koyu, düşükse beyaz
+    lum = 0.299 * base_color.red() + 0.587 * base_color.green() + 0.114 * base_color.blue()
+    inner = QColor(20, 20, 20, 210) if lum > 160 else QColor(255, 255, 255, 220)
+    return halo, inner
 
 
-def draw_selection_outline(painter, x, y, w, h, ann_type, strand="+", char_width=12.0):
-    """Seçili annotation için parlayan beyaz kenarlık çizer."""
+def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
+                           strand="+", char_width=12.0):
+    """
+    Seçili annotation için annotation renginden türetilmiş parlayan kenarlık çizer.
+    base_color değiştiğinde otomatik olarak uyum sağlar.
+    """
     if w <= 0:
         return
     if ann_type in (AnnotationType.PRIMER, AnnotationType.PROBE):
         path = _build_primer_probe_path(x, y, w, h, strand, char_width)
     else:
         path = _build_repeated_region_path(x, y, w, h)
+
+    halo_color, inner_color = _selection_colors(base_color)
 
     painter.save()
     painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setBrush(Qt.NoBrush)
-    # Dış parlama
-    painter.setPen(QPen(_SELECTION_GLOW_COLOR, 4.5))
+    # Dış halo — annotation renginden türetilmiş geniş parlama
+    halo_pen = QPen(halo_color, 5.0)
+    halo_pen.setJoinStyle(Qt.RoundJoin)
+    painter.setPen(halo_pen)
     painter.drawPath(path)
-    # İç keskin çizgi
-    painter.setPen(QPen(_SELECTION_BORDER_COLOR, 1.8))
+    # İç keskin çizgi — kontrast renk
+    inner_pen = QPen(inner_color, 1.5)
+    inner_pen.setJoinStyle(Qt.RoundJoin)
+    painter.setPen(inner_pen)
     painter.drawPath(path)
     painter.restore()
 
 
-def draw_hover_overlay(painter, x, y, w, h, ann_type, strand="+", char_width=12.0):
+def draw_hover_overlay(painter, x, y, w, h, ann_type, base_color,
+                       strand="+", char_width=12.0):
     """
-    Hover durumunda annotation üzerine yarı saydam açık katman çizer.
+    Hover durumunda annotation renginden türetilmiş ince parlaklık katmanı çizer.
     Seçim state'i aktifken çağrılmaz.
     """
     if w <= 0:
         return
-
     if ann_type in (AnnotationType.PRIMER, AnnotationType.PROBE):
         path = _build_primer_probe_path(x, y, w, h, strand, char_width)
     else:
         path = _build_repeated_region_path(x, y, w, h)
 
+    # Hafif renk aydınlatma: annotation rengiyle uyumlu hover tonu
+    h_f = base_color.hsvHueF()
+    s_f = max(0.0, base_color.hsvSaturationF() - 0.1)
+    v_f = min(1.0, base_color.valueF() * 0.35 + 0.65)
+    overlay = QColor.fromHsvF(h_f if h_f >= 0 else 0.0, s_f, v_f, 0.22)
+    border  = QColor.fromHsvF(h_f if h_f >= 0 else 0.0,
+                               min(1.0, base_color.hsvSaturationF() + 0.2),
+                               min(1.0, base_color.valueF() + 0.15), 0.65)
+
     painter.save()
     painter.setRenderHint(QPainter.Antialiasing, True)
-    painter.setBrush(QBrush(_HOVER_OVERLAY_COLOR))
-    painter.setPen(QPen(_HOVER_BORDER_COLOR, 1.2))
+    border_pen = QPen(border, 1.3)
+    border_pen.setJoinStyle(Qt.RoundJoin)
+    painter.setBrush(QBrush(overlay))
+    painter.setPen(border_pen)
     painter.drawPath(path)
     painter.restore()
 

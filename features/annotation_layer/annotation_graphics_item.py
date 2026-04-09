@@ -64,10 +64,10 @@ class AnnotationGraphicsItem(QGraphicsItem):
         else:
             draw_repeated_region(painter, 0, 0, self._w, self._h, color, ann.label)
         if self._hovered and not self._selected:
-            draw_hover_overlay(painter, 0, 0, self._w, self._h, ann.type,
+            draw_hover_overlay(painter, 0, 0, self._w, self._h, ann.type, color,
                                strand=strand, char_width=char_width)
         if self._selected:
-            draw_selection_outline(painter, 0, 0, self._w, self._h, ann.type,
+            draw_selection_outline(painter, 0, 0, self._w, self._h, ann.type, color,
                                    strand=strand, char_width=char_width)
 
     def mousePressEvent(self, event):

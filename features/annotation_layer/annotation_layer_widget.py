@@ -103,7 +103,8 @@ class AnnotationLayerWidget(QWidget):
                 draw_repeated_region(painter, vp.x(), vp.y(), vp.width(), vp.height(), ann.resolved_color(), ann.label)
             if ann.id == self._selected_ann_id:
                 draw_selection_outline(painter, vp.x(), vp.y(), vp.width(), vp.height(),
-                                       ann.type, strand=getattr(ann, 'strand', '+'), char_width=ann_char_w)
+                                       ann.type, ann.resolved_color(),
+                                       strand=getattr(ann, 'strand', '+'), char_width=ann_char_w)
             painter.restore(); self._hit_rects.append((vp, ann))
         # ---- Seçim odak efekti ----
         dim_range = getattr(self._sequence_viewer, '_selection_dim_range', None)
