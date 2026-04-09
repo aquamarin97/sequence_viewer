@@ -10,7 +10,7 @@ from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation, AnnotationType
 from settings.theme import theme_manager
 
-_LANE_HEIGHT = 20; _LANE_PADDING = 3; _MIN_HEIGHT = 24
+_LANE_HEIGHT = 20; _LANE_PADDING = 6; _MIN_HEIGHT = 24
 
 class AnnotationLayerWidget(QWidget):
     annotationClicked = pyqtSignal(object)

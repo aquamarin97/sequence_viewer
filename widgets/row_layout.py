@@ -4,7 +4,7 @@ import bisect
 from dataclasses import dataclass, field
 from typing import List
 
-PAD_FAR = 10; PAD_NEAR = 0; LANE_GAP = 2
+PAD_FAR = 10; PAD_NEAR = 0; LANE_GAP = 6
 
 def _lane_h(lane_height):
     if lane_height is not None:
