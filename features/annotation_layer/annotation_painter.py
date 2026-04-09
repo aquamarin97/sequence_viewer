@@ -10,9 +10,8 @@ from model.annotation import AnnotationType
 from settings.annotation_styles import annotation_style_manager
 from settings.theme import theme_manager
 
-_LABEL_MARGIN    = 6      # yatay iç boşluk (px)
-_LABEL_V_PADDING = 3      # dikey iç boşluk — metnin üst/alt boşluğu (px)
-_MIN_TIP_PX      = 5.0
+_LABEL_MARGIN = 6      # yatay iç boşluk (px)
+_MIN_TIP_PX   = 5.0
 _CORNER_RADIUS   = 3.5    # köşe yuvarlaması yarıçapı (px)
 
 # ── Label metin renkleri ───────────────────────────────────────────────────────
@@ -376,12 +375,8 @@ def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="
     painter.setFont(font)
     painter.setPen(QPen(text_color))
     metrics   = QFontMetrics(font)
-    # Yatay ve dikey padding uygulanmış metin alanı
-    text_rect = QRectF(
-        x + _LABEL_MARGIN,
-        y + _LABEL_V_PADDING,
-        w - _LABEL_MARGIN * 2,
-        h - _LABEL_V_PADDING * 2,
-    )
+    # Dikey: tam yükseklik — descender kırpılmasını önler; hizalama AlignVCenter üstlenir
+    # Yatay: _LABEL_MARGIN ile iç boşluk
+    text_rect = QRectF(x + _LABEL_MARGIN, y, w - _LABEL_MARGIN * 2, h)
     elided = metrics.elidedText(label, Qt.ElideRight, int(text_rect.width()))
     painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignHCenter, elided)

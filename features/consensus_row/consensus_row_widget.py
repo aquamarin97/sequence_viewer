@@ -10,7 +10,10 @@ from typing import Optional, Tuple
 from PyQt5.QtCore import Qt, QRectF, QPointF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont
 from PyQt5.QtWidgets import QApplication, QWidget, QScrollBar
-from features.annotation_layer.annotation_painter import draw_primer, draw_probe, draw_repeated_region
+from features.annotation_layer.annotation_painter import (
+    draw_primer, draw_probe, draw_repeated_region,
+    draw_hover_overlay, draw_selection_outline,
+)
 from features.consensus_row.consensus_row_model import ConsensusRowModel
 from model.annotation import AnnotationType
 from graphics.sequence_item.sequence_glyph_cache import GLYPH_CACHE
@@ -53,6 +56,8 @@ class ConsensusRowWidget(QWidget):
         self._press_pos = None; self._drag_started = False; self._press_scene_col = None
         self._hit_rects: list = []
         self._press_on_annotation = False
+        self._hovered_ann_id: str | None = None
+        self._selected_ann_id: str | None = None
         ch = int(round(sequence_viewer.char_height))
         self.setFixedHeight(ch)
         self.setMinimumWidth(0); self.setMouseTracking(True); self.setFocusPolicy(Qt.ClickFocus)
@@ -262,6 +267,13 @@ class ConsensusRowWidget(QWidget):
         except Exception:
             pass
 
+    def leaveEvent(self, event):
+        if self._hovered_ann_id is not None:
+            self._hovered_ann_id = None
+            self.setCursor(Qt.IBeamCursor)
+            self.update()
+        super().leaveEvent(event)
+
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
             ann = self._annotation_at(event.pos())
@@ -272,6 +284,7 @@ class ConsensusRowWidget(QWidget):
 
     def _select_annotation_range(self, ann):
         """Annotation aralığını seçili yap ve guide çizgileri oluştur."""
+        self._selected_ann_id = ann.id
         self._selection = (ann.start, ann.end)
         self._is_selected = True
         self._sequence_viewer.set_selection_dim_range(ann.start, ann.end + 1)
@@ -299,6 +312,7 @@ class ConsensusRowWidget(QWidget):
                 self._select_annotation_range(ann)
                 event.accept(); return
             self._press_on_annotation = False
+            self._selected_ann_id = None
             self.setFocus()
             self._sequence_viewer.clear_visual_selection()
             try: self._sequence_viewer._model.clear_selection()
@@ -323,8 +337,12 @@ class ConsensusRowWidget(QWidget):
 
     def mouseMoveEvent(self, event):
         if self._press_pos is None:
-            # Annotation tooltip
             ann = self._annotation_at(event.pos())
+            new_hovered_id = ann.id if ann else None
+            if new_hovered_id != self._hovered_ann_id:
+                self._hovered_ann_id = new_hovered_id
+                self.setCursor(Qt.PointingHandCursor if ann else Qt.IBeamCursor)
+                self.update()
             if ann:
                 from PyQt5.QtWidgets import QToolTip
                 QToolTip.showText(event.globalPos(), ann.tooltip_text(), self)
@@ -427,11 +445,25 @@ class ConsensusRowWidget(QWidget):
     def keyPressEvent(self, event):
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)
-        if ctrl and shift and event.key() == Qt.Key_C:
+        if event.key() == Qt.Key_Delete and self._selected_ann_id is not None:
+            self._delete_selected_annotation(); event.accept()
+        elif ctrl and shift and event.key() == Qt.Key_C:
             self._copy_fasta(); event.accept()
         elif ctrl and not shift and event.key() == Qt.Key_C:
             self._copy_sequence(); event.accept()
-        else: super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
+
+    def _delete_selected_annotation(self):
+        ann_id = self._selected_ann_id
+        self._selected_ann_id = None
+        self._selection = None
+        self._is_selected = False
+        self.update()
+        try:
+            self._alignment_model.remove_consensus_annotation(ann_id)
+        except (KeyError, Exception):
+            pass
 
     def _copy_sequence(self):
         consensus = self._get_consensus()
@@ -573,13 +605,23 @@ class ConsensusRowWidget(QWidget):
                     lane = below_assignment.get(ann.id, 0)
                     ann_y = seq_top + ch + below_lane_y(lane)
                 ann_h_draw = _LANE_H
+                ann_color = ann.resolved_color()
+                ann_strand = getattr(ann, 'strand', '+')
                 painter.save()
                 if ann.type == AnnotationType.PRIMER:
-                    draw_primer(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann.resolved_color(), ann.label, strand=ann.strand, char_width=ann_char_w)
+                    draw_primer(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label, strand=ann_strand, char_width=ann_char_w)
                 elif ann.type == AnnotationType.PROBE:
-                    draw_probe(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann.resolved_color(), ann.label, strand=ann.strand, char_width=ann_char_w)
+                    draw_probe(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label, strand=ann_strand, char_width=ann_char_w)
                 else:
-                    draw_repeated_region(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann.resolved_color(), ann.label)
+                    draw_repeated_region(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label)
+                is_ann_selected = (ann.id == self._selected_ann_id)
+                is_ann_hovered  = (ann.id == self._hovered_ann_id)
+                if is_ann_hovered and not is_ann_selected:
+                    draw_hover_overlay(painter, clipped_x, ann_y, clipped_w, ann_h_draw,
+                                       ann.type, ann_color, strand=ann_strand, char_width=ann_char_w)
+                if is_ann_selected:
+                    draw_selection_outline(painter, clipped_x, ann_y, clipped_w, ann_h_draw,
+                                           ann.type, ann_color, strand=ann_strand, char_width=ann_char_w)
                 painter.restore()
                 self._hit_rects.append((QRectF(clipped_x, ann_y, clipped_w, ann_h_draw), ann))
             painter.setRenderHint(QPainter.Antialiasing, False)
