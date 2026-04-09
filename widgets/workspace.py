@@ -71,6 +71,7 @@ class SequenceWorkspaceWidget(QWidget):
         ml = QHBoxLayout(self)
         ml.setContentsMargins(0,0,0,0); ml.setSpacing(0)
         ml.addWidget(self.splitter); self.setLayout(ml)
+        self.setFocusPolicy(Qt.StrongFocus)
 
         hsb_h = self.sequence_viewer.horizontalScrollBar().sizeHint().height()
         self.header_viewer.setViewportMargins(0, 0, 0, hsb_h)
@@ -220,6 +221,8 @@ class SequenceWorkspaceWidget(QWidget):
             self._copy_fasta(); event.accept(); return
         if ctrl and not shift and event.key() == Qt.Key_C:
             self._copy_sequences(); event.accept(); return
+        if event.key() == Qt.Key_Delete and self._action_dialogs._selected_annotation is not None:
+            self._action_dialogs.delete_selected_annotation(); event.accept(); return
         super().keyPressEvent(event)
 
     def _copy_sequences(self):

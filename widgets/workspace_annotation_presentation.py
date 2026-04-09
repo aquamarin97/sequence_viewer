@@ -11,7 +11,20 @@ if TYPE_CHECKING:
     from widgets.workspace import SequenceWorkspaceWidget
 
 class WorkspaceAnnotationPresentation:
-    def __init__(self, workspace): self.workspace = workspace; self.ann_items = {}
+    def __init__(self, workspace):
+        self.workspace = workspace
+        self.ann_items = {}
+        self._selected_ann_id = None
+
+    def set_selected_annotation(self, ann_id):
+        if self._selected_ann_id == ann_id: return
+        if self._selected_ann_id is not None:
+            for item in self.ann_items.get(self._selected_ann_id, []):
+                item.set_selected_visual(False)
+        self._selected_ann_id = ann_id
+        if ann_id is not None:
+            for item in self.ann_items.get(ann_id, []):
+                item.set_selected_visual(True)
 
     def remove_all_ann_items(self):
         scene = self.workspace.sequence_viewer.scene
@@ -46,6 +59,8 @@ class WorkspaceAnnotationPresentation:
                 on_click=self.workspace._on_ann_item_clicked, on_double_click=self.workspace._on_ann_item_double_clicked)
             item.setPos(scene_x, scene_y); scene.addItem(item)
             self.ann_items.setdefault(ann.id, []).append(item)
+            if ann.id == self._selected_ann_id:
+                item.set_selected_visual(True)
 
     def update_ann_items_geometry(self, layout):
         if not self.ann_items or layout.row_count == 0: return

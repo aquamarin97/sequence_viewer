@@ -5,7 +5,7 @@ from typing import Callable, Optional
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem, QToolTip
-from features.annotation_layer.annotation_painter import draw_primer, draw_probe, draw_repeated_region
+from features.annotation_layer.annotation_painter import draw_primer, draw_probe, draw_repeated_region, draw_selection_outline
 from model.annotation import Annotation, AnnotationType
 from settings.theme import theme_manager
 
@@ -40,11 +40,6 @@ class AnnotationGraphicsItem(QGraphicsItem):
 
     def paint(self, painter, option, widget=None):
         ann = self.annotation; color = ann.resolved_color()
-        if self._selected:
-            from PyQt5.QtGui import QPen
-            from settings.theme import theme_manager as _tm
-            painter.setPen(QPen(_tm.current.text_selected, 1.5))
-        else: painter.setPen(Qt.NoPen)
         painter.setRenderHint(QPainter.Antialiasing, True)
         char_width = self._w / max(ann.length(), 1)
         if ann.type == AnnotationType.PRIMER:
@@ -53,6 +48,8 @@ class AnnotationGraphicsItem(QGraphicsItem):
             draw_probe(painter, 0, 0, self._w, self._h, color, ann.label, strand=ann.strand, char_width=char_width)
         else:
             draw_repeated_region(painter, 0, 0, self._w, self._h, color, ann.label)
+        if self._selected:
+            draw_selection_outline(painter, 0, 0, self._w, self._h, ann.type, strand=getattr(ann, 'strand', '+'), char_width=char_width)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:

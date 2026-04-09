@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from features.annotation_layer.annotation_painter import draw_selection_outline; from features.annotation_layer.annotation_graphics_item import AnnotationGraphicsItem; from features.annotation_layer.annotation_layer_widget import AnnotationLayerWidget; from widgets.workspace_annotation_presentation import WorkspaceAnnotationPresentation; print\\('OK'\\)\")"
+    ]
+  }
+}

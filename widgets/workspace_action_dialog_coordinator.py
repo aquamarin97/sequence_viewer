@@ -6,9 +6,20 @@ if TYPE_CHECKING:
     from widgets.workspace import SequenceWorkspaceWidget
 
 class WorkspaceActionDialogCoordinator:
-    def __init__(self, workspace): self.workspace = workspace
+    def __init__(self, workspace):
+        self.workspace = workspace
+        self._selected_annotation = None  # (annotation, row_index_or_None)
+
+    def _update_selection_visuals(self, ann_id, is_layer):
+        """Per-row ve layer annotation seçim görsellerini senkronize eder."""
+        ws = self.workspace
+        ws._annotation_presentation.set_selected_annotation(ann_id if not is_layer else None)
+        ws.annotation_layer.set_selected_annotation(ann_id if is_layer else None)
 
     def on_annotation_layer_clicked(self, annotation):
+        self._selected_annotation = (annotation, None)
+        self._update_selection_visuals(annotation.id, is_layer=True)
+        self.workspace.setFocus()
         self.workspace.sequence_viewer.set_guide_cols(annotation.start, annotation.end)
         self.workspace.sequence_viewer.set_selection_dim_range(annotation.start, annotation.end + 1)
         n = self.workspace.model.row_count()
@@ -21,6 +32,9 @@ class WorkspaceActionDialogCoordinator:
         self.do_edit_dialog(annotation, row_index=None)
 
     def on_ann_item_clicked(self, annotation, row_index):
+        self._selected_annotation = (annotation, row_index)
+        self._update_selection_visuals(annotation.id, is_layer=False)
+        self.workspace.setFocus()
         ws = self.workspace
         n = ws.model.row_count()
 
@@ -103,6 +117,10 @@ class WorkspaceActionDialogCoordinator:
             except IndexError: pass
 
     def on_selection_changed(self, selected_rows):
+        if self._selected_annotation is not None:
+            _, ri = self._selected_annotation
+            self._update_selection_visuals(None, is_layer=(ri is None))
+            self._selected_annotation = None
         # Herhangi bir header seçilince consensus vurgusunu, seçimini ve guide'ları kaldır
         self.workspace.consensus_spacer.set_selected(False)
         self.workspace.consensus_row.clear_selection()
@@ -172,8 +190,27 @@ class WorkspaceActionDialogCoordinator:
 
     def on_model_reset(self): self.rebuild_views()
 
+    def delete_selected_annotation(self):
+        """Seçili annotation'ı sil (Delete tuşu)."""
+        if self._selected_annotation is None:
+            return
+        ann, row_index = self._selected_annotation
+        self._selected_annotation = None
+        self._update_selection_visuals(None, is_layer=(row_index is None))
+        try:
+            if row_index is None:
+                self.workspace.model.remove_global_annotation(ann.id)
+            else:
+                self.workspace.model.remove_annotation(row_index, ann.id)
+        except (KeyError, IndexError):
+            pass
+
     def on_consensus_spacer_clicked(self):
         """Consensus spacer'a tıklama → seçim vurgusu + consensus dizisini tümüyle seçer."""
+        if self._selected_annotation is not None:
+            _, ri = self._selected_annotation
+            self._update_selection_visuals(None, is_layer=(ri is None))
+            self._selected_annotation = None
         ws = self.workspace
         # Header seçimini temizle — ama on_selection_changed'i tetikleme
         # (o fonksiyon consensus_spacer.set_selected(False) yapıyor)

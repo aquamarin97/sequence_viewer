@@ -261,6 +261,51 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
                     font_family=style.label_font_family)
 
 
+# ── Seçim outline ─────────────────────────────────────────────────────────────
+
+_SELECTION_GLOW_COLOR  = QColor(255, 255, 255, 80)   # dış parlama (geniş, yarı saydam)
+_SELECTION_BORDER_COLOR = QColor(255, 255, 255, 220)  # iç keskin kenarlık
+
+
+def _build_primer_probe_path(x, y, w, h, strand, char_width):
+    tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
+    body_w = max(0.0, w - tip_w)
+    if strand == "+":
+        pts = [QPointF(x, y), QPointF(x + body_w, y),
+               QPointF(x + w, y + h), QPointF(x, y + h)]
+    else:
+        pts = [QPointF(x + tip_w, y), QPointF(x + w, y),
+               QPointF(x + w, y + h), QPointF(x, y + h)]
+    return _rounded_poly_path(pts, _CORNER_RADIUS)
+
+
+def _build_repeated_region_path(x, y, w, h):
+    path = QPainterPath()
+    path.addRoundedRect(QRectF(x, y, w, h), _CORNER_RADIUS, _CORNER_RADIUS)
+    return path
+
+
+def draw_selection_outline(painter, x, y, w, h, ann_type, strand="+", char_width=12.0):
+    """Seçili annotation için parlayan beyaz kenarlık çizer."""
+    if w <= 0:
+        return
+    if ann_type in (AnnotationType.PRIMER, AnnotationType.PROBE):
+        path = _build_primer_probe_path(x, y, w, h, strand, char_width)
+    else:
+        path = _build_repeated_region_path(x, y, w, h)
+
+    painter.save()
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setBrush(Qt.NoBrush)
+    # Dış parlama
+    painter.setPen(QPen(_SELECTION_GLOW_COLOR, 4.5))
+    painter.drawPath(path)
+    # İç keskin çizgi
+    painter.setPen(QPen(_SELECTION_BORDER_COLOR, 1.8))
+    painter.drawPath(path)
+    painter.restore()
+
+
 # ── Label ──────────────────────────────────────────────────────────────────────
 
 def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="Arial"):
