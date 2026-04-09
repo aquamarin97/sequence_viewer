@@ -11,18 +11,18 @@ class AnnotationTypeStyle:
     border_alpha: int
     border_width: float
     label_min_width: int
-    label_font_size: int = 7
+    label_font_size: int = 11
     label_font_family: str = "Arial"
 
 _STYLES_LIGHT = {
-    AnnotationType.PRIMER:          AnnotationTypeStyle(255, 0,   0.0, 20, 7, "Arial"),
-    AnnotationType.PROBE:           AnnotationTypeStyle(165, 220, 1.5, 20, 7, "Arial"),
-    AnnotationType.REPEATED_REGION: AnnotationTypeStyle(55,  170, 1.0, 24, 7, "Arial"),
+    AnnotationType.PRIMER:          AnnotationTypeStyle(255, 0,   0.0, 20, 11, "Arial"),
+    AnnotationType.PROBE:           AnnotationTypeStyle(165, 220, 1.5, 20, 11, "Arial"),
+    AnnotationType.REPEATED_REGION: AnnotationTypeStyle(55,  170, 1.0, 24, 11, "Arial"),
 }
 _STYLES_DARK = {
-    AnnotationType.PRIMER:          AnnotationTypeStyle(210, 0,   0.0, 20, 7, "Arial"),
-    AnnotationType.PROBE:           AnnotationTypeStyle(150, 190, 1.5, 20, 7, "Arial"),
-    AnnotationType.REPEATED_REGION: AnnotationTypeStyle(75,  160, 1.0, 24, 7, "Arial"),
+    AnnotationType.PRIMER:          AnnotationTypeStyle(210, 0,   0.0, 20, 11, "Arial"),
+    AnnotationType.PROBE:           AnnotationTypeStyle(150, 190, 1.5, 20, 11, "Arial"),
+    AnnotationType.REPEATED_REGION: AnnotationTypeStyle(75,  160, 1.0, 24, 11, "Arial"),
 }
 
 class _AnnotationStyleManager(QObject):

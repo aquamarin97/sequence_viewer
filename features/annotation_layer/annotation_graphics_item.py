@@ -5,7 +5,10 @@ from typing import Callable, Optional
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem, QToolTip
-from features.annotation_layer.annotation_painter import draw_primer, draw_probe, draw_repeated_region, draw_selection_outline
+from features.annotation_layer.annotation_painter import (
+    draw_primer, draw_probe, draw_repeated_region,
+    draw_selection_outline, draw_hover_overlay,
+)
 from model.annotation import Annotation, AnnotationType
 from settings.theme import theme_manager
 
@@ -21,6 +24,7 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self.setAcceptedMouseButtons(Qt.LeftButton)
         self.setAcceptHoverEvents(True); self.setZValue(10.0)
         self._selected = False
+        self._hovered  = False
         _ref = weakref.ref(self)
         theme_manager.themeChanged.connect(lambda _, r=_ref: (s := r()) and s.update())
         try:
@@ -29,41 +33,63 @@ class AnnotationGraphicsItem(QGraphicsItem):
         except: pass
 
     def update_size(self, ann_width, ann_height):
-        if abs(self._w - ann_width) < 0.01 and abs(self._h - ann_height) < 0.01: return
-        self.prepareGeometryChange(); self._w = float(ann_width); self._h = float(ann_height); self.update()
+        if abs(self._w - ann_width) < 0.01 and abs(self._h - ann_height) < 0.01:
+            return
+        self.prepareGeometryChange()
+        self._w = float(ann_width)
+        self._h = float(ann_height)
+        self.update()
 
     def set_selected_visual(self, selected):
-        if self._selected == selected: return
-        self._selected = selected; self.update()
+        if self._selected == selected:
+            return
+        self._selected = selected
+        self.update()
 
-    def boundingRect(self): return QRectF(0, 0, self._w, self._h)
+    def boundingRect(self):
+        return QRectF(0, 0, self._w, self._h)
 
     def paint(self, painter, option, widget=None):
-        ann = self.annotation; color = ann.resolved_color()
+        ann = self.annotation
+        color = ann.resolved_color()
         painter.setRenderHint(QPainter.Antialiasing, True)
         char_width = self._w / max(ann.length(), 1)
+        strand = getattr(ann, "strand", "+")
         if ann.type == AnnotationType.PRIMER:
-            draw_primer(painter, 0, 0, self._w, self._h, color, ann.label, strand=ann.strand, char_width=char_width)
+            draw_primer(painter, 0, 0, self._w, self._h, color, ann.label,
+                        strand=strand, char_width=char_width)
         elif ann.type == AnnotationType.PROBE:
-            draw_probe(painter, 0, 0, self._w, self._h, color, ann.label, strand=ann.strand, char_width=char_width)
+            draw_probe(painter, 0, 0, self._w, self._h, color, ann.label,
+                       strand=strand, char_width=char_width)
         else:
             draw_repeated_region(painter, 0, 0, self._w, self._h, color, ann.label)
+        if self._hovered and not self._selected:
+            draw_hover_overlay(painter, 0, 0, self._w, self._h, ann.type,
+                               strand=strand, char_width=char_width)
         if self._selected:
-            draw_selection_outline(painter, 0, 0, self._w, self._h, ann.type, strand=getattr(ann, 'strand', '+'), char_width=char_width)
+            draw_selection_outline(painter, 0, 0, self._w, self._h, ann.type,
+                                   strand=strand, char_width=char_width)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            if self._on_click: self._on_click(self.annotation, self.row_index)
+            if self._on_click:
+                self._on_click(self.annotation, self.row_index)
             event.accept()
-        else: super().mousePressEvent(event)
+        else:
+            super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
-            if self._on_double_click: self._on_double_click(self.annotation, self.row_index)
+            if self._on_double_click:
+                self._on_double_click(self.annotation, self.row_index)
             event.accept()
-        else: super().mouseDoubleClickEvent(event)
+        else:
+            super().mouseDoubleClickEvent(event)
 
     def hoverEnterEvent(self, event):
+        self._hovered = True
+        self.setCursor(Qt.PointingHandCursor)
+        self.update()
         scene_views = self.scene().views() if self.scene() else []
         if scene_views:
             vp = scene_views[0].viewport()
@@ -72,4 +98,8 @@ class AnnotationGraphicsItem(QGraphicsItem):
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
-        QToolTip.hideText(); super().hoverLeaveEvent(event)
+        self._hovered = False
+        self.unsetCursor()
+        self.update()
+        QToolTip.hideText()
+        super().hoverLeaveEvent(event)

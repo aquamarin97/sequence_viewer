@@ -158,6 +158,10 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+
+    from settings.font_families import load_embedded_fonts
+    load_embedded_fonts()
+
     workspace = SequenceWorkspaceWidget()
     workspace.resize(1200, 600)
     window = MainWindow(workspace)

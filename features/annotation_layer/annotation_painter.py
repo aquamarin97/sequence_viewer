@@ -10,9 +10,10 @@ from model.annotation import AnnotationType
 from settings.annotation_styles import annotation_style_manager
 from settings.theme import theme_manager
 
-_LABEL_MARGIN  = 4
-_MIN_TIP_PX    = 5.0
-_CORNER_RADIUS = 3.5      # köşe yuvarlaması yarıçapı (px)
+_LABEL_MARGIN    = 6      # yatay iç boşluk (px)
+_LABEL_V_PADDING = 3      # dikey iç boşluk — metnin üst/alt boşluğu (px)
+_MIN_TIP_PX      = 5.0
+_CORNER_RADIUS   = 3.5    # köşe yuvarlaması yarıçapı (px)
 
 # ── Label metin renkleri ───────────────────────────────────────────────────────
 # Luminance < 140 → koyu zemin → beyaz metin; aksi halde koyu metin.
@@ -261,10 +262,11 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
                     font_family=style.label_font_family)
 
 
-# ── Seçim outline ─────────────────────────────────────────────────────────────
+# ── Seçim ve hover outline ─────────────────────────────────────────────────────
 
-_SELECTION_GLOW_COLOR  = QColor(255, 255, 255, 80)   # dış parlama (geniş, yarı saydam)
-_SELECTION_BORDER_COLOR = QColor(255, 255, 255, 220)  # iç keskin kenarlık
+# Hover: nötr beyaz/açık overlay
+_HOVER_OVERLAY_COLOR   = QColor(255, 255, 255,  45)  # üstüne bindirilen açık katman
+_HOVER_BORDER_COLOR    = QColor(255, 255, 255, 160)  # hover kenarlığı
 
 
 def _build_primer_probe_path(x, y, w, h, strand, char_width):
@@ -283,6 +285,10 @@ def _build_repeated_region_path(x, y, w, h):
     path = QPainterPath()
     path.addRoundedRect(QRectF(x, y, w, h), _CORNER_RADIUS, _CORNER_RADIUS)
     return path
+
+
+_SELECTION_GLOW_COLOR   = QColor(255, 255, 255, 80)   # dış parlama (geniş, yarı saydam)
+_SELECTION_BORDER_COLOR = QColor(255, 255, 255, 220)  # iç keskin kenarlık
 
 
 def draw_selection_outline(painter, x, y, w, h, ann_type, strand="+", char_width=12.0):
@@ -306,6 +312,27 @@ def draw_selection_outline(painter, x, y, w, h, ann_type, strand="+", char_width
     painter.restore()
 
 
+def draw_hover_overlay(painter, x, y, w, h, ann_type, strand="+", char_width=12.0):
+    """
+    Hover durumunda annotation üzerine yarı saydam açık katman çizer.
+    Seçim state'i aktifken çağrılmaz.
+    """
+    if w <= 0:
+        return
+
+    if ann_type in (AnnotationType.PRIMER, AnnotationType.PROBE):
+        path = _build_primer_probe_path(x, y, w, h, strand, char_width)
+    else:
+        path = _build_repeated_region_path(x, y, w, h)
+
+    painter.save()
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setBrush(QBrush(_HOVER_OVERLAY_COLOR))
+    painter.setPen(QPen(_HOVER_BORDER_COLOR, 1.2))
+    painter.drawPath(path)
+    painter.restore()
+
+
 # ── Label ──────────────────────────────────────────────────────────────────────
 
 def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="Arial"):
@@ -318,6 +345,12 @@ def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="
     painter.setFont(font)
     painter.setPen(QPen(text_color))
     metrics   = QFontMetrics(font)
-    text_rect = QRectF(x + _LABEL_MARGIN, y, w - _LABEL_MARGIN * 2, h)
-    elided    = metrics.elidedText(label, Qt.ElideRight, int(text_rect.width()))
+    # Yatay ve dikey padding uygulanmış metin alanı
+    text_rect = QRectF(
+        x + _LABEL_MARGIN,
+        y + _LABEL_V_PADDING,
+        w - _LABEL_MARGIN * 2,
+        h - _LABEL_V_PADDING * 2,
+    )
+    elided = metrics.elidedText(label, Qt.ElideRight, int(text_rect.width()))
     painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignHCenter, elided)

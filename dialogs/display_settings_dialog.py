@@ -1,6 +1,5 @@
 # dialogs/display_settings_dialog.py
 from __future__ import annotations
-from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtWidgets import (
     QDialog, QFormLayout, QComboBox, QDoubleSpinBox, QSpinBox,
     QDialogButtonBox, QVBoxLayout, QGroupBox,
@@ -8,19 +7,7 @@ from PyQt5.QtWidgets import (
 from model.annotation import AnnotationType
 from settings.annotation_styles import annotation_style_manager
 from settings.display_settings_manager import display_settings_manager
-
-
-def _monospace_families() -> list[str]:
-    db = QFontDatabase()
-    return sorted(
-        f for f in db.families()
-        if db.isFixedPitch(f)
-    )
-
-
-def _all_families() -> list[str]:
-    db = QFontDatabase()
-    return sorted(db.families())
+from settings.font_families import get_monospace_fonts
 
 
 # ── Annotation tipleri ve etiketleri ──────────────────────────────────────────
@@ -37,8 +24,11 @@ class DisplaySettingsDialog(QDialog):
         self.setWindowTitle("Display Settings")
         self.setMinimumWidth(360)
 
-        mono_families = _monospace_families()
-        all_families  = _all_families()
+        mono_families = get_monospace_fonts()
+
+        from PyQt5.QtGui import QFontDatabase
+        _db = QFontDatabase()
+        all_families = sorted(_db.families())
 
         # ── Sequence / Consensus font ──────────────────────────────────────────
         self._seq_combo = QComboBox()
