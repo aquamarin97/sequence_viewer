@@ -57,7 +57,7 @@ class ConsensusRowWidget(QWidget):
         self._hit_rects: list = []
         self._press_on_annotation = False
         self._hovered_ann_id: str | None = None
-        self._selected_ann_id: str | None = None
+        self._selected_ann_ids: set = set()
         ch = int(round(sequence_viewer.char_height))
         self.setFixedHeight(ch)
         self.setMinimumWidth(0); self.setMouseTracking(True); self.setFocusPolicy(Qt.ClickFocus)
@@ -87,6 +87,10 @@ class ConsensusRowWidget(QWidget):
         try:
             from settings.color_styles import color_style_manager as _csm2
             _csm2.stylesChanged.connect(self._on_color_styles_changed)
+        except: pass
+        try:
+            from settings.annotation_styles import annotation_style_manager as _asm2
+            _asm2.stylesChanged.connect(self._update_visibility)
         except: pass
 
         # Başlangıçta gizli
@@ -151,7 +155,11 @@ class ConsensusRowWidget(QWidget):
     @property
     def current_threshold(self): return self._model.threshold
 
-    def clear_selection(self): self._selection = None; self._is_selected = False; self.update()
+    def clear_selection(self):
+        self._selection = None
+        self._is_selected = False
+        self._selected_ann_ids.clear()
+        self.update()
 
     def set_selected(self, selected: bool):
         if self._is_selected == selected: return
@@ -282,9 +290,22 @@ class ConsensusRowWidget(QWidget):
                 event.accept(); return
         super().mouseDoubleClickEvent(event)
 
-    def _select_annotation_range(self, ann):
+    def _select_annotation_range(self, ann, ctrl=False):
         """Annotation aralığını seçili yap ve guide çizgileri oluştur."""
-        self._selected_ann_id = ann.id
+        if ctrl:
+            if ann.id in self._selected_ann_ids:
+                self._selected_ann_ids.discard(ann.id)
+                if not self._selected_ann_ids:
+                    self._selection = None
+                    self._is_selected = False
+            else:
+                self._selected_ann_ids.add(ann.id)
+                self._selection = (ann.start, ann.end)
+                self._is_selected = True
+            self.update()
+            return
+        # Tekil seçim: önceki seçimi temizle, yeni annotation'ı seç
+        self._selected_ann_ids = {ann.id}
         self._selection = (ann.start, ann.end)
         self._is_selected = True
         self._sequence_viewer.set_selection_dim_range(ann.start, ann.end + 1)
@@ -309,7 +330,8 @@ class ConsensusRowWidget(QWidget):
             ann = self._annotation_at(event.pos())
             if ann:
                 self._press_on_annotation = True
-                self._select_annotation_range(ann)
+                ctrl = bool(event.modifiers() & Qt.ControlModifier)
+                self._select_annotation_range(ann, ctrl=ctrl)
                 event.accept(); return
             self._press_on_annotation = False
             self._selected_ann_id = None
@@ -455,15 +477,16 @@ class ConsensusRowWidget(QWidget):
             super().keyPressEvent(event)
 
     def _delete_selected_annotation(self):
-        ann_id = self._selected_ann_id
-        self._selected_ann_id = None
+        ann_ids = set(self._selected_ann_ids)
+        self._selected_ann_ids.clear()
         self._selection = None
         self._is_selected = False
         self.update()
-        try:
-            self._alignment_model.remove_consensus_annotation(ann_id)
-        except (KeyError, Exception):
-            pass
+        for ann_id in ann_ids:
+            try:
+                self._alignment_model.remove_consensus_annotation(ann_id)
+            except (KeyError, Exception):
+                pass
 
     def _copy_sequence(self):
         consensus = self._get_consensus()
@@ -580,7 +603,8 @@ class ConsensusRowWidget(QWidget):
         if annotations:
             from widgets.row_layout import above_lane_y, below_lane_y, strip_height
             from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
-            _LANE_H = 16
+            from settings.annotation_styles import annotation_style_manager as _asm_cr
+            _LANE_H = _asm_cr.get_lane_height()
             above_anns = [a for a in annotations if a.type.is_above_sequence()]
             below_anns = [a for a in annotations if not a.type.is_above_sequence()]
             above_assignment = assign_lanes(above_anns)
@@ -614,7 +638,7 @@ class ConsensusRowWidget(QWidget):
                     draw_probe(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label, strand=ann_strand, char_width=ann_char_w)
                 else:
                     draw_repeated_region(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label)
-                is_ann_selected = (ann.id == self._selected_ann_id)
+                is_ann_selected = ann.id in self._selected_ann_ids
                 is_ann_hovered  = (ann.id == self._hovered_ann_id)
                 if is_ann_hovered and not is_ann_selected:
                     draw_hover_overlay(painter, clipped_x, ann_y, clipped_w, ann_h_draw,

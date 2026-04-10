@@ -64,8 +64,8 @@ class _AnnotationStyleManager(QObject):
             self.stylesChanged.emit()
 
     def set_label_font_size(self, ann_type, size):
-        """label_font_size'ı 8–32pt aralığına clamp ederek günceller."""
-        clamped = max(8, min(32, int(round(size))))
+        """label_font_size'ı 6pt minimumla günceller; üst sınır yoktur."""
+        clamped = max(6, int(round(size)))
         current = self._styles.get(ann_type)
         if current is None or current.label_font_size == clamped:
             return
@@ -84,12 +84,24 @@ class _AnnotationStyleManager(QObject):
 
     def get_lane_height(self) -> int:
         """
-        Tüm annotation tipleri arasındaki maksimum label_font_size'a göre
-        lane yüksekliğini hesaplar.
-        Formül: max(label_font_size) + 6px padding.
+        Tüm annotation tiplerindeki gerçek font metriklerine göre lane
+        yüksekliğini hesaplar.
+
+        QFontMetrics.height() = ascent + descent kullanılır; bu değer
+        "p", "g", "y", "q" gibi descender'lı karakterleri tam kapsar.
+        Font-agnostic: farklı font family'lerde de doğru çalışır.
         """
-        max_fs = max(s.label_font_size for s in self._styles.values()) if self._styles else 7
-        return max_fs + 6
+        from PyQt5.QtGui import QFont, QFontMetrics
+        _V_PAD = 4  # üst + alt boşluk toplamı (px)
+        max_h = 0
+        for s in self._styles.values():
+            font = QFont(s.label_font_family, s.label_font_size)
+            font.setBold(True)
+            fm = QFontMetrics(font)
+            # height() descender'ları da içerir
+            actual_h = fm.height() + _V_PAD
+            max_h = max(max_h, actual_h)
+        return max(16, max_h) if max_h > 0 else 16
 
     def reset(self, theme_name="light"):
         self.apply_theme(theme_name)

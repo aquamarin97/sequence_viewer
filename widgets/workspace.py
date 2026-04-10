@@ -221,7 +221,7 @@ class SequenceWorkspaceWidget(QWidget):
             self._copy_fasta(); event.accept(); return
         if ctrl and not shift and event.key() == Qt.Key_C:
             self._copy_sequences(); event.accept(); return
-        if event.key() == Qt.Key_Delete and self._action_dialogs._selected_annotation is not None:
+        if event.key() == Qt.Key_Delete and self._action_dialogs._selected_annotations:
             self._action_dialogs.delete_selected_annotation(); event.accept(); return
         super().keyPressEvent(event)
 

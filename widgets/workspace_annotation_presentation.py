@@ -14,17 +14,35 @@ class WorkspaceAnnotationPresentation:
     def __init__(self, workspace):
         self.workspace = workspace
         self.ann_items = {}
-        self._selected_ann_id = None
+        self._selected_ann_ids: set = set()
 
-    def set_selected_annotation(self, ann_id):
-        if self._selected_ann_id == ann_id: return
-        if self._selected_ann_id is not None:
-            for item in self.ann_items.get(self._selected_ann_id, []):
+    def set_selected_annotation(self, ann_id, ctrl=False):
+        if ctrl:
+            if ann_id is None:
+                return
+            if ann_id in self._selected_ann_ids:
+                self._selected_ann_ids.discard(ann_id)
+                for item in self.ann_items.get(ann_id, []):
+                    item.set_selected_visual(False)
+            else:
+                self._selected_ann_ids.add(ann_id)
+                for item in self.ann_items.get(ann_id, []):
+                    item.set_selected_visual(True)
+        else:
+            for prev_id in list(self._selected_ann_ids):
+                for item in self.ann_items.get(prev_id, []):
+                    item.set_selected_visual(False)
+            self._selected_ann_ids.clear()
+            if ann_id is not None:
+                self._selected_ann_ids.add(ann_id)
+                for item in self.ann_items.get(ann_id, []):
+                    item.set_selected_visual(True)
+
+    def clear_annotation_selection(self):
+        for prev_id in list(self._selected_ann_ids):
+            for item in self.ann_items.get(prev_id, []):
                 item.set_selected_visual(False)
-        self._selected_ann_id = ann_id
-        if ann_id is not None:
-            for item in self.ann_items.get(ann_id, []):
-                item.set_selected_visual(True)
+        self._selected_ann_ids.clear()
 
     def remove_all_ann_items(self):
         scene = self.workspace.sequence_viewer.scene
@@ -59,7 +77,7 @@ class WorkspaceAnnotationPresentation:
                 on_click=self.workspace._on_ann_item_clicked, on_double_click=self.workspace._on_ann_item_double_clicked)
             item.setPos(scene_x, scene_y); scene.addItem(item)
             self.ann_items.setdefault(ann.id, []).append(item)
-            if ann.id == self._selected_ann_id:
+            if ann.id in self._selected_ann_ids:
                 item.set_selected_visual(True)
 
     def update_ann_items_geometry(self, layout):

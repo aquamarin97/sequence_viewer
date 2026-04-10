@@ -8,16 +8,62 @@ if TYPE_CHECKING:
 class WorkspaceActionDialogCoordinator:
     def __init__(self, workspace):
         self.workspace = workspace
-        self._selected_annotation = None  # (annotation, row_index_or_None)
+        self._selected_annotations: list = []  # [(annotation, row_index_or_None), ...]
 
-    def _update_selection_visuals(self, ann_id, is_layer):
+    def _update_selection_visuals(self, ann_id, is_layer, ctrl=False):
         """Per-row ve layer annotation seçim görsellerini senkronize eder."""
         ws = self.workspace
-        ws._annotation_presentation.set_selected_annotation(ann_id if not is_layer else None)
-        ws.annotation_layer.set_selected_annotation(ann_id if is_layer else None)
+        ws._annotation_presentation.set_selected_annotation(
+            ann_id if not is_layer else None, ctrl=ctrl)
+        ws.annotation_layer.set_selected_annotation(
+            ann_id if is_layer else None, ctrl=ctrl)
+
+    def _clear_all_annotation_visuals(self):
+        """Tüm seçili annotation görsellerini temizler."""
+        ws = self.workspace
+        ws._annotation_presentation.clear_annotation_selection()
+        ws.annotation_layer.clear_annotation_selection()
+
+    def _apply_union_selection(self):
+        """
+        Seçili her annotation'ı yalnızca kendi satırında gösterir.
+        Satırlar arası boşluklar seçili değildir; her satır kendi annotation
+        kolon aralığını kullanır.
+        """
+        ws = self.workspace
+        n = ws.model.row_count()
+        ws.sequence_viewer.clear_visual_selection()
+        try: ws.sequence_viewer._model.clear_selection()
+        except: pass
+        ws.sequence_viewer.clear_selection_dim_range()
+        if not self._selected_annotations or n == 0:
+            return
+        items = ws.sequence_viewer.sequence_items
+        for ann, row_index in self._selected_annotations:
+            if row_index is None:
+                # Layer annotation → tüm satırlar
+                for item in items:
+                    item.set_selection(ann.start, ann.end)
+            elif 0 <= row_index < len(items):
+                items[row_index].set_selection(ann.start, ann.end)
+        ws.sequence_viewer.scene.invalidate()
+        ws.sequence_viewer.viewport().update()
 
     def on_annotation_layer_clicked(self, annotation):
-        self._selected_annotation = (annotation, None)
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import Qt as _Qt
+        ctrl = bool(QApplication.keyboardModifiers() & _Qt.ControlModifier)
+        if ctrl:
+            existing = next((i for i, (a, _) in enumerate(self._selected_annotations)
+                             if a.id == annotation.id), -1)
+            if existing >= 0:
+                self._selected_annotations.pop(existing)
+            else:
+                self._selected_annotations.append((annotation, None))
+            self.workspace.annotation_layer.set_selected_annotation(annotation.id, ctrl=True)
+            self._apply_union_selection()
+            return
+        self._selected_annotations = [(annotation, None)]
         self._update_selection_visuals(annotation.id, is_layer=True)
         self.workspace.setFocus()
         self.workspace.sequence_viewer.set_guide_cols(annotation.start, annotation.end)
@@ -32,7 +78,20 @@ class WorkspaceActionDialogCoordinator:
         self.do_edit_dialog(annotation, row_index=None)
 
     def on_ann_item_clicked(self, annotation, row_index):
-        self._selected_annotation = (annotation, row_index)
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import Qt as _Qt
+        ctrl = bool(QApplication.keyboardModifiers() & _Qt.ControlModifier)
+        if ctrl:
+            existing = next((i for i, (a, _) in enumerate(self._selected_annotations)
+                             if a.id == annotation.id), -1)
+            if existing >= 0:
+                self._selected_annotations.pop(existing)
+            else:
+                self._selected_annotations.append((annotation, row_index))
+            self.workspace._annotation_presentation.set_selected_annotation(annotation.id, ctrl=True)
+            self._apply_union_selection()
+            return
+        self._selected_annotations = [(annotation, row_index)]
         self._update_selection_visuals(annotation.id, is_layer=False)
         self.workspace.setFocus()
         ws = self.workspace
@@ -117,10 +176,9 @@ class WorkspaceActionDialogCoordinator:
             except IndexError: pass
 
     def on_selection_changed(self, selected_rows):
-        if self._selected_annotation is not None:
-            _, ri = self._selected_annotation
-            self._update_selection_visuals(None, is_layer=(ri is None))
-            self._selected_annotation = None
+        if self._selected_annotations:
+            self._clear_all_annotation_visuals()
+            self._selected_annotations.clear()
         # Herhangi bir header seçilince consensus vurgusunu, seçimini ve guide'ları kaldır
         self.workspace.consensus_spacer.set_selected(False)
         self.workspace.consensus_row.clear_selection()
@@ -146,6 +204,9 @@ class WorkspaceActionDialogCoordinator:
     def on_seq_row_clicked(self, row_start, row_end):
         """Sequence view'da satır(lar)a tıklanınca: header highlight + h-guide, full selection yok."""
         ws = self.workspace
+        if self._selected_annotations:
+            self._clear_all_annotation_visuals()
+            self._selected_annotations.clear()
         n = ws.model.row_count()
         rows = frozenset(range(row_start, row_end + 1)) if 0 <= row_start < n else frozenset()
 
@@ -191,26 +252,26 @@ class WorkspaceActionDialogCoordinator:
     def on_model_reset(self): self.rebuild_views()
 
     def delete_selected_annotation(self):
-        """Seçili annotation'ı sil (Delete tuşu)."""
-        if self._selected_annotation is None:
+        """Seçili annotation'ları sil (Delete tuşu)."""
+        if not self._selected_annotations:
             return
-        ann, row_index = self._selected_annotation
-        self._selected_annotation = None
-        self._update_selection_visuals(None, is_layer=(row_index is None))
-        try:
-            if row_index is None:
-                self.workspace.model.remove_global_annotation(ann.id)
-            else:
-                self.workspace.model.remove_annotation(row_index, ann.id)
-        except (KeyError, IndexError):
-            pass
+        to_delete = list(self._selected_annotations)
+        self._selected_annotations.clear()
+        self._clear_all_annotation_visuals()
+        for ann, row_index in to_delete:
+            try:
+                if row_index is None:
+                    self.workspace.model.remove_global_annotation(ann.id)
+                else:
+                    self.workspace.model.remove_annotation(row_index, ann.id)
+            except (KeyError, IndexError):
+                pass
 
     def on_consensus_spacer_clicked(self):
         """Consensus spacer'a tıklama → seçim vurgusu + consensus dizisini tümüyle seçer."""
-        if self._selected_annotation is not None:
-            _, ri = self._selected_annotation
-            self._update_selection_visuals(None, is_layer=(ri is None))
-            self._selected_annotation = None
+        if self._selected_annotations:
+            self._clear_all_annotation_visuals()
+            self._selected_annotations.clear()
         ws = self.workspace
         # Header seçimini temizle — ama on_selection_changed'i tetikleme
         # (o fonksiyon consensus_spacer.set_selected(False) yapıyor)

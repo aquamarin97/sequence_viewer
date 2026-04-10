@@ -10,7 +10,11 @@ from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation, AnnotationType
 from settings.theme import theme_manager
 
-_LANE_HEIGHT = 20; _LANE_PADDING = 6; _MIN_HEIGHT = 24
+_LANE_PADDING = 6; _MIN_HEIGHT = 24
+
+def _lane_height() -> int:
+    from settings.annotation_styles import annotation_style_manager
+    return annotation_style_manager.get_lane_height()
 
 class AnnotationLayerWidget(QWidget):
     annotationClicked = pyqtSignal(object)
@@ -20,7 +24,7 @@ class AnnotationLayerWidget(QWidget):
         super().__init__(parent)
         self._model = model; self._sequence_viewer = sequence_viewer
         self._lane_assignment = {}; self._annotations = []; self._hit_rects = []
-        self._selected_ann_id = None
+        self._selected_ann_ids: set = set()
         self.setMouseTracking(True); self._sync_from_model()
         self._model.globalAnnotationAdded.connect(self._on_global_changed)
         self._model.globalAnnotationRemoved.connect(self._on_global_changed)
@@ -36,7 +40,7 @@ class AnnotationLayerWidget(QWidget):
         theme_manager.themeChanged.connect(lambda _: self.update())
         try:
             from settings.annotation_styles import annotation_style_manager as _asm
-            _asm.stylesChanged.connect(lambda: self.update())
+            _asm.stylesChanged.connect(self._sync_from_model)
         except: pass
 
     def _sync_from_model(self):
@@ -49,12 +53,27 @@ class AnnotationLayerWidget(QWidget):
         if not self._model.is_aligned or not self._annotations:
             self.setFixedHeight(0); self.setVisible(False); return
         n = lane_count(self._lane_assignment)
-        h = max(_MIN_HEIGHT, n * (_LANE_HEIGHT + _LANE_PADDING) + _LANE_PADDING)
+        lh = _lane_height()
+        h = max(_MIN_HEIGHT, n * (lh + _LANE_PADDING) + _LANE_PADDING)
         self.setFixedHeight(h); self.setVisible(True)
 
-    def set_selected_annotation(self, ann_id):
-        if self._selected_ann_id == ann_id: return
-        self._selected_ann_id = ann_id; self.update()
+    def set_selected_annotation(self, ann_id, ctrl=False):
+        if ctrl:
+            if ann_id is None:
+                return
+            if ann_id in self._selected_ann_ids:
+                self._selected_ann_ids.discard(ann_id)
+            else:
+                self._selected_ann_ids.add(ann_id)
+        else:
+            self._selected_ann_ids = {ann_id} if ann_id is not None else set()
+        self.update()
+
+    def clear_annotation_selection(self):
+        if not self._selected_ann_ids:
+            return
+        self._selected_ann_ids.clear()
+        self.update()
 
     def _on_global_changed(self, *_): self._sync_from_model()
     def _on_alignment_changed(self, is_aligned): self._sync_from_model()
@@ -68,7 +87,8 @@ class AnnotationLayerWidget(QWidget):
 
     def _annotation_viewport_rect(self, ann, lane, cw, view_left):
         x = ann.start * cw - view_left; w = ann.length() * cw
-        y = _LANE_PADDING + lane * (_LANE_HEIGHT + _LANE_PADDING); h = _LANE_HEIGHT
+        lh = _lane_height()
+        y = _LANE_PADDING + lane * (lh + _LANE_PADDING); h = lh
         widget_w = float(self.width())
         if x + w < 0 or x > widget_w: return None
         if x < 0: w += x; x = 0.0
@@ -101,7 +121,7 @@ class AnnotationLayerWidget(QWidget):
                 draw_probe(painter, vp.x(), vp.y(), vp.width(), vp.height(), ann.resolved_color(), ann.label, strand=ann.strand, char_width=ann_char_w)
             else:
                 draw_repeated_region(painter, vp.x(), vp.y(), vp.width(), vp.height(), ann.resolved_color(), ann.label)
-            if ann.id == self._selected_ann_id:
+            if ann.id in self._selected_ann_ids:
                 draw_selection_outline(painter, vp.x(), vp.y(), vp.width(), vp.height(),
                                        ann.type, ann.resolved_color(),
                                        strand=getattr(ann, 'strand', '+'), char_width=ann_char_w)
