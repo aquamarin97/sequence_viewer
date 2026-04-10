@@ -21,7 +21,7 @@ class SequenceItemModel:
         # default_char_width / 1.8 ile LOD referans noktası kaydırılır:
         # başlangıç scale = char_width / (char_width/1.8) = 1.8 → TEXT MODE garantisi.
         self.default_char_width = self.char_width / 1.8
-        self.selection_range = None
+        self._selection_ranges: list = []   # [(start_incl, end_excl), ...]
         self.base_font_size = self.char_height * 0.6
         self.display_mode = self.TEXT_MODE
         self.current_font_size = self.base_font_size
@@ -66,12 +66,28 @@ class SequenceItemModel:
         self.box_height = max(box_ref, 1.0)
         self.line_height = self.char_height * 0.3
 
+    @property
+    def selection_range(self):
+        """Geriye dönük uyumluluk: ilk aralığı döndürür (veya None)."""
+        return self._selection_ranges[0] if self._selection_ranges else None
+
     def set_selection(self, start_col, end_col):
         start = max(0, min(start_col, end_col))
         end = min(self.length, max(start_col, end_col) + 1)
-        self.selection_range = (start, end) if start < end else None
+        self._selection_ranges = [(start, end)] if start < end else []
 
-    def clear_selection(self): self.selection_range = None
+    def set_multi_selection(self, ranges):
+        """[(start_col, end_col), ...] — her aralık bağımsız, aralarındaki boşluk seçilmez."""
+        result = []
+        for start_col, end_col in ranges:
+            start = max(0, min(start_col, end_col))
+            end = min(self.length, max(start_col, end_col) + 1)
+            if start < end:
+                result.append((start, end))
+        self._selection_ranges = result
+
+    def clear_selection(self):
+        self._selection_ranges = []
 
     @staticmethod
     def _mode_order(mode):

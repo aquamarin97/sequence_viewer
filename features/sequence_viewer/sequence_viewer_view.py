@@ -144,7 +144,7 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         self.scene.clear()
         self.max_sequence_length = 0
         self._row_layout = None
-        self._selection_dim_range = None
+        self._selection_dim_ranges = []
         self.scene.setSceneRect(0, 0, 0, 0)
         self.scene.invalidate()
 

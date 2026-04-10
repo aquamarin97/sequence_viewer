@@ -25,20 +25,26 @@ from settings.display_settings_manager import display_settings_manager
 
 
 def _paint_dim_overlay(painter, sequence_viewer, cw, widget_w, widget_h, t):
-    """Seçim dışı sütunlar üzerine solduklaştırma katmanı çizer."""
-    dim_range = getattr(sequence_viewer, '_selection_dim_range', None)
-    if dim_range is None or cw <= 0:
+    """Seçim dışı sütunlar üzerine solduklaştırma katmanı çizer (çoklu focus aralığı destekli)."""
+    dim_ranges = getattr(sequence_viewer, '_selection_dim_ranges', None)
+    if not dim_ranges or cw <= 0:
         return
-    left_col, right_col = dim_range
     offset = float(sequence_viewer.horizontalScrollBar().value())
     dim_color = QColor(t.selection_dim_color)
-    left_px = left_col * cw - offset
-    right_px = right_col * cw - offset
+    sorted_ranges = sorted(dim_ranges, key=lambda r: r[0])
     painter.setPen(Qt.NoPen)
-    if left_px > 0:
-        painter.fillRect(QRectF(0.0, 0.0, min(left_px, widget_w), widget_h), dim_color)
-    if right_px < widget_w:
-        r = max(right_px, 0.0)
+    prev_right_px = 0.0
+    for left_col, right_col in sorted_ranges:
+        left_px = left_col * cw - offset
+        right_px = right_col * cw - offset
+        if left_px > prev_right_px:
+            x = max(prev_right_px, 0.0)
+            w = min(left_px, widget_w) - x
+            if w > 0:
+                painter.fillRect(QRectF(x, 0.0, w, widget_h), dim_color)
+        prev_right_px = max(prev_right_px, right_px)
+    if prev_right_px < widget_w:
+        r = max(prev_right_px, 0.0)
         painter.fillRect(QRectF(r, 0.0, widget_w - r, widget_h), dim_color)
 
 
@@ -52,12 +58,13 @@ class ConsensusRowWidget(QWidget):
         self._font.setStyleHint(QFont.Monospace); self._font.setFixedPitch(True)
         from settings.color_styles import color_style_manager as _csm
         self._color_map = _csm.consensus_nucleotide_color_map()
-        self._selection = None; self._press_col = None; self._is_selected = False
+        self._press_col = None; self._is_selected = False
         self._press_pos = None; self._drag_started = False; self._press_scene_col = None
         self._hit_rects: list = []
         self._press_on_annotation = False
         self._hovered_ann_id: str | None = None
         self._selected_ann_ids: set = set()
+        self._selection_ranges: list = []   # [(start_incl, end_excl), ...] — multi-range
         ch = int(round(sequence_viewer.char_height))
         self.setFixedHeight(ch)
         self.setMinimumWidth(0); self.setMouseTracking(True); self.setFocusPolicy(Qt.ClickFocus)
@@ -155,8 +162,28 @@ class ConsensusRowWidget(QWidget):
     @property
     def current_threshold(self): return self._model.threshold
 
+    # ------------------------------------------------------------------
+    # _selection: drag ve tekli annotation seçimi için backward-compat property
+    # backing store: _selection_ranges [(start_incl, end_excl), ...]
+    # ------------------------------------------------------------------
+    @property
+    def _selection(self):
+        """İlk aralığı (start_incl, end_incl) olarak döndürür; yoksa None."""
+        if self._selection_ranges:
+            s, e = self._selection_ranges[0]
+            return (s, e - 1)
+        return None
+
+    @_selection.setter
+    def _selection(self, value):
+        if value is None:
+            self._selection_ranges = []
+        else:
+            s, e = value  # end inclusive
+            self._selection_ranges = [(s, e + 1)]
+
     def clear_selection(self):
-        self._selection = None
+        self._selection_ranges = []
         self._is_selected = False
         self._selected_ann_ids.clear()
         self.update()
@@ -169,7 +196,7 @@ class ConsensusRowWidget(QWidget):
         """Tüm konsensüs dizisini seçili hale getirir."""
         consensus = self._get_consensus()
         if consensus:
-            self._selection = (0, len(consensus) - 1)
+            self._selection_ranges = [(0, len(consensus))]
             self._is_selected = True
             self.update()
 
@@ -290,33 +317,69 @@ class ConsensusRowWidget(QWidget):
                 event.accept(); return
         super().mouseDoubleClickEvent(event)
 
+    def _notify_workspace_ann_cleared(self):
+        """Workspace coordinator'ın annotation seçimini temizle (koordinasyon)."""
+        try:
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, '_action_dialogs'):
+                    ad = p._action_dialogs
+                    if ad._selected_annotations:
+                        ad._selected_annotations.clear()
+                        ad._clear_all_annotation_visuals()
+                    break
+                p = p.parent()
+        except Exception:
+            pass
+
+    def _notify_coordinator_refresh(self):
+        """Coordinator'ın _apply_union_selection'ını tetikle (cross-widget merge)."""
+        try:
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, '_action_dialogs'):
+                    p._action_dialogs._apply_union_selection()
+                    break
+                p = p.parent()
+        except Exception:
+            pass
+
     def _select_annotation_range(self, ann, ctrl=False):
         """Annotation aralığını seçili yap ve guide çizgileri oluştur."""
+        c = self._get_controller()
+
         if ctrl:
+            # Additive: coordinator seçimini KORU, sadece kendi state'ini güncelle
             if ann.id in self._selected_ann_ids:
                 self._selected_ann_ids.discard(ann.id)
-                if not self._selected_ann_ids:
-                    self._selection = None
-                    self._is_selected = False
             else:
                 self._selected_ann_ids.add(ann.id)
-                self._selection = (ann.start, ann.end)
-                self._is_selected = True
+            self._is_selected = bool(self._selected_ann_ids)
+            # Seçili annotation nesnelerini bul ve _selection_ranges'i güncelle
+            ann_map = {a.id: a for a in (
+                self._alignment_model.consensus_annotations
+                if self._alignment_model.is_aligned else [])}
+            selected_anns = [ann_map[aid] for aid in self._selected_ann_ids if aid in ann_map]
+            if selected_anns:
+                self._selection_ranges = [(a.start, a.end + 1) for a in selected_anns]
+            else:
+                self._selection_ranges = []
             self.update()
+            # Coordinator'a merge refresh bildir — guides + dim + seq selection hesaplar
+            self._notify_coordinator_refresh()
             return
-        # Tekil seçim: önceki seçimi temizle, yeni annotation'ı seç
+
+        # Tekil seçim: coordinator'ı temizle, kendi seçimini yap
+        self._notify_workspace_ann_cleared()
         self._selected_ann_ids = {ann.id}
-        self._selection = (ann.start, ann.end)
+        self._selection_ranges = [(ann.start, ann.end + 1)]
         self._is_selected = True
+        # Controller ÖNCE güncelle — observers paint sırasında okur
+        if c is not None:
+            c._v_guide_cols = [ann.start, ann.end + 1]
+        self._sequence_viewer.set_v_guides([ann.start, ann.end + 1])
         self._sequence_viewer.set_selection_dim_range(ann.start, ann.end + 1)
         self.update()
-        # Guide çizgileri: ilk NA'nın solu ve son NA'nın sağı
-        c = self._get_controller()
-        if c is not None:
-            left_b = ann.start
-            right_b = ann.end + 1
-            c._v_guide_cols = [left_b, right_b]
-            self._sequence_viewer.set_v_guides(c._v_guide_cols)
 
     def _annotation_at(self, pos):
         p = QRectF(pos.x(), pos.y(), 1, 1)
@@ -334,7 +397,7 @@ class ConsensusRowWidget(QWidget):
                 self._select_annotation_range(ann, ctrl=ctrl)
                 event.accept(); return
             self._press_on_annotation = False
-            self._selected_ann_id = None
+            self._selected_ann_ids.clear()
             self.setFocus()
             self._sequence_viewer.clear_visual_selection()
             try: self._sequence_viewer._model.clear_selection()
@@ -467,7 +530,7 @@ class ConsensusRowWidget(QWidget):
     def keyPressEvent(self, event):
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)
-        if event.key() == Qt.Key_Delete and self._selected_ann_id is not None:
+        if event.key() == Qt.Key_Delete and self._selected_ann_ids:
             self._delete_selected_annotation(); event.accept()
         elif ctrl and shift and event.key() == Qt.Key_C:
             self._copy_fasta(); event.accept()
@@ -558,8 +621,7 @@ class ConsensusRowWidget(QWidget):
         length = len(consensus)
         start_col = max(0, int(math.floor(view_left / cw)))
         end_col = min(length, int(math.ceil((view_left + width) / cw)))
-        sel_start = sel_end = None
-        if self._selection: sel_start, sel_end = self._selection
+        sel_ranges = self._selection_ranges  # [(start_incl, end_excl), ...]
         ch = seq_char_h  # dizi satırının yüksekliği
         if mode == "line":
             line_h = ch * 0.3; y = seq_top + (ch - line_h) / 2.0
@@ -568,26 +630,29 @@ class ConsensusRowWidget(QWidget):
             draw_width = max(0.0, x_end - x_start)
             painter.setBrush(QBrush(t.seq_line_fg)); painter.setPen(Qt.NoPen)
             painter.drawRect(QRectF(x_start, y, draw_width, line_h))
-            if sel_start is not None and sel_end is not None:
-                sx = sel_start * cw - view_left; sw = (sel_end - sel_start + 1) * cw
-                sx2 = max(0.0, sx); sw2 = min(sw - (sx2 - sx), float(width) - sx2)
-                if sw2 > 0:
-                    sel_color = QColor(t.seq_selection_bg)
-                    painter.setBrush(QBrush(sel_color)); painter.drawRect(QRectF(sx2, seq_top, sw2, ch))
+            if sel_ranges:
+                sel_color = QColor(t.seq_selection_bg)
+                painter.setBrush(QBrush(sel_color))
+                for sel_s, sel_e in sel_ranges:
+                    sx = sel_s * cw - view_left; sw = (sel_e - sel_s) * cw
+                    sx2 = max(0.0, sx); sw2 = min(sw - (sx2 - sx), float(width) - sx2)
+                    if sw2 > 0:
+                        painter.drawRect(QRectF(sx2, seq_top, sw2, ch))
             _paint_dim_overlay(painter, self._sequence_viewer, cw, float(width), float(height), t)
             painter.end(); return
-        if sel_start is not None and sel_end is not None:
-            sel_l = max(sel_start, start_col); sel_r = min(sel_end + 1, end_col)
-            if sel_r > sel_l:
-                sel_color = QColor(t.seq_selection_bg)
-                painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
-                for i in range(sel_l, sel_r):
-                    painter.drawRect(QRectF(i * cw - view_left, seq_top, cw, ch))
+        if sel_ranges:
+            sel_color = QColor(t.seq_selection_bg)
+            painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
+            for sel_s, sel_e in sel_ranges:
+                sel_l = max(sel_s, start_col); sel_r = min(sel_e, end_col)
+                if sel_r > sel_l:
+                    for i in range(sel_l, sel_r):
+                        painter.drawRect(QRectF(i * cw - view_left, seq_top, cw, ch))
         font_pt = self._font.pointSizeF()
         box_ref = min(ch * 0.7, font_pt); box_h = max(box_ref, 1.0); box_y = seq_top + (ch - box_h) / 2.0
         for col in range(start_col, end_col):
             base = consensus[col].upper(); x = col * cw - view_left
-            is_selected = sel_start is not None and sel_end is not None and sel_start <= col <= sel_end
+            is_selected = any(s <= col < e for s, e in sel_ranges)
             color = QColor(255, 255, 255) if is_selected else self._color_map.get(base, t.text_primary)
             if mode == "box":
                 painter.setBrush(QBrush(color)); painter.setPen(Qt.NoPen)

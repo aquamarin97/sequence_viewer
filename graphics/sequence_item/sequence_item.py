@@ -60,6 +60,8 @@ class SequenceGraphicsItem(QGraphicsItem):
 
     def set_selection(self, start_col, end_col):
         self._model.set_selection(start_col, end_col); self.update()
+    def set_multi_selection(self, ranges):
+        self._model.set_multi_selection(ranges); self.update()
     def clear_selection(self):
         self._model.clear_selection(); self.update()
     def set_row_highlighted(self, highlighted):
@@ -116,31 +118,33 @@ class SequenceGraphicsItem(QGraphicsItem):
         if visible_right <= visible_left: painter.restore(); return
         start_index = max(0, math.floor(visible_left / cw))
         end_index = min(length, math.ceil(visible_right / cw))
-        sel_start = sel_end = None
-        if self.selection_range is not None: sel_start, sel_end = self.selection_range
+        sel_ranges = self._model._selection_ranges  # [(start_incl, end_excl), ...]
         if effective_mode == SequenceItemModel.LINE_MODE:
             vis_l, vis_r = max(exposed.left(), 0.0), min(exposed.right(), total_width)
             if vis_r > vis_l:
                 line_h = self._model.line_height; y = (ch - line_h) / 2.0
                 painter.setBrush(QBrush(t.seq_line_fg)); painter.setPen(Qt.NoPen)
                 painter.drawRect(QRectF(vis_l, y, vis_r - vis_l, line_h))
-            if sel_start is not None and sel_end is not None:
-                sx = max(sel_start * cw, vis_l); ex = min((sel_end + 1) * cw, vis_r)
-                if ex > sx:
-                    sel_color = QColor(t.seq_selection_bg)
-                    painter.setBrush(QBrush(sel_color)); painter.drawRect(QRectF(sx, 0, ex - sx, ch))
-            painter.restore(); return
-        if sel_start is not None and sel_end is not None:
-            sel_l, sel_r = max(sel_start, start_index), min(sel_end, end_index)
-            if sel_r > sel_l:
+            if sel_ranges:
                 sel_color = QColor(t.seq_selection_bg)
                 painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
-                for i in range(sel_l, sel_r): painter.drawRect(QRectF(i * cw, 0, cw, ch))
+                for s, e in sel_ranges:
+                    sx = max(s * cw, vis_l); ex = min(e * cw, vis_r)
+                    if ex > sx:
+                        painter.drawRect(QRectF(sx, 0, ex - sx, ch))
+            painter.restore(); return
+        if sel_ranges:
+            sel_color = QColor(t.seq_selection_bg)
+            painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
+            for s, e in sel_ranges:
+                sel_l = max(s, start_index); sel_r = min(e, end_index)
+                if sel_r > sel_l:
+                    for i in range(sel_l, sel_r): painter.drawRect(QRectF(i * cw, 0, cw, ch))
         if effective_mode == SequenceItemModel.TEXT_MODE:
             painter.setPen(Qt.NoPen); painter.setBrush(Qt.NoBrush)
             for i in range(start_index, end_index):
                 base, base_u, x = seq[i], seq_upper[i], i * cw
-                is_selected = sel_start is not None and sel_end is not None and sel_start <= i < sel_end
+                is_selected = any(s <= i < e for s, e in sel_ranges)
                 color = QColor(255, 255, 255) if is_selected else color_map.get(base_u, QColor(50,50,50))
                 glyph = GLYPH_CACHE.get_glyph(base, self.font, color)
                 dx = x + (cw - glyph.width()) / 2.0; dy = (ch - glyph.height()) / 2.0

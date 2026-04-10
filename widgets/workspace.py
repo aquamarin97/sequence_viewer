@@ -155,8 +155,8 @@ class SequenceWorkspaceWidget(QWidget):
     def _on_alignment_state_changed(self, is_aligned):
         self._sync_consensus_visibility()
 
-    def _on_consensus_spacer_clicked(self):
-        self._action_dialogs.on_consensus_spacer_clicked()
+    def _on_consensus_spacer_clicked(self, ctrl=False):
+        self._action_dialogs.on_consensus_spacer_clicked(ctrl=ctrl)
 
     def eventFilter(self, obj, event):
         from PyQt5.QtCore import QEvent

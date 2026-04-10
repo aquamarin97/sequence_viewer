@@ -31,7 +31,7 @@ class OverlayMixin:
         self._v_guide_cols: list = []
         self._v_guide_observers: list = []
         self._h_guide_rows: frozenset = frozenset()
-        self._selection_dim_range = None
+        self._selection_dim_ranges: list = []  # [(left_col, right_col), ...] focus alanları
 
     # ------------------------------------------------------------------
     # Vertical guide public API
@@ -83,17 +83,29 @@ class OverlayMixin:
     # ------------------------------------------------------------------
 
     def set_selection_dim_range(self, left_col: int, right_col: int):
-        self._selection_dim_range = (left_col, right_col)
+        self._selection_dim_ranges = [(left_col, right_col)]
+        self.viewport().update()
+        for cb in self._v_guide_observers:
+            cb()
+
+    def set_selection_focus_ranges(self, ranges: list):
+        """Birden fazla focus aralığı ayarla — aralarındaki boşluklar karartılır."""
+        self._selection_dim_ranges = list(ranges)
         self.viewport().update()
         for cb in self._v_guide_observers:
             cb()
 
     def clear_selection_dim_range(self):
-        if self._selection_dim_range is not None:
-            self._selection_dim_range = None
+        if self._selection_dim_ranges:
+            self._selection_dim_ranges = []
             self.viewport().update()
             for cb in self._v_guide_observers:
                 cb()
+
+    @property
+    def _selection_dim_range(self):
+        """Geriye dönük uyumluluk: ilk aralığı döndürür veya None."""
+        return self._selection_dim_ranges[0] if self._selection_dim_ranges else None
 
     # ------------------------------------------------------------------
     # QGraphicsView paint hooks
@@ -154,9 +166,8 @@ class OverlayMixin:
         painter.restore()
 
     def _draw_selection_dim_overlay(self, painter, t):
-        if self._selection_dim_range is None:
+        if not self._selection_dim_ranges:
             return
-        left_col, right_col = self._selection_dim_range
         cw = self._effective_char_width()
         if cw <= 0:
             return
@@ -164,17 +175,29 @@ class OverlayMixin:
         vp_w = float(self.viewport().width())
         vp_h = float(self.viewport().height())
         dim_color = QColor(t.selection_dim_color)
-        left_px = left_col * cw - offset
-        right_px = right_col * cw - offset
+        sorted_ranges = sorted(self._selection_dim_ranges, key=lambda r: r[0])
 
         painter.save()
         painter.resetTransform()
         painter.setPen(Qt.NoPen)
-        if left_px > 0:
-            painter.fillRect(QRectF(0.0, 0.0, min(left_px, vp_w), vp_h), dim_color)
-        if right_px < vp_w:
-            r = max(right_px, 0.0)
+
+        prev_right_px = 0.0
+        for left_col, right_col in sorted_ranges:
+            left_px = left_col * cw - offset
+            right_px = right_col * cw - offset
+            # Focus aralığının solundaki boşluğu karart
+            if left_px > prev_right_px:
+                x = max(prev_right_px, 0.0)
+                w = min(left_px, vp_w) - x
+                if w > 0:
+                    painter.fillRect(QRectF(x, 0.0, w, vp_h), dim_color)
+            prev_right_px = max(prev_right_px, right_px)
+
+        # Son focus aralığının sağındaki her şeyi karart
+        if prev_right_px < vp_w:
+            r = max(prev_right_px, 0.0)
             painter.fillRect(QRectF(r, 0.0, vp_w - r, vp_h), dim_color)
+
         painter.restore()
 
     def _draw_vertical_guides(self, painter, t):

@@ -19,16 +19,16 @@ class WorkspaceActionDialogCoordinator:
             ann_id if is_layer else None, ctrl=ctrl)
 
     def _clear_all_annotation_visuals(self):
-        """Tüm seçili annotation görsellerini temizler."""
+        """Tüm seçili annotation görsellerini ve dim overlay'ini temizler."""
         ws = self.workspace
         ws._annotation_presentation.clear_annotation_selection()
         ws.annotation_layer.clear_annotation_selection()
+        ws.sequence_viewer.clear_selection_dim_range()
 
     def _apply_union_selection(self):
         """
-        Seçili her annotation'ı yalnızca kendi satırında gösterir.
-        Satırlar arası boşluklar seçili değildir; her satır kendi annotation
-        kolon aralığını kullanır.
+        Coordinator'ın seçimlerini uygular. Consensus annotation'lar kendi widget'ında
+        render edilir (regular sequence items'a yazılmaz). V-guide + dim için merge.
         """
         ws = self.workspace
         n = ws.model.row_count()
@@ -36,18 +36,73 @@ class WorkspaceActionDialogCoordinator:
         try: ws.sequence_viewer._model.clear_selection()
         except: pass
         ws.sequence_viewer.clear_selection_dim_range()
-        if not self._selected_annotations or n == 0:
+
+        # Consensus row'un seçili annotation'larını sadece guide/dim hesabı için al
+        cr = ws.consensus_row
+        cr_ann_ids = set(getattr(cr, '_selected_ann_ids', set()))
+        cr_anns: list = []
+        if cr_ann_ids and getattr(ws.model, 'is_aligned', False):
+            ann_map = {a.id: a for a in ws.model.consensus_annotations}
+            cr_anns = [ann_map[aid] for aid in cr_ann_ids if aid in ann_map]
+
+        has_any = bool(self._selected_annotations or cr_anns)
+        if not has_any or n == 0:
+            ws.sequence_viewer.clear_h_guides()
+            clear_changed = ws.header_viewer._selection.clear()
+            ws.header_viewer.apply_selection_to_items(clear_changed)
             return
+
         items = ws.sequence_viewer.sequence_items
+        # Her satır için ayrı aralıkları topla — SADECE coordinator annotation'ları
+        row_ranges_map: dict = {}  # row_index → [(start, end), ...]
+        per_row_indices: set = set()
         for ann, row_index in self._selected_annotations:
             if row_index is None:
-                # Layer annotation → tüm satırlar
-                for item in items:
-                    item.set_selection(ann.start, ann.end)
+                for i in range(len(items)):
+                    row_ranges_map.setdefault(i, []).append((ann.start, ann.end))
             elif 0 <= row_index < len(items):
-                items[row_index].set_selection(ann.start, ann.end)
+                per_row_indices.add(row_index)
+                row_ranges_map.setdefault(row_index, []).append((ann.start, ann.end))
+
+        for row_index, ranges in row_ranges_map.items():
+            if len(ranges) == 1:
+                items[row_index].set_selection(ranges[0][0], ranges[0][1])
+            else:
+                items[row_index].set_multi_selection(ranges)
         ws.sequence_viewer.scene.invalidate()
         ws.sequence_viewer.viewport().update()
+
+        # V-guide + focus: coordinator + consensus annotation sınırlarını birleştir
+        boundaries: list = []
+        focus_ranges: list = []
+        for ann, _ in self._selected_annotations:
+            if ann.start not in boundaries: boundaries.append(ann.start)
+            if ann.end + 1 not in boundaries: boundaries.append(ann.end + 1)
+            focus_ranges.append((ann.start, ann.end + 1))
+        for ann in cr_anns:
+            if ann.start not in boundaries: boundaries.append(ann.start)
+            if ann.end + 1 not in boundaries: boundaries.append(ann.end + 1)
+            focus_ranges.append((ann.start, ann.end + 1))
+        boundaries.sort()
+
+        # Controller güncellenmesi set_v_guides'dan ÖNCE olmalı
+        seq_ctrl = ws.sequence_viewer._controller
+        if seq_ctrl is not None:
+            seq_ctrl._v_guide_cols = list(boundaries)
+        ws.sequence_viewer.set_v_guides(boundaries)
+        if focus_ranges:
+            ws.sequence_viewer.set_selection_focus_ranges(focus_ranges)
+
+        # H-guide: sadece per-row annotation satırları
+        if per_row_indices:
+            ws.sequence_viewer.set_h_guides(frozenset(per_row_indices))
+        else:
+            ws.sequence_viewer.clear_h_guides()
+        # Header: per-row annotation satırlarını vurgula
+        changed = ws.header_viewer._selection.clear()
+        for ri in per_row_indices:
+            changed = changed | ws.header_viewer._selection.handle_ctrl_click(ri, n)
+        ws.header_viewer.apply_selection_to_items(changed)
 
     def on_annotation_layer_clicked(self, annotation):
         from PyQt5.QtWidgets import QApplication
@@ -63,10 +118,17 @@ class WorkspaceActionDialogCoordinator:
             self.workspace.annotation_layer.set_selected_annotation(annotation.id, ctrl=True)
             self._apply_union_selection()
             return
+        # Non-ctrl tekil seçim: consensus row'u temizle
+        self.workspace.consensus_row._selected_ann_ids.clear()
+        self.workspace.consensus_row.update()
         self._selected_annotations = [(annotation, None)]
         self._update_selection_visuals(annotation.id, is_layer=True)
         self.workspace.setFocus()
-        self.workspace.sequence_viewer.set_guide_cols(annotation.start, annotation.end)
+        _boundaries = [annotation.start, annotation.end + 1]
+        _seq_ctrl = self.workspace.sequence_viewer._controller
+        if _seq_ctrl is not None:
+            _seq_ctrl._v_guide_cols = list(_boundaries)
+        self.workspace.sequence_viewer.set_v_guides(_boundaries)
         self.workspace.sequence_viewer.set_selection_dim_range(annotation.start, annotation.end + 1)
         n = self.workspace.model.row_count()
         if n > 0:
@@ -91,6 +153,9 @@ class WorkspaceActionDialogCoordinator:
             self.workspace._annotation_presentation.set_selected_annotation(annotation.id, ctrl=True)
             self._apply_union_selection()
             return
+        # Non-ctrl tekil seçim: consensus row'u temizle
+        self.workspace.consensus_row._selected_ann_ids.clear()
+        self.workspace.consensus_row.update()
         self._selected_annotations = [(annotation, row_index)]
         self._update_selection_visuals(annotation.id, is_layer=False)
         self.workspace.setFocus()
@@ -116,7 +181,11 @@ class WorkspaceActionDialogCoordinator:
             ws.sequence_viewer.clear_h_guides()
 
         # V-guide: annotation sütun aralığı
-        ws.sequence_viewer.set_guide_cols(annotation.start, annotation.end)
+        _boundaries = [annotation.start, annotation.end + 1]
+        _seq_ctrl = ws.sequence_viewer._controller
+        if _seq_ctrl is not None:
+            _seq_ctrl._v_guide_cols = list(_boundaries)
+        ws.sequence_viewer.set_v_guides(_boundaries)
         ws.sequence_viewer.set_selection_dim_range(annotation.start, annotation.end + 1)
 
         # Görsel seçim: sadece annotation sütun aralığı
@@ -176,13 +245,18 @@ class WorkspaceActionDialogCoordinator:
             except IndexError: pass
 
     def on_selection_changed(self, selected_rows):
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import Qt as _Qt
+        ctrl = bool(QApplication.keyboardModifiers() & _Qt.ControlModifier)
         if self._selected_annotations:
             self._clear_all_annotation_visuals()
             self._selected_annotations.clear()
-        # Herhangi bir header seçilince consensus vurgusunu, seçimini ve guide'ları kaldır
-        self.workspace.consensus_spacer.set_selected(False)
-        self.workspace.consensus_row.clear_selection()
+        # Consensus row: ctrl+click'te koru, non-ctrl'da temizle
+        if not ctrl:
+            self.workspace.consensus_spacer.set_selected(False)
+            self.workspace.consensus_row.clear_selection()
         self.workspace.sequence_viewer.clear_v_guides()
+        self.workspace.sequence_viewer.clear_selection_dim_range()
         if not selected_rows:
             self.workspace.sequence_viewer.clear_h_guides()
         else:
@@ -267,26 +341,43 @@ class WorkspaceActionDialogCoordinator:
             except (KeyError, IndexError):
                 pass
 
-    def on_consensus_spacer_clicked(self):
-        """Consensus spacer'a tıklama → seçim vurgusu + consensus dizisini tümüyle seçer."""
+    def on_consensus_spacer_clicked(self, ctrl=False):
+        """Consensus spacer'a tıklama.
+        ctrl=False: exclusive — header + annotation seçimlerini sıfırla, sadece consensus seç.
+        ctrl=True:  additive  — header seçimlerini koru, consensus'u toggle et.
+        """
         if self._selected_annotations:
             self._clear_all_annotation_visuals()
             self._selected_annotations.clear()
         ws = self.workspace
-        # Header seçimini temizle — ama on_selection_changed'i tetikleme
-        # (o fonksiyon consensus_spacer.set_selected(False) yapıyor)
-        changed = ws.header_viewer._selection.clear()
-        ws.header_viewer.apply_selection_to_items(changed)
-        ws.sequence_viewer.clear_h_guides()
+        # Annotation seçimini temizle (her iki modda da)
+        ws.consensus_row._selected_ann_ids.clear()
         ws.sequence_viewer.clear_v_guides()
-        ws.sequence_viewer.clear_visual_selection()
-        try: ws.sequence_viewer._model.clear_selection()
-        except: pass
-        # Şimdi consensus'u seçili yap
-        ws.consensus_spacer.set_selected(True)
-        ws.consensus_spacer.setFocus()
-        ws.consensus_row.set_selected(True)
-        ws.consensus_row.select_all()
+        ws.sequence_viewer.clear_selection_dim_range()
+        if ctrl:
+            # Additive: header seçimini koru, consensus'u toggle et
+            if ws.consensus_spacer._selected:
+                # Seçimi kaldır
+                ws.consensus_spacer.set_selected(False)
+                ws.consensus_row.clear_selection()
+            else:
+                # Ekle
+                ws.consensus_spacer.set_selected(True)
+                ws.consensus_spacer.setFocus()
+                ws.consensus_row.set_selected(True)
+                ws.consensus_row.select_all()
+        else:
+            # Exclusive: header seçimini temizle
+            changed = ws.header_viewer._selection.clear()
+            ws.header_viewer.apply_selection_to_items(changed)
+            ws.sequence_viewer.clear_h_guides()
+            ws.sequence_viewer.clear_visual_selection()
+            try: ws.sequence_viewer._model.clear_selection()
+            except: pass
+            ws.consensus_spacer.set_selected(True)
+            ws.consensus_spacer.setFocus()
+            ws.consensus_row.set_selected(True)
+            ws.consensus_row.select_all()
 
     def rebuild_views(self):
         h_scroll = self.workspace.sequence_viewer.horizontalScrollBar().value()

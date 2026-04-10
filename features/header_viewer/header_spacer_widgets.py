@@ -58,7 +58,7 @@ class ConsensusSpacerWidget(QWidget):
     Tek tıklama: consensus dizisini tümüyle seçer.
     Çift tıklama: consensus etiketini düzenlemeye açar.
     """
-    clicked = pyqtSignal()           # tek tıklama → consensus select all
+    clicked = pyqtSignal(bool)       # tek tıklama → consensus select all (bool=ctrl)
     doubleClicked = pyqtSignal()     # çift tıklama → label düzenleme
     labelChanged = pyqtSignal(str)   # düzenleme tamamlandı
 
@@ -118,16 +118,8 @@ class ConsensusSpacerWidget(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.setFocus()
-            # Guide çizgilerini temizle
-            try:
-                p = self.parent()
-                while p is not None:
-                    if hasattr(p, 'sequence_viewer'):
-                        p.sequence_viewer.clear_v_guides()
-                        break
-                    p = p.parent()
-            except: pass
-            self.clicked.emit()
+            ctrl = bool(event.modifiers() & Qt.ControlModifier)
+            self.clicked.emit(ctrl)
             event.accept()
         else: super().mousePressEvent(event)
 
