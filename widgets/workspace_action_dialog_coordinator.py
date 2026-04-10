@@ -119,8 +119,7 @@ class WorkspaceActionDialogCoordinator:
             self._apply_union_selection()
             return
         # Non-ctrl tekil seçim: consensus row'u temizle
-        self.workspace.consensus_row._selected_ann_ids.clear()
-        self.workspace.consensus_row.update()
+        self.workspace.consensus_row.clear_selection()
         self._selected_annotations = [(annotation, None)]
         self._update_selection_visuals(annotation.id, is_layer=True)
         self.workspace.setFocus()
@@ -154,8 +153,7 @@ class WorkspaceActionDialogCoordinator:
             self._apply_union_selection()
             return
         # Non-ctrl tekil seçim: consensus row'u temizle
-        self.workspace.consensus_row._selected_ann_ids.clear()
-        self.workspace.consensus_row.update()
+        self.workspace.consensus_row.clear_selection()
         self._selected_annotations = [(annotation, row_index)]
         self._update_selection_visuals(annotation.id, is_layer=False)
         self.workspace.setFocus()

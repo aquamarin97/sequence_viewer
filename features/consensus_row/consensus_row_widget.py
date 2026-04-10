@@ -186,6 +186,7 @@ class ConsensusRowWidget(QWidget):
         self._selection_ranges = []
         self._is_selected = False
         self._selected_ann_ids.clear()
+        self._notify_spacer_selected(False)
         self.update()
 
     def set_selected(self, selected: bool):
@@ -332,6 +333,18 @@ class ConsensusRowWidget(QWidget):
         except Exception:
             pass
 
+    def _notify_spacer_selected(self, selected: bool):
+        """Sol paneldeki consensus_spacer'ı seçim durumuna göre güncelle."""
+        try:
+            p = self.parent()
+            while p is not None:
+                if hasattr(p, 'consensus_spacer'):
+                    p.consensus_spacer.set_selected(selected)
+                    break
+                p = p.parent()
+        except Exception:
+            pass
+
     def _notify_coordinator_refresh(self):
         """Coordinator'ın _apply_union_selection'ını tetikle (cross-widget merge)."""
         try:
@@ -355,6 +368,7 @@ class ConsensusRowWidget(QWidget):
             else:
                 self._selected_ann_ids.add(ann.id)
             self._is_selected = bool(self._selected_ann_ids)
+            self._notify_spacer_selected(self._is_selected)
             # Seçili annotation nesnelerini bul ve _selection_ranges'i güncelle
             ann_map = {a.id: a for a in (
                 self._alignment_model.consensus_annotations
@@ -374,6 +388,7 @@ class ConsensusRowWidget(QWidget):
         self._selected_ann_ids = {ann.id}
         self._selection_ranges = [(ann.start, ann.end + 1)]
         self._is_selected = True
+        self._notify_spacer_selected(True)
         # Controller ÖNCE güncelle — observers paint sırasında okur
         if c is not None:
             c._v_guide_cols = [ann.start, ann.end + 1]
@@ -398,6 +413,14 @@ class ConsensusRowWidget(QWidget):
                 event.accept(); return
             self._press_on_annotation = False
             self._selected_ann_ids.clear()
+            self._notify_workspace_ann_cleared()
+            # Annotation seçiminin bıraktığı dim + v_guide'ları temizle
+            self._sequence_viewer.clear_selection_dim_range()
+            c = self._get_controller()
+            if c is not None:
+                c._v_guide_cols = []
+            self._sequence_viewer.set_v_guides([])
+            self.update()
             self.setFocus()
             self._sequence_viewer.clear_visual_selection()
             try: self._sequence_viewer._model.clear_selection()
@@ -531,7 +554,7 @@ class ConsensusRowWidget(QWidget):
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)
         if event.key() == Qt.Key_Delete and self._selected_ann_ids:
-            self._delete_selected_annotation(); event.accept()
+            self.delete_selected_annotations(); event.accept()
         elif ctrl and shift and event.key() == Qt.Key_C:
             self._copy_fasta(); event.accept()
         elif ctrl and not shift and event.key() == Qt.Key_C:
@@ -539,7 +562,7 @@ class ConsensusRowWidget(QWidget):
         else:
             super().keyPressEvent(event)
 
-    def _delete_selected_annotation(self):
+    def delete_selected_annotations(self):
         ann_ids = set(self._selected_ann_ids)
         self._selected_ann_ids.clear()
         self._selection = None
@@ -590,12 +613,12 @@ class ConsensusRowWidget(QWidget):
         is_selected = self._is_selected
         bg_color = QColor(t.row_band_highlight) if is_selected else t.row_bg_odd
         painter.fillRect(rect, QBrush(bg_color))
-        # Sol kenar çizgisi (seçili iken)
-        if is_selected:
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(t.drop_indicator))
-            painter.drawRect(0, 0, 2, height)
         painter.setPen(QPen(t.border_normal)); painter.drawLine(0, height-1, width, height-1)
+        # Yatay kılavuz çizgileri: dizi seçiliyken ve annotation seçimi yokken
+        if is_selected and not self._selected_ann_ids:
+            h_pen = QPen(t.guide_line_color, 1, Qt.SolidLine)
+            painter.setPen(h_pen)
+            painter.drawLine(0, height - 1, width, height - 1)
         sequences = [seq for _, seq in self._alignment_model.all_rows()]
         _char_h = float(int(round(self._sequence_viewer.char_height)))
         if not sequences:
