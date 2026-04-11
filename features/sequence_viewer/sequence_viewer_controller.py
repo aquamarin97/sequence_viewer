@@ -55,6 +55,7 @@ class SequenceViewerController:
         self._press_pos = None
         self._v_guide_cols.clear()
         self._view.set_v_guides(self._v_guide_cols)
+        self._view.clear_caret()
         self._view.clear_selection_dim_range()
         self._wheel_zoom_streak_dir = None; self._wheel_zoom_streak_len = 0
         self._notify_selection_changed()
@@ -73,7 +74,6 @@ class SequenceViewerController:
 
         scene_pos = self._view.mapToScene(event.pos())
         row, col = self._view.scene_pos_to_row_col(scene_pos)
-        ctrl = bool(event.modifiers() & Qt.ControlModifier)
 
         # Basış pozisyonunu sakla — drag threshold için
         self._press_pos = QPoint(event.pos())
@@ -90,16 +90,19 @@ class SequenceViewerController:
 
         if not self._drag_started and delta >= mouse_binding_manager.drag_threshold("sequence_viewer"):
             # Drag başlıyor — guide'ları hemen temizle (aksiyon DRAG_SELECT ise)
+            drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers(), Qt.LeftButton)
+            if drag_action == MouseAction.NONE:
+                return False
             self._drag_started = True
             self._is_selecting = True
             row = self._press_scene_row; col = self._press_scene_col
             row_count = self._model.get_row_count()
             if 0 <= row < row_count and col >= 0:
                 self._model.start_selection(row, col)
-            drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers())
             if drag_action == MouseAction.DRAG_SELECT:
                 self._v_guide_cols.clear()
                 self._view.set_v_guides(self._v_guide_cols)
+            self._view.clear_caret()
             # SizeWE cursor
             self._view.viewport().setCursor(Qt.SizeHorCursor)
 
@@ -153,7 +156,7 @@ class SequenceViewerController:
             if sel is not None:
                 col_start, col_end = sel
                 if col_end > col_start:
-                    drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers())
+                    drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers(), Qt.LeftButton)
                     if drag_action == MouseAction.DRAG_SELECT:
                         self._v_guide_cols.clear()
                     left_boundary = col_start
@@ -176,19 +179,25 @@ class SequenceViewerController:
         if self._press_pos is not None and self._view.sequence_items:
             scene_pos = self._view.mapToScene(event.pos())
             boundary_col = self._boundary_col_at(float(scene_pos.x()))
-            click_action = mouse_binding_manager.resolve_sequence_click(event.modifiers())
+            click_action = mouse_binding_manager.resolve_sequence_click(event.modifiers(), Qt.LeftButton)
+            if click_action == MouseAction.NONE:
+                self._press_pos = None
+                self._drag_started = False
+                return False
             row_start = self._press_scene_row
             row_end = row_start
 
             if click_action == MouseAction.GUIDE_TOGGLE:
                 # Toggle — aynı col varsa kaldır, yoksa ekle
+                self._view.clear_caret()
                 if boundary_col in self._v_guide_cols:
                     self._v_guide_cols.remove(boundary_col)
                 else:
                     self._v_guide_cols.append(boundary_col)
             else:
-                # Tek guide koy
+                # Tek guide koy + tıklanan satıra I-beam caret
                 self._v_guide_cols = [boundary_col]
+                self._view.set_caret(boundary_col, row_start)
 
             # Boundary tıklamada dim efektini temizle (yeni seçim yok)
             self._view.clear_selection_dim_range()

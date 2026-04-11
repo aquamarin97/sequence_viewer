@@ -35,6 +35,9 @@ class AppTheme:
     # header/sequence satır seçiminde bant vurgusu
     row_band_highlight:   QColor = None
 
+    i_beam: QColor = None
+
+
     # ── Kılavuz çizgileri (Guide Lines) ──────────────────────────────────────
     # Dikey ve yatay kılavuz çizgilerinin rengi (yarı saydam mavi).
     # Hem SequenceViewerView hem ConsensusRowWidget tarafından kullanılır.
@@ -78,6 +81,9 @@ class AppTheme:
         if self.nav_ruler_drag_border is None:
             object.__setattr__(self, 'nav_ruler_drag_border',
                 QColor(80, 80, 200) if self.name == "dark" else QColor(0, 0, 160))
+        if self.i_beam is None:
+            object.__setattr__(self, 'i_beam',
+                QColor(100, 160, 255, 160) if self.name == "dark" else QColor(0, 0, 160))
 
 
 THEME_COLOR_FIELDS = tuple(field.name for field in fields(AppTheme) if field.name != "name")

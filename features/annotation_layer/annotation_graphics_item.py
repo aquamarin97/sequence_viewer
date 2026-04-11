@@ -10,6 +10,7 @@ from features.annotation_layer.annotation_painter import (
     draw_selection_outline, draw_hover_overlay,
 )
 from model.annotation import Annotation, AnnotationType
+from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
 from settings.theme import theme_manager
 
 ClickCallback = Callable[[Annotation, int], None]
@@ -71,7 +72,8 @@ class AnnotationGraphicsItem(QGraphicsItem):
                                    strand=strand, char_width=char_width)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        action = mouse_binding_manager.resolve_annotation_click(event.modifiers(), event.button())
+        if action in (MouseAction.ANNOTATION_SELECT, MouseAction.ANNOTATION_MULTI_SELECT):
             if self._on_click:
                 self._on_click(self.annotation, self.row_index)
             event.accept()
@@ -79,7 +81,7 @@ class AnnotationGraphicsItem(QGraphicsItem):
             super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if mouse_binding_manager.is_annotation_edit_event(event.modifiers(), event.button()):
             if self._on_double_click:
                 self._on_double_click(self.annotation, self.row_index)
             event.accept()

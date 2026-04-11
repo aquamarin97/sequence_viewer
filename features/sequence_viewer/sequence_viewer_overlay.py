@@ -32,6 +32,7 @@ class OverlayMixin:
         self._v_guide_observers: list = []
         self._h_guide_rows: frozenset = frozenset()
         self._selection_dim_ranges: list = []  # [(left_col, right_col), ...] focus alanları
+        self._caret = None  # (col, row) veya None — tek tıklama pozisyonu
 
     # ------------------------------------------------------------------
     # Vertical guide public API
@@ -51,6 +52,20 @@ class OverlayMixin:
 
     def add_v_guide_observer(self, callback):
         self._v_guide_observers.append(callback)
+
+    # ------------------------------------------------------------------
+    # Caret (metin kursörü) public API
+    # ------------------------------------------------------------------
+
+    def set_caret(self, col: int, row: int):
+        """Belirtilen kolon/satır kesişimine I-beam caret koy."""
+        self._caret = (col, row)
+        self.viewport().update()
+
+    def clear_caret(self):
+        if self._caret is not None:
+            self._caret = None
+            self.viewport().update()
 
     # Backwards-compat single-guide API
     def set_guide_cols(self, start_col, end_col):
@@ -137,6 +152,7 @@ class OverlayMixin:
         self._draw_row_band_border_lines(painter, t)
         self._draw_selection_dim_overlay(painter, t)
         self._draw_vertical_guides(painter, t)
+        self._draw_caret(painter, t)
 
     # ------------------------------------------------------------------
     # drawForeground sub-renderers
@@ -224,6 +240,43 @@ class OverlayMixin:
             vp_x = col * cw - offset
             if -10 <= vp_x <= vp_w + 10:
                 painter.drawLine(QPointF(vp_x, draw_top), QPointF(vp_x, draw_bottom))
+        painter.restore()
+
+    def _draw_caret(self, painter, t):
+        """Tıklanan satırda düz I-beam (metin kursörü) çizer."""
+        if self._caret is None:
+            return
+        col, row = self._caret
+        cw = self._effective_char_width()
+        if cw <= 0:
+            return
+        layout = self._row_layout
+        if layout is None or row < 0 or row >= layout.row_count:
+            return
+
+        offset_h = self._viewport_horizontal_offset()
+        offset_v = self._viewport_vertical_offset()
+        vp_w = float(self.viewport().width())
+        vp_h = float(self.viewport().height())
+
+        x = col * cw - offset_h
+        if not (-10 <= x <= vp_w + 10):
+            return
+
+        y_top = float(layout.seq_y_offsets[row]) - offset_v
+        y_bottom = float(layout.below_y_offsets[row]) - offset_v
+        if y_bottom < 0 or y_top > vp_h:
+            return
+
+        caret_color = QColor(theme_manager.current.i_beam)
+        caret_color.setAlpha(255)
+
+        painter.save()
+        painter.resetTransform()
+        pen = QPen(caret_color, 3, Qt.SolidLine)
+        pen.setCapStyle(Qt.FlatCap)
+        painter.setPen(pen)
+        painter.drawLine(QPointF(x, y_top), QPointF(x, y_bottom))
         painter.restore()
 
     # ------------------------------------------------------------------

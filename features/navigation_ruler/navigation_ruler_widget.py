@@ -5,6 +5,7 @@ from PyQt5.QtGui import QPainter, QPen, QBrush, QFont, QPixmap
 from PyQt5.QtWidgets import QWidget, QScrollBar
 from features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 from features.navigation_ruler.navigation_ruler_model import NavigationRulerModel
+from settings.mouse_binding_manager import mouse_binding_manager
 from settings.theme import theme_manager
 
 class RulerWidget(QWidget):
@@ -15,7 +16,7 @@ class RulerWidget(QWidget):
         hbar = self.viewer.horizontalScrollBar()
         hbar.valueChanged.connect(self._on_view_changed); hbar.rangeChanged.connect(self._on_view_changed)
         self._dragging_window = False; self._drag_start_x = 0
-        self._drag_start_nt = 0.0; self._drag_last_nt = 0.0; self._drag_threshold_px = 3
+        self._drag_start_nt = 0.0; self._drag_last_nt = 0.0
         self._ruler_pixmap = None; self._pixmap_max_len = 0; self._pixmap_theme = ""
         theme_manager.themeChanged.connect(self._on_theme_changed)
 
@@ -84,17 +85,19 @@ class RulerWidget(QWidget):
         painter.end()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if mouse_binding_manager.is_navigation_zoom_to_range_event(event.modifiers(), event.button()):
             x = event.pos().x(); self._dragging_window = False
             self._drag_start_x = x; self._drag_start_nt = self._x_to_nt(x); self._drag_last_nt = self._drag_start_nt
             event.accept()
         else: super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.LeftButton:
+        if (event.buttons() & Qt.LeftButton and
+                mouse_binding_manager.is_navigation_zoom_to_range_event(event.modifiers(), Qt.LeftButton)):
             x = event.pos().x(); current_nt = self._x_to_nt(x)
             if not self._dragging_window:
-                if abs(x - self._drag_start_x) >= self._drag_threshold_px: self._dragging_window = True
+                if abs(x - self._drag_start_x) >= mouse_binding_manager.drag_threshold("navigation_ruler"):
+                    self._dragging_window = True
             if self._dragging_window: self._drag_last_nt = current_nt; self.update()
             event.accept()
         else: super().mouseMoveEvent(event)
@@ -102,14 +105,18 @@ class RulerWidget(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
             x = event.pos().x()
-            if self._dragging_window:
+            if self._dragging_window and mouse_binding_manager.is_navigation_zoom_to_range_event(event.modifiers(), event.button()):
                 self._drag_last_nt = self._x_to_nt(x)
                 self.viewer.zoom_to_nt_range(self._drag_start_nt, self._drag_last_nt)
-            else:
+            elif mouse_binding_manager.is_navigation_scroll_to_event(event.modifiers(), event.button()):
                 target_nt = self._x_to_nt(x); hbar = self.viewer.horizontalScrollBar()
                 vp_width = float(self.viewer.viewport().width())
                 center_x = target_nt * self.viewer.char_width
                 new_left = max(float(hbar.minimum()), min(center_x - vp_width/2.0, float(hbar.maximum())))
                 hbar.setValue(int(new_left))
+            else:
+                self._dragging_window = False
+                super().mouseReleaseEvent(event)
+                return
             self._dragging_window = False; self.update(); event.accept()
         else: super().mouseReleaseEvent(event)

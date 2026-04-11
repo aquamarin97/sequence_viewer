@@ -7,12 +7,12 @@ from PyQt5.QtGui import QPainter, QFontMetrics, QPen, QBrush, QColor
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QLineEdit
 from graphics.header_item.header_item import HeaderRowItem
 from model.row_selection_model import RowSelectionModel
+from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
 from settings.theme import theme_manager
 
 if TYPE_CHECKING:
     from widgets.row_layout import RowLayout
 
-_DRAG_THRESHOLD_PX = 6
 _DROP_LINE_WIDTH = 2
 
 class HeaderViewerView(QGraphicsView):
@@ -227,11 +227,13 @@ class HeaderViewerView(QGraphicsView):
     def _handle_selection(self, row, modifiers):
         n = len(self.header_items)
         if n == 0: return
-        ctrl = bool(modifiers & Qt.ControlModifier); shift = bool(modifiers & Qt.ShiftModifier)
-        if ctrl and shift: changed = self._selection.handle_shift_click(row, n)
-        elif ctrl: changed = self._selection.handle_ctrl_click(row, n)
-        elif shift: changed = self._selection.handle_shift_click(row, n)
-        else: changed = self._selection.handle_click(row, n)
+        action = mouse_binding_manager.resolve_header_click(modifiers)
+        if action == MouseAction.ROW_MULTI_SELECT:
+            changed = self._selection.handle_ctrl_click(row, n)
+        elif action == MouseAction.ROW_RANGE_SELECT:
+            changed = self._selection.handle_shift_click(row, n)
+        else:
+            changed = self._selection.handle_click(row, n)
         self.apply_selection_to_items(changed)
         self._on_selection_changed(self._selection.selected_rows())
 
@@ -241,7 +243,8 @@ class HeaderViewerView(QGraphicsView):
     def _on_rows_delete_requested(self, rows): pass
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        click_action = mouse_binding_manager.resolve_header_click(event.modifiers(), event.button())
+        if click_action != MouseAction.NONE:
             row = self._row_at_viewport_y(event.pos().y())
             if self._editing_row is not None and self._editing_row != row:
                 self._commit_edit(self._editing_row)
@@ -256,9 +259,10 @@ class HeaderViewerView(QGraphicsView):
         else: super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if (event.buttons() & Qt.LeftButton and self._press_pos is not None and self._drag_source_row is not None):
+        if (event.buttons() & Qt.LeftButton and self._press_pos is not None and self._drag_source_row is not None and
+                mouse_binding_manager.is_header_reorder_event(event.modifiers(), Qt.LeftButton)):
             delta = (event.pos() - self._press_pos).manhattanLength()
-            if not self._dragging and delta >= _DRAG_THRESHOLD_PX:
+            if not self._dragging and delta >= mouse_binding_manager.drag_threshold("header_viewer"):
                 self._dragging = True; self.header_items[self._drag_source_row].set_dragging(True)
                 self.viewport().setCursor(Qt.SizeVerCursor)
             if self._dragging: self._update_drag(event.pos())

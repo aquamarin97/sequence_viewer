@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import FrozenSet, Optional, TYPE_CHECKING
 from model.annotation import Annotation
+from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
 if TYPE_CHECKING:
     from widgets.workspace import SequenceWorkspaceWidget
 
@@ -9,6 +10,7 @@ class WorkspaceActionDialogCoordinator:
     def __init__(self, workspace):
         self.workspace = workspace
         self._selected_annotations: list = []  # [(annotation, row_index_or_None), ...]
+        self._last_clicked_row: int = 0  # Shift+click anchor
 
     def _update_selection_visuals(self, ann_id, is_layer, ctrl=False):
         """Per-row ve layer annotation seçim görsellerini senkronize eder."""
@@ -106,9 +108,9 @@ class WorkspaceActionDialogCoordinator:
 
     def on_annotation_layer_clicked(self, annotation):
         from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import Qt as _Qt
-        ctrl = bool(QApplication.keyboardModifiers() & _Qt.ControlModifier)
-        if ctrl:
+        action = mouse_binding_manager.resolve_annotation_click(QApplication.keyboardModifiers())
+        is_multi = action == MouseAction.ANNOTATION_MULTI_SELECT
+        if is_multi:
             existing = next((i for i, (a, _) in enumerate(self._selected_annotations)
                              if a.id == annotation.id), -1)
             if existing >= 0:
@@ -140,9 +142,10 @@ class WorkspaceActionDialogCoordinator:
 
     def on_ann_item_clicked(self, annotation, row_index):
         from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import Qt as _Qt
-        ctrl = bool(QApplication.keyboardModifiers() & _Qt.ControlModifier)
-        if ctrl:
+        action = mouse_binding_manager.resolve_annotation_click(QApplication.keyboardModifiers())
+        is_multi = action == MouseAction.ANNOTATION_MULTI_SELECT
+        if is_multi:
+            self.workspace.sequence_viewer.clear_caret()
             existing = next((i for i, (a, _) in enumerate(self._selected_annotations)
                              if a.id == annotation.id), -1)
             if existing >= 0:
@@ -154,6 +157,7 @@ class WorkspaceActionDialogCoordinator:
             return
         # Non-ctrl tekil seçim: consensus row'u temizle
         self.workspace.consensus_row.clear_selection()
+        self.workspace.sequence_viewer.clear_caret()
         self._selected_annotations = [(annotation, row_index)]
         self._update_selection_visuals(annotation.id, is_layer=False)
         self.workspace.setFocus()
@@ -244,13 +248,13 @@ class WorkspaceActionDialogCoordinator:
 
     def on_selection_changed(self, selected_rows):
         from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import Qt as _Qt
-        ctrl = bool(QApplication.keyboardModifiers() & _Qt.ControlModifier)
+        header_action = mouse_binding_manager.resolve_header_click(QApplication.keyboardModifiers())
+        is_multi = header_action == MouseAction.ROW_MULTI_SELECT
         if self._selected_annotations:
             self._clear_all_annotation_visuals()
             self._selected_annotations.clear()
         # Consensus row: ctrl+click'te koru, non-ctrl'da temizle
-        if not ctrl:
+        if not is_multi:
             self.workspace.consensus_spacer.set_selected(False)
             self.workspace.consensus_row.clear_selection()
         self.workspace.sequence_viewer.clear_v_guides()
@@ -275,31 +279,66 @@ class WorkspaceActionDialogCoordinator:
 
     def on_seq_row_clicked(self, row_start, row_end):
         """Sequence view'da satır(lar)a tıklanınca: header highlight + h-guide, full selection yok."""
+        from PyQt5.QtWidgets import QApplication
         ws = self.workspace
-        if self._selected_annotations:
-            self._clear_all_annotation_visuals()
-            self._selected_annotations.clear()
         n = ws.model.row_count()
-        rows = frozenset(range(row_start, row_end + 1)) if 0 <= row_start < n else frozenset()
+        if n == 0: return
+        click_action = mouse_binding_manager.resolve_header_click(QApplication.keyboardModifiers())
+        is_multi = click_action == MouseAction.ROW_MULTI_SELECT
+        is_range = click_action == MouseAction.ROW_RANGE_SELECT
 
-        # Header seçimini temizle + seçili satırları görsel olarak işaretle
-        # (on_selection_changed tetiklenmez → full sequence selection yapılmaz)
-        clear_changed = ws.header_viewer._selection.clear()
-        click_changed: frozenset = frozenset()
-        if rows:
+        # Drag (row_start != row_end) → her zaman temizle ve yeni aralığı seç
+        is_drag = (row_start != row_end)
+
+        if is_drag or click_action in (MouseAction.ROW_SELECT, MouseAction.NONE):
+            # Normal tıklama veya drag: annotation + consensus temizle, yeni seçim
+            if self._selected_annotations:
+                self._clear_all_annotation_visuals()
+                self._selected_annotations.clear()
+            ws.consensus_spacer.set_selected(False)
+            ws.consensus_row.clear_selection()
+            rows = frozenset(range(row_start, row_end + 1)) if 0 <= row_start < n else frozenset()
+            clear_changed = ws.header_viewer._selection.clear()
+            click_changed: frozenset = frozenset()
+            if rows:
+                for r in rows:
+                    click_changed = click_changed | ws.header_viewer._selection.handle_ctrl_click(r, n)
+            ws.header_viewer.apply_selection_to_items(clear_changed | click_changed)
+            self._last_clicked_row = row_start
+            if rows:
+                ws.sequence_viewer.set_h_guides(rows)
+            else:
+                ws.sequence_viewer.clear_h_guides()
+
+        elif is_multi:
+            # Ctrl+click: toggle bu satırı, mevcut seçimi koru
+            row = row_start
+            if not (0 <= row < n): return
+            changed = ws.header_viewer._selection.handle_ctrl_click(row, n)
+            ws.header_viewer.apply_selection_to_items(changed)
+            selected = ws.header_viewer._selection.selected_rows()
+            self._last_clicked_row = row
+            if selected:
+                ws.sequence_viewer.set_h_guides(frozenset(selected))
+            else:
+                ws.sequence_viewer.clear_h_guides()
+
+        elif is_range:
+            # Shift+click: _last_clicked_row ile row_start arasındaki tüm satırlar
+            anchor = getattr(self, '_last_clicked_row', row_start)
+            lo, hi = min(anchor, row_start), max(anchor, row_start)
+            rows = frozenset(range(lo, hi + 1)) if 0 <= lo < n else frozenset()
+            # Mevcut seçimi koru, range'i ekle
+            click_changed = frozenset()
             for r in rows:
-                click_changed = click_changed | ws.header_viewer._selection.handle_ctrl_click(r, n)
-        ws.header_viewer.apply_selection_to_items(clear_changed | click_changed)
-
-        # Consensus state temizle
-        ws.consensus_spacer.set_selected(False)
-        ws.consensus_row.clear_selection()
-
-        # H-guide: seçili satırların tamamı
-        if rows:
-            ws.sequence_viewer.set_h_guides(rows)
-        else:
-            ws.sequence_viewer.clear_h_guides()
+                if not ws.header_viewer._selection.is_selected(r):
+                    click_changed = click_changed | ws.header_viewer._selection.handle_ctrl_click(r, n)
+            ws.header_viewer.apply_selection_to_items(click_changed)
+            selected = ws.header_viewer._selection.selected_rows()
+            if selected:
+                ws.sequence_viewer.set_h_guides(frozenset(selected))
+            else:
+                ws.sequence_viewer.clear_h_guides()
 
     def on_row_appended(self, index, header, sequence):
         self.workspace.header_viewer.add_header_item(f"{index + 1}. {header}")

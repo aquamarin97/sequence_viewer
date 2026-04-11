@@ -311,7 +311,7 @@ class ConsensusRowWidget(QWidget):
         super().leaveEvent(event)
 
     def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if mouse_binding_manager.is_annotation_edit_event(event.modifiers(), event.button()):
             ann = self._annotation_at(event.pos())
             if ann:
                 self._notify_edit_annotation(ann)
@@ -408,8 +408,12 @@ class ConsensusRowWidget(QWidget):
             ann = self._annotation_at(event.pos())
             if ann:
                 self._press_on_annotation = True
-                ctrl = bool(event.modifiers() & Qt.ControlModifier)
-                self._select_annotation_range(ann, ctrl=ctrl)
+                self._sequence_viewer.clear_caret()
+                action = mouse_binding_manager.resolve_annotation_click(event.modifiers(), event.button())
+                if action == MouseAction.NONE:
+                    super().mousePressEvent(event)
+                    return
+                self._select_annotation_range(ann, ctrl=(action == MouseAction.ANNOTATION_MULTI_SELECT))
                 event.accept(); return
             self._press_on_annotation = False
             self._selected_ann_ids.clear()
@@ -462,12 +466,16 @@ class ConsensusRowWidget(QWidget):
         delta = (event.pos() - self._press_pos).manhattanLength()
 
         if not self._drag_started and delta >= mouse_binding_manager.drag_threshold("consensus_row"):
+            drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers(), Qt.LeftButton)
+            if drag_action == MouseAction.NONE:
+                super().mouseMoveEvent(event)
+                return
             self._drag_started = True
-            drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers())
             c = self._get_controller()
             if drag_action == MouseAction.DRAG_SELECT and c is not None:
                 c._v_guide_cols.clear()
                 self._sequence_viewer.set_v_guides(c._v_guide_cols)
+            self._sequence_viewer.clear_caret()
             self.setCursor(Qt.SizeHorCursor)
             # Drag başladığı anda başlangıç kolonu için guide'ı hemen göster
             if c is not None and self._press_scene_col is not None:
@@ -515,7 +523,7 @@ class ConsensusRowWidget(QWidget):
                 if c is not None and self._selection is not None:
                     lo, hi = self._selection
                     if hi > lo:
-                        drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers())
+                        drag_action = mouse_binding_manager.resolve_sequence_drag(event.modifiers(), Qt.LeftButton)
                         if drag_action == MouseAction.DRAG_SELECT:
                             c._v_guide_cols.clear()
                         for b in (lo, hi + 1):
@@ -536,7 +544,11 @@ class ConsensusRowWidget(QWidget):
                 boundary_col = self._boundary_col_at_x(float(event.pos().x()))
                 c = self._get_controller()
                 if c is not None:
-                    click_action = mouse_binding_manager.resolve_sequence_click(event.modifiers())
+                    click_action = mouse_binding_manager.resolve_sequence_click(event.modifiers(), Qt.LeftButton)
+                    if click_action == MouseAction.NONE:
+                        self.update()
+                        event.accept()
+                        return
                     if click_action == MouseAction.GUIDE_TOGGLE:
                         if boundary_col in c._v_guide_cols:
                             c._v_guide_cols.remove(boundary_col)
@@ -544,6 +556,7 @@ class ConsensusRowWidget(QWidget):
                             c._v_guide_cols.append(boundary_col)
                     else:
                         c._v_guide_cols = [boundary_col]
+                        self._sequence_viewer.set_caret(boundary_col, -1)
                     self._sequence_viewer.set_v_guides(c._v_guide_cols)
 
             self.update()
@@ -759,5 +772,20 @@ class ConsensusRowWidget(QWidget):
                 vp_x = gcol * cw - offset
                 if -10 <= vp_x <= vp_w + 10:
                     painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, float(height)))
+
+        # ---- I-beam caret (yalnızca consensus row tıklamasında, row == -1) ----
+        caret = getattr(self._sequence_viewer, '_caret', None)
+        if caret is not None and caret[1] == -1:
+            hbar = self._sequence_viewer.horizontalScrollBar()
+            offset = float(hbar.value())
+            vp_w = float(self.width())
+            vp_x = caret[0] * cw - offset
+            if -10 <= vp_x <= vp_w + 10:
+                caret_color = QColor(theme_manager.current.i_beam)
+                caret_color.setAlpha(255)
+                pen = QPen(caret_color, 3, Qt.SolidLine)
+                pen.setCapStyle(Qt.FlatCap)
+                painter.setPen(pen)
+                painter.drawLine(QPointF(vp_x, seq_top), QPointF(vp_x, seq_top + seq_char_h))
 
         painter.end()

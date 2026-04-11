@@ -8,6 +8,7 @@ from features.annotation_layer.annotation_layout_engine import assign_lanes, lan
 from features.annotation_layer.annotation_painter import draw_primer, draw_probe, draw_repeated_region, draw_selection_outline
 from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation, AnnotationType
+from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
 from settings.theme import theme_manager
 
 _LANE_PADDING = 6; _MIN_HEIGHT = 24
@@ -150,14 +151,17 @@ class AnnotationLayerWidget(QWidget):
         return None
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        action = mouse_binding_manager.resolve_annotation_click(event.modifiers(), event.button())
+        if action in (MouseAction.ANNOTATION_SELECT, MouseAction.ANNOTATION_MULTI_SELECT):
             ann = self._annotation_at(event.pos())
-            if ann: self.annotationClicked.emit(ann)
+            if ann:
+                self._sequence_viewer.clear_caret()
+                self.annotationClicked.emit(ann)
             event.accept()
         else: super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if mouse_binding_manager.is_annotation_edit_event(event.modifiers(), event.button()):
             ann = self._annotation_at(event.pos())
             if ann: self.annotationDoubleClicked.emit(ann)
             event.accept()

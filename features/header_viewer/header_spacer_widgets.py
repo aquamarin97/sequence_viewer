@@ -9,6 +9,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt, pyqtSignal, QRectF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QFont, QColor
 from PyQt5.QtWidgets import QWidget, QLineEdit
+from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
 from settings.theme import theme_manager
 
 class HeaderTopWidget(QWidget):
@@ -116,9 +117,10 @@ class ConsensusSpacerWidget(QWidget):
         painter.end()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        action = mouse_binding_manager.resolve_consensus_spacer_click(event.modifiers(), event.button())
+        if action in (MouseAction.CONSENSUS_SELECT_ALL, MouseAction.CONSENSUS_SELECT_ADDITIVE):
             self.setFocus()
-            ctrl = bool(event.modifiers() & Qt.ControlModifier)
+            ctrl = action == MouseAction.CONSENSUS_SELECT_ADDITIVE
             self.clicked.emit(ctrl)
             event.accept()
         else: super().mousePressEvent(event)
@@ -154,7 +156,7 @@ class ConsensusSpacerWidget(QWidget):
         row._copy_fasta()
 
     def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if mouse_binding_manager.is_consensus_spacer_edit_event(event.modifiers(), event.button()):
             self._start_edit()
             event.accept()
         else: super().mouseDoubleClickEvent(event)
