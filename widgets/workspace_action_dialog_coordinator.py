@@ -330,12 +330,19 @@ class WorkspaceActionDialogCoordinator:
         to_delete = list(self._selected_annotations)
         self._selected_annotations.clear()
         self._clear_all_annotation_visuals()
+        ws = self.workspace
+        ws.sequence_viewer.clear_visual_selection()
+        try: ws.sequence_viewer._model.clear_selection()
+        except: pass
+        ws.sequence_viewer.clear_h_guides()
+        ws.sequence_viewer.clear_v_guides()
+        ws.sequence_viewer.clear_selection_dim_range()
         for ann, row_index in to_delete:
             try:
                 if row_index is None:
-                    self.workspace.model.remove_global_annotation(ann.id)
+                    ws.model.remove_global_annotation(ann.id)
                 else:
-                    self.workspace.model.remove_annotation(row_index, ann.id)
+                    ws.model.remove_annotation(row_index, ann.id)
             except (KeyError, IndexError):
                 pass
 

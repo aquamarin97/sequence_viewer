@@ -565,8 +565,14 @@ class ConsensusRowWidget(QWidget):
     def delete_selected_annotations(self):
         ann_ids = set(self._selected_ann_ids)
         self._selected_ann_ids.clear()
-        self._selection = None
+        self._selection_ranges = []
         self._is_selected = False
+        self._notify_spacer_selected(False)
+        self._sequence_viewer.clear_selection_dim_range()
+        c = self._get_controller()
+        if c is not None:
+            c._v_guide_cols = []
+        self._sequence_viewer.set_v_guides([])
         self.update()
         for ann_id in ann_ids:
             try:
