@@ -15,6 +15,7 @@ _ANN_TYPES = [
     (AnnotationType.PRIMER,          "Primer"),
     (AnnotationType.PROBE,           "Probe"),
     (AnnotationType.REPEATED_REGION, "Repeated Region"),
+    (AnnotationType.MISMATCH_MARKER, "Mismatch Marker"),
 ]
 
 

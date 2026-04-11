@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem, QToolTip
 from features.annotation_layer.annotation_painter import (
-    draw_primer, draw_probe, draw_repeated_region,
+    draw_primer, draw_probe, draw_repeated_region, draw_mismatch_marker,
     draw_selection_outline, draw_hover_overlay,
 )
 from model.annotation import Annotation, AnnotationType
@@ -62,6 +62,15 @@ class AnnotationGraphicsItem(QGraphicsItem):
         elif ann.type == AnnotationType.PROBE:
             draw_probe(painter, 0, 0, self._w, self._h, color, ann.label,
                        strand=strand, char_width=char_width)
+        elif ann.type == AnnotationType.MISMATCH_MARKER:
+            from settings.display_settings_manager import display_settings_manager as _dsm
+            draw_mismatch_marker(
+                painter, 0, 0, self._w, self._h, color,
+                ann.expected_base or ann.mismatch_base or ann.label,
+                char_width=self._w,
+                font_family=_dsm.sequence_font_family,
+                font_size=_dsm.sequence_font_size_base,
+            )
         else:
             draw_repeated_region(painter, 0, 0, self._w, self._h, color, ann.label)
         if self._hovered and not self._selected:
@@ -81,6 +90,9 @@ class AnnotationGraphicsItem(QGraphicsItem):
             super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
+        if self.annotation.type == AnnotationType.MISMATCH_MARKER:
+            event.accept()
+            return
         if mouse_binding_manager.is_annotation_edit_event(event.modifiers(), event.button()):
             if self._on_double_click:
                 self._on_double_click(self.annotation, self.row_index)

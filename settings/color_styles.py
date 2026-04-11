@@ -27,6 +27,7 @@ _DEFAULT_ANNOTATION_COLORS = {
     AnnotationType.PRIMER: QColor(52,152,219),
     AnnotationType.PROBE: QColor(39,174,96),
     AnnotationType.REPEATED_REGION: QColor(243,156,18),
+    AnnotationType.MISMATCH_MARKER: QColor(255,220,0),
 }
 
 # Renk körü (colorblind) modları için alternatif paletler

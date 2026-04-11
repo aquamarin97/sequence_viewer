@@ -12,8 +12,9 @@ from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont
 from PyQt5.QtWidgets import QApplication, QWidget, QScrollBar
 from features.annotation_layer.annotation_painter import (
     draw_primer, draw_probe, draw_repeated_region,
-    draw_hover_overlay, draw_selection_outline,
+    draw_hover_overlay, draw_selection_outline, draw_mismatch_marker,
 )
+from features.annotation_layer.annotation_layout_engine import build_side_geometry, partition_annotations_by_side, side_strip_height
 from features.consensus_row.consensus_row_model import ConsensusRowModel
 from model.annotation import AnnotationType
 from graphics.sequence_item.sequence_glyph_cache import GLYPH_CACHE
@@ -105,14 +106,11 @@ class ConsensusRowWidget(QWidget):
 
     def _compute_heights(self):
         """Üst annotation, dizi ve alt annotation yüksekliklerini hesapla."""
-        from widgets.row_layout import strip_height
-        from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
         ch = int(round(self._sequence_viewer.char_height))
         annotations = list(self._alignment_model.consensus_annotations) if self._alignment_model.is_aligned else []
-        above_anns = [a for a in annotations if a.type.is_above_sequence()]
-        below_anns = [a for a in annotations if not a.type.is_above_sequence()]
-        above_h = strip_height(lane_count(assign_lanes(above_anns)))
-        below_h = strip_height(lane_count(assign_lanes(below_anns)))
+        above_anns, below_anns = partition_annotations_by_side(annotations)
+        above_h = side_strip_height(above_anns)
+        below_h = side_strip_height(below_anns)
         return above_h, ch, below_h
 
     def _update_visibility(self):
@@ -313,8 +311,10 @@ class ConsensusRowWidget(QWidget):
     def mouseDoubleClickEvent(self, event):
         if mouse_binding_manager.is_annotation_edit_event(event.modifiers(), event.button()):
             ann = self._annotation_at(event.pos())
-            if ann:
+            if ann and ann.type != AnnotationType.MISMATCH_MARKER:
                 self._notify_edit_annotation(ann)
+                event.accept(); return
+            if ann:
                 event.accept(); return
         super().mouseDoubleClickEvent(event)
 
@@ -375,7 +375,10 @@ class ConsensusRowWidget(QWidget):
                 if self._alignment_model.is_aligned else [])}
             selected_anns = [ann_map[aid] for aid in self._selected_ann_ids if aid in ann_map]
             if selected_anns:
-                self._selection_ranges = [(a.start, a.end + 1) for a in selected_anns]
+                self._selection_ranges = [
+                    (a.start, a.start + 1) if a.type == AnnotationType.MISMATCH_MARKER else (a.start, a.end + 1)
+                    for a in selected_anns
+                ]
             else:
                 self._selection_ranges = []
             self.update()
@@ -386,14 +389,14 @@ class ConsensusRowWidget(QWidget):
         # Tekil seçim: coordinator'ı temizle, kendi seçimini yap
         self._notify_workspace_ann_cleared()
         self._selected_ann_ids = {ann.id}
-        self._selection_ranges = [(ann.start, ann.end + 1)]
+        self._selection_ranges = [(ann.start, ann.start + 1) if ann.type == AnnotationType.MISMATCH_MARKER else (ann.start, ann.end + 1)]
         self._is_selected = True
         self._notify_spacer_selected(True)
         # Controller ÖNCE güncelle — observers paint sırasında okur
         if c is not None:
-            c._v_guide_cols = [ann.start, ann.end + 1]
-        self._sequence_viewer.set_v_guides([ann.start, ann.end + 1])
-        self._sequence_viewer.set_selection_dim_range(ann.start, ann.end + 1)
+            c._v_guide_cols = [ann.start] if ann.type == AnnotationType.MISMATCH_MARKER else [ann.start, ann.end + 1]
+        self._sequence_viewer.set_v_guides([ann.start] if ann.type == AnnotationType.MISMATCH_MARKER else [ann.start, ann.end + 1])
+        self._sequence_viewer.set_selection_dim_range(ann.start, ann.start + 1 if ann.type == AnnotationType.MISMATCH_MARKER else ann.end + 1)
         self.update()
 
     def _annotation_at(self, pos):
@@ -653,11 +656,9 @@ class ConsensusRowWidget(QWidget):
         self._sync_font_from_viewer(); painter.setFont(self._font)
         mode = self._effective_mode()
         # Annotation lane yüksekliklerini hesapla
-        from widgets.row_layout import strip_height
-        from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
         _anns = list(self._alignment_model.consensus_annotations) if self._alignment_model.is_aligned else []
-        _above_anns = [a for a in _anns if a.type.is_above_sequence()]
-        _above_h = float(strip_height(lane_count(assign_lanes(_above_anns))))
+        _above_anns, _ = partition_annotations_by_side(_anns)
+        _above_h = float(side_strip_height(_above_anns))
         seq_char_h = float(int(round(self._sequence_viewer.char_height)))
         seq_top = _above_h  # dizi bu y'den başlar
         length = len(consensus)
@@ -708,33 +709,35 @@ class ConsensusRowWidget(QWidget):
         self._hit_rects = []
         annotations = list(self._alignment_model.consensus_annotations) if self._alignment_model.is_aligned else []
         if annotations:
-            from widgets.row_layout import above_lane_y, below_lane_y, strip_height
-            from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
             from settings.annotation_styles import annotation_style_manager as _asm_cr
             _LANE_H = _asm_cr.get_lane_height()
-            above_anns = [a for a in annotations if a.type.is_above_sequence()]
-            below_anns = [a for a in annotations if not a.type.is_above_sequence()]
-            above_assignment = assign_lanes(above_anns)
-            below_assignment = assign_lanes(below_anns)
-            above_h = strip_height(lane_count(above_assignment))
+            above_anns, below_anns = partition_annotations_by_side(annotations)
+            above_geometry = build_side_geometry(above_anns)
+            below_geometry = build_side_geometry(below_anns)
+            above_assignment = above_geometry.lane_assignment
+            below_assignment = below_geometry.lane_assignment
+            above_h = side_strip_height(above_anns)
             # dizi alanı above_h'den başlar
             seq_top = float(above_h)
             painter.setRenderHint(QPainter.Antialiasing, True)
             widget_w = float(width)
+            parent_by_id = {ann.id: ann for ann in annotations}
             for ann in annotations:
                 x = ann.start * cw - view_left
-                w_ann = ann.length() * cw
+                w_ann = cw if ann.type == AnnotationType.MISMATCH_MARKER else ann.length() * cw
                 if x + w_ann < 0 or x > widget_w: continue
                 clipped_x = max(x, 0.0)
                 clipped_w = min(w_ann - (clipped_x - x), widget_w - clipped_x)
                 if clipped_w <= 0: continue
                 ann_char_w = clipped_w / max(ann.length(), 1)
-                if ann.type.is_above_sequence():
+                parent = parent_by_id.get(ann.parent_id)
+                is_above = parent.type.is_above_sequence() if ann.type == AnnotationType.MISMATCH_MARKER and parent is not None else ann.type.is_above_sequence()
+                if is_above:
                     lane = above_assignment.get(ann.id, 0)
-                    ann_y = above_lane_y(lane)
+                    ann_y = above_geometry.marker_y(above_assignment.get(ann.parent_id, 0), above=True, lane_height=_LANE_H) if ann.type == AnnotationType.MISMATCH_MARKER else above_geometry.parent_y(lane, above=True, lane_height=_LANE_H)
                 else:
                     lane = below_assignment.get(ann.id, 0)
-                    ann_y = seq_top + ch + below_lane_y(lane)
+                    ann_y = seq_top + ch + (below_geometry.marker_y(below_assignment.get(ann.parent_id, 0), above=False, lane_height=_LANE_H) if ann.type == AnnotationType.MISMATCH_MARKER else below_geometry.parent_y(lane, above=False, lane_height=_LANE_H))
                 ann_h_draw = _LANE_H
                 ann_color = ann.resolved_color()
                 ann_strand = getattr(ann, 'strand', '+')
@@ -743,6 +746,15 @@ class ConsensusRowWidget(QWidget):
                     draw_primer(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label, strand=ann_strand, char_width=ann_char_w)
                 elif ann.type == AnnotationType.PROBE:
                     draw_probe(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label, strand=ann_strand, char_width=ann_char_w)
+                elif ann.type == AnnotationType.MISMATCH_MARKER:
+                    draw_mismatch_marker(
+                        painter, clipped_x, ann_y, clipped_w, ann_h_draw,
+                        ann_color,
+                        ann.expected_base or ann.mismatch_base or ann.label,
+                        char_width=cw,
+                        font_family=self._font.family(),
+                        font_size=self._font.pointSizeF(),
+                    )
                 else:
                     draw_repeated_region(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label)
                 is_ann_selected = ann.id in self._selected_ann_ids

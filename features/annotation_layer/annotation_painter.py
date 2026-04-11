@@ -261,6 +261,58 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
                     font_family=style.label_font_family)
 
 
+_MM_V_PAD = 3       # marker ile lane üst/alt kenarı arasındaki dikey boşluk (px)
+_MM_TEXT_THRESHOLD = 8.0  # char_width bu değerin altındaysa (box/line mod) metin gizlenir
+
+
+def draw_mismatch_marker(painter, x, y, w, h, color, label,
+                          char_width=12.0, font_family=None, font_size=None):
+    """
+    Mismatch marker alt-annotation'ı çizer.
+
+    Parameters
+    ----------
+    label       : Gösterilecek tek karakter (beklenen NA / expected base).
+    char_width  : Mevcut karakter genişliği (px). 8.0'ın altındaysa metin
+                  gizlenir (box/line mod uyumu).
+    font_family : Metin için font ailesi; None → annotation style varsayılanı.
+    font_size   : Metin için font boyutu (pt); None → annotation style varsayılanı.
+    """
+    if w <= 0 or h <= 0:
+        return
+    style = annotation_style_manager.get(AnnotationType.MISMATCH_MARKER)
+
+    # Dikey padding — box lane kenarlarından görsel boşluk
+    box_y = y + _MM_V_PAD
+    box_h = max(1.0, h - 2 * _MM_V_PAD)
+
+    painter.save()
+    painter.setRenderHint(QPainter.Antialiasing, True)
+
+    path = QPainterPath()
+    path.addRoundedRect(QRectF(x, box_y, w, box_h), _CORNER_RADIUS, _CORNER_RADIUS)
+
+    painter.setBrush(QBrush(QColor(color)))
+    painter.setPen(Qt.NoPen)   # Border yok; seçim durumunda draw_selection_outline kullanılır
+    painter.drawPath(path)
+
+    # Metin: sadece text modunda (char_width yeterince büyükse) göster
+    show_text = char_width >= _MM_TEXT_THRESHOLD
+    if show_text and label:
+        bg = QColor(color)
+        lum = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
+        text_color = _LABEL_TEXT_ON_DARK if lum < 140 else _LABEL_TEXT_ON_LIGHT
+        ff = font_family if font_family else style.label_font_family
+        fs = font_size if font_size else style.label_font_size
+        font = QFont(ff, max(6, int(round(fs))))
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QPen(text_color))
+        painter.drawText(QRectF(x, box_y, w, box_h), Qt.AlignVCenter | Qt.AlignHCenter, label[:1])
+
+    painter.restore()
+
+
 # ── Seçim ve hover outline ─────────────────────────────────────────────────────
 
 def _build_primer_probe_path(x, y, w, h, strand, char_width):

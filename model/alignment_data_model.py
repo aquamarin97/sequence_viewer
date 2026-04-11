@@ -150,11 +150,15 @@ class AlignmentDataModel(QObject):
         self.globalAnnotationAdded.emit(annotation)
 
     def remove_global_annotation(self, annotation_id):
-        for i, ann in enumerate(self._global_annotations):
-            if ann.id == annotation_id:
-                del self._global_annotations[i]
-                self.globalAnnotationRemoved.emit(annotation_id)
-                return
+        remove_ids = {annotation_id}
+        target = next((ann for ann in self._global_annotations if ann.id == annotation_id), None)
+        if target is not None and target.parent_id is None:
+            remove_ids.update(ann.id for ann in self._global_annotations if ann.parent_id == annotation_id)
+        kept = [ann for ann in self._global_annotations if ann.id not in remove_ids]
+        if len(kept) != len(self._global_annotations):
+            self._global_annotations[:] = kept
+            self.globalAnnotationRemoved.emit(annotation_id)
+            return
         raise KeyError(f"Global annotation '{annotation_id}' not found.")
 
     def update_global_annotation(self, annotation):
@@ -176,11 +180,15 @@ class AlignmentDataModel(QObject):
         self.consensusAnnotationAdded.emit(annotation)
 
     def remove_consensus_annotation(self, annotation_id):
-        for i, ann in enumerate(self._consensus_annotations):
-            if ann.id == annotation_id:
-                del self._consensus_annotations[i]
-                self.consensusAnnotationRemoved.emit(annotation_id)
-                return
+        remove_ids = {annotation_id}
+        target = next((ann for ann in self._consensus_annotations if ann.id == annotation_id), None)
+        if target is not None and target.parent_id is None:
+            remove_ids.update(ann.id for ann in self._consensus_annotations if ann.parent_id == annotation_id)
+        kept = [ann for ann in self._consensus_annotations if ann.id not in remove_ids]
+        if len(kept) != len(self._consensus_annotations):
+            self._consensus_annotations[:] = kept
+            self.consensusAnnotationRemoved.emit(annotation_id)
+            return
         raise KeyError(f"Consensus annotation '{annotation_id}' not found.")
 
     def update_consensus_annotation(self, annotation):

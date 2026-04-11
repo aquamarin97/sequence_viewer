@@ -82,13 +82,41 @@ class FindMotifsDialog(QDialog):
         added = 0
         for hit in hits:
             ann = Annotation(type=ann_type, start=hit.start, end=hit.end, label=name, strand=hit.strand, notes=f"Fuzzy search: max {max_mm} mismatch(es)")
-            try: self._model.add_annotation(hit.seq_index, ann); added += 1
+            try:
+                self._model.add_annotation(hit.seq_index, ann)
+                for mismatch in hit.mismatch_details:
+                    marker = Annotation(
+                        type=AnnotationType.MISMATCH_MARKER,
+                        start=mismatch.alignment_col,
+                        end=mismatch.alignment_col,
+                        label=mismatch.query_base,
+                        parent_id=ann.id,
+                        mismatch_base=mismatch.query_base,
+                        expected_base=mismatch.reference_base,
+                        notes=f"Expected {mismatch.reference_base}, found {mismatch.query_base}",
+                    )
+                    self._model.add_annotation(hit.seq_index, marker)
+                added += 1
             except: pass
 
         consensus_added = 0
         for hit in consensus_hits:
             ann = Annotation(type=ann_type, start=hit.start, end=hit.end, label=name, strand=hit.strand, notes=f"Fuzzy search (consensus): max {max_mm} mismatch(es)")
-            try: self._model.add_consensus_annotation(ann); consensus_added += 1
+            try:
+                self._model.add_consensus_annotation(ann)
+                for mismatch in hit.mismatch_details:
+                    marker = Annotation(
+                        type=AnnotationType.MISMATCH_MARKER,
+                        start=mismatch.alignment_col,
+                        end=mismatch.alignment_col,
+                        label=mismatch.query_base,
+                        parent_id=ann.id,
+                        mismatch_base=mismatch.query_base,
+                        expected_base=mismatch.reference_base,
+                        notes=f"Expected {mismatch.reference_base}, found {mismatch.query_base}",
+                    )
+                    self._model.add_consensus_annotation(marker)
+                consensus_added += 1
             except: pass
 
         msg = f"<span style='color:green'>{len(hits)} match(es) in sequences ({added} added)"

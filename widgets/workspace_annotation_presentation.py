@@ -3,9 +3,10 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List
 from features.annotation_layer.annotation_graphics_item import AnnotationGraphicsItem
-from features.annotation_layer.annotation_layout_engine import assign_lanes
+from features.annotation_layer.annotation_layout_engine import build_side_geometry, partition_annotations_by_side
 from settings.annotation_styles import annotation_style_manager
-from widgets.row_layout import RowLayout, above_lane_y, below_lane_y
+from widgets.row_layout import RowLayout
+from model.annotation import AnnotationType
 
 if TYPE_CHECKING:
     from widgets.workspace import SequenceWorkspaceWidget
@@ -53,12 +54,16 @@ class WorkspaceAnnotationPresentation:
 
     def per_row_lane_assignment(self, flat):
         above_by_row, below_by_row = defaultdict(list), defaultdict(list)
+        per_row = defaultdict(list)
         for row_index, ann in flat:
-            if ann.type.is_above_sequence(): above_by_row[row_index].append(ann)
-            else: below_by_row[row_index].append(ann)
+            per_row[row_index].append(ann)
+        for row_index, anns in per_row.items():
+            above_anns, below_anns = partition_annotations_by_side(anns)
+            above_by_row[row_index].extend(above_anns)
+            below_by_row[row_index].extend(below_anns)
         result = {}
-        for anns in above_by_row.values(): result.update(assign_lanes(anns))
-        for anns in below_by_row.values(): result.update(assign_lanes(anns))
+        for anns in above_by_row.values(): result.update(build_side_geometry(anns).lane_assignment)
+        for anns in below_by_row.values(): result.update(build_side_geometry(anns).lane_assignment)
         return result
 
     def rebuild_ann_items(self, layout):
@@ -66,14 +71,30 @@ class WorkspaceAnnotationPresentation:
         flat = self.workspace.model.all_annotations_flat()
         if not flat or layout.row_count == 0: return
         assignment = self.per_row_lane_assignment(flat)
+        row_sides = {}
+        for row_index, _ in flat:
+            row_anns = [ann for r, ann in flat if r == row_index]
+            row_sides[row_index] = partition_annotations_by_side(row_anns)
+        side_geometry = {("above", row_index): build_side_geometry(above_anns) for row_index, (above_anns, _) in row_sides.items()}
+        side_geometry.update({("below", row_index): build_side_geometry(below_anns) for row_index, (_, below_anns) in row_sides.items()})
         cw = float(self.workspace.sequence_viewer.current_char_width())
         ann_h = float(annotation_style_manager.get_lane_height()); scene = self.workspace.sequence_viewer.scene
         for row_index, ann in flat:
             if row_index >= layout.row_count: continue
-            lane = assignment.get(ann.id, 0); scene_x = ann.start * cw
-            if ann.type.is_above_sequence(): scene_y = float(layout.y_offsets[row_index]) + above_lane_y(lane)
-            else: scene_y = float(layout.below_y_offsets[row_index]) + below_lane_y(lane)
-            item = AnnotationGraphicsItem(annotation=ann, row_index=row_index, ann_width=ann.length()*cw, ann_height=ann_h,
+            scene_x = ann.start * cw
+            parent_lookup = {candidate.id: candidate for r_idx, candidate in flat if r_idx == row_index}
+            parent = parent_lookup.get(ann.parent_id)
+            is_above = parent.type.is_above_sequence() if ann.type == AnnotationType.MISMATCH_MARKER and parent is not None else ann.type.is_above_sequence()
+            side_key = ("above", row_index) if is_above else ("below", row_index)
+            geometry = side_geometry[side_key]
+            lane = assignment.get(ann.id, 0)
+            if ann.type == AnnotationType.MISMATCH_MARKER:
+                parent_lane = assignment.get(ann.parent_id, 0)
+                side_y = geometry.marker_y(parent_lane, above=is_above, lane_height=ann_h)
+            else:
+                side_y = geometry.parent_y(lane, above=is_above, lane_height=ann_h)
+            scene_y = float(layout.y_offsets[row_index] if is_above else layout.below_y_offsets[row_index]) + side_y
+            item = AnnotationGraphicsItem(annotation=ann, row_index=row_index, ann_width=(cw if ann.type == AnnotationType.MISMATCH_MARKER else ann.length()*cw), ann_height=ann_h,
                 on_click=self.workspace._on_ann_item_clicked, on_double_click=self.workspace._on_ann_item_double_clicked)
             item.setPos(scene_x, scene_y); scene.addItem(item)
             self.ann_items.setdefault(ann.id, []).append(item)
@@ -85,16 +106,32 @@ class WorkspaceAnnotationPresentation:
         flat = self.workspace.model.all_annotations_flat()
         if not flat: return
         assignment = self.per_row_lane_assignment(flat)
+        row_sides = {}
+        for row_index, _ in flat:
+            row_anns = [ann for r, ann in flat if r == row_index]
+            row_sides[row_index] = partition_annotations_by_side(row_anns)
+        side_geometry = {("above", row_index): build_side_geometry(above_anns) for row_index, (above_anns, _) in row_sides.items()}
+        side_geometry.update({("below", row_index): build_side_geometry(below_anns) for row_index, (_, below_anns) in row_sides.items()})
         cw = float(self.workspace.sequence_viewer.current_char_width()); ann_h = float(annotation_style_manager.get_lane_height())
         for row_index, ann in flat:
             items = self.ann_items.get(ann.id, [])
             if not items or row_index >= layout.row_count: continue
-            lane = assignment.get(ann.id, 0); scene_x = ann.start * cw
-            if ann.type.is_above_sequence(): scene_y = float(layout.y_offsets[row_index]) + above_lane_y(lane)
-            else: scene_y = float(layout.below_y_offsets[row_index]) + below_lane_y(lane)
+            scene_x = ann.start * cw
+            parent_lookup = {candidate.id: candidate for r_idx, candidate in flat if r_idx == row_index}
+            parent = parent_lookup.get(ann.parent_id)
+            is_above = parent.type.is_above_sequence() if ann.type == AnnotationType.MISMATCH_MARKER and parent is not None else ann.type.is_above_sequence()
+            side_key = ("above", row_index) if is_above else ("below", row_index)
+            geometry = side_geometry[side_key]
+            lane = assignment.get(ann.id, 0)
+            if ann.type == AnnotationType.MISMATCH_MARKER:
+                parent_lane = assignment.get(ann.parent_id, 0)
+                side_y = geometry.marker_y(parent_lane, above=is_above, lane_height=ann_h)
+            else:
+                side_y = geometry.parent_y(lane, above=is_above, lane_height=ann_h)
+            scene_y = float(layout.y_offsets[row_index] if is_above else layout.below_y_offsets[row_index]) + side_y
             for item in items:
                 if item.row_index == row_index:
-                    item.setPos(scene_x, scene_y); item.update_size(ann.length()*cw, ann_h)
+                    item.setPos(scene_x, scene_y); item.update_size(cw if ann.type == AnnotationType.MISMATCH_MARKER else ann.length()*cw, ann_h)
 
     def on_annotation_changed(self, *_):
         layout = self.workspace._compute_row_layout()

@@ -4,8 +4,8 @@ from typing import Dict, List, Optional, Tuple
 from PyQt5.QtCore import Qt, QRectF, QPoint, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor
 from PyQt5.QtWidgets import QWidget, QScrollBar, QToolTip
-from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
-from features.annotation_layer.annotation_painter import draw_primer, draw_probe, draw_repeated_region, draw_selection_outline
+from features.annotation_layer.annotation_layout_engine import build_side_geometry
+from features.annotation_layer.annotation_painter import draw_primer, draw_probe, draw_repeated_region, draw_mismatch_marker, draw_selection_outline
 from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation, AnnotationType
 from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
@@ -25,6 +25,7 @@ class AnnotationLayerWidget(QWidget):
         super().__init__(parent)
         self._model = model; self._sequence_viewer = sequence_viewer
         self._lane_assignment = {}; self._annotations = []; self._hit_rects = []
+        self._side_geometry = build_side_geometry([])
         self._selected_ann_ids: set = set()
         self.setMouseTracking(True); self._sync_from_model()
         self._model.globalAnnotationAdded.connect(self._on_global_changed)
@@ -47,13 +48,14 @@ class AnnotationLayerWidget(QWidget):
     def _sync_from_model(self):
         if self._model.is_aligned: self._annotations = list(self._model.global_annotations)
         else: self._annotations = []
-        self._lane_assignment = assign_lanes(self._annotations)
+        self._side_geometry = build_side_geometry(self._annotations)
+        self._lane_assignment = self._side_geometry.lane_assignment
         self._update_visibility(); self.update()
 
     def _update_visibility(self):
         if not self._model.is_aligned or not self._annotations:
             self.setFixedHeight(0); self.setVisible(False); return
-        n = lane_count(self._lane_assignment)
+        n = self._side_geometry.total_lanes
         lh = _lane_height()
         h = max(_MIN_HEIGHT, n * (lh + _LANE_PADDING) + _LANE_PADDING)
         self.setFixedHeight(h); self.setVisible(True)
@@ -89,7 +91,12 @@ class AnnotationLayerWidget(QWidget):
     def _annotation_viewport_rect(self, ann, lane, cw, view_left):
         x = ann.start * cw - view_left; w = ann.length() * cw
         lh = _lane_height()
-        y = _LANE_PADDING + lane * (lh + _LANE_PADDING); h = lh
+        if ann.type == AnnotationType.MISMATCH_MARKER:
+            parent_lane = self._lane_assignment.get(ann.parent_id, 0)
+            visual_lane = self._side_geometry.expanded_parent_lane(parent_lane) + 1
+        else:
+            visual_lane = self._side_geometry.expanded_parent_lane(lane)
+        y = _LANE_PADDING + visual_lane * (lh + _LANE_PADDING); h = lh
         widget_w = float(self.width())
         if x + w < 0 or x > widget_w: return None
         if x < 0: w += x; x = 0.0
@@ -120,6 +127,16 @@ class AnnotationLayerWidget(QWidget):
                 draw_primer(painter, vp.x(), vp.y(), vp.width(), vp.height(), ann.resolved_color(), ann.label, strand=ann.strand, char_width=ann_char_w)
             elif ann.type == AnnotationType.PROBE:
                 draw_probe(painter, vp.x(), vp.y(), vp.width(), vp.height(), ann.resolved_color(), ann.label, strand=ann.strand, char_width=ann_char_w)
+            elif ann.type == AnnotationType.MISMATCH_MARKER:
+                from settings.display_settings_manager import display_settings_manager as _dsm
+                draw_mismatch_marker(
+                    painter, vp.x(), vp.y(), vp.width(), vp.height(),
+                    ann.resolved_color(),
+                    ann.expected_base or ann.mismatch_base or ann.label,
+                    char_width=vp.width(),
+                    font_family=_dsm.sequence_font_family,
+                    font_size=_dsm.sequence_font_size_base,
+                )
             else:
                 draw_repeated_region(painter, vp.x(), vp.y(), vp.width(), vp.height(), ann.resolved_color(), ann.label)
             if ann.id in self._selected_ann_ids:
@@ -163,7 +180,8 @@ class AnnotationLayerWidget(QWidget):
     def mouseDoubleClickEvent(self, event):
         if mouse_binding_manager.is_annotation_edit_event(event.modifiers(), event.button()):
             ann = self._annotation_at(event.pos())
-            if ann: self.annotationDoubleClicked.emit(ann)
+            if ann and ann.type != AnnotationType.MISMATCH_MARKER:
+                self.annotationDoubleClicked.emit(ann)
             event.accept()
         else: super().mouseDoubleClickEvent(event)
 

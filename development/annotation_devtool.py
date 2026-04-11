@@ -26,6 +26,7 @@ ANNOTATION_ORDER = (
     AnnotationType.PRIMER,
     AnnotationType.PROBE,
     AnnotationType.REPEATED_REGION,
+    AnnotationType.MISMATCH_MARKER,
 )
 
 

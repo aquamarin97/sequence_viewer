@@ -18,10 +18,14 @@ class SequenceRecord:
         self.annotations.append(annotation)
 
     def remove_annotation(self, annotation_id):
-        for i, ann in enumerate(self.annotations):
-            if ann.id == annotation_id:
-                del self.annotations[i]
-                return
+        remove_ids = {annotation_id}
+        target = self.get_annotation(annotation_id)
+        if target is not None and target.parent_id is None:
+            remove_ids.update(a.id for a in self.annotations if a.parent_id == annotation_id)
+        kept = [ann for ann in self.annotations if ann.id not in remove_ids]
+        if len(kept) != len(self.annotations):
+            self.annotations[:] = kept
+            return
         raise KeyError(f"Annotation '{annotation_id}' not found in record '{self.header}'.")
 
     def update_annotation(self, annotation):

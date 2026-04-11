@@ -2,8 +2,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, List
 from PyQt5.QtWidgets import QScrollBar
-from features.annotation_layer.annotation_layout_engine import assign_lanes, lane_count
-from widgets.row_layout import RowLayout, strip_height
+from features.annotation_layer.annotation_layout_engine import partition_annotations_by_side, side_strip_height
+from widgets.row_layout import RowLayout
 
 if TYPE_CHECKING:
     from widgets.workspace import SequenceWorkspaceWidget
@@ -23,10 +23,9 @@ class WorkspaceLayoutScrollSync:
         ch = self.workspace.sequence_viewer.char_height
         above_heights, below_heights = [], []
         for record in self.workspace.model.all_records():
-            above_anns = [a for a in record.annotations if a.type.is_above_sequence()]
-            below_anns = [a for a in record.annotations if not a.type.is_above_sequence()]
-            above_heights.append(strip_height(lane_count(assign_lanes(above_anns))))
-            below_heights.append(strip_height(lane_count(assign_lanes(below_anns))))
+            above_anns, below_anns = partition_annotations_by_side(record.annotations)
+            above_heights.append(side_strip_height(above_anns))
+            below_heights.append(side_strip_height(below_anns))
         return RowLayout.build(ch, above_heights, below_heights)
 
     def apply_layout(self, layout):

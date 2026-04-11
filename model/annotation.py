@@ -10,12 +10,14 @@ class AnnotationType(Enum):
     PRIMER          = auto()
     PROBE           = auto()
     REPEATED_REGION = auto()
+    MISMATCH_MARKER = auto()
 
     def display_name(self) -> str:
         return {
             AnnotationType.PRIMER:          "Primer",
             AnnotationType.PROBE:           "Probe",
             AnnotationType.REPEATED_REGION: "Repeated Region",
+            AnnotationType.MISMATCH_MARKER: "Mismatch Marker",
         }[self]
 
     def default_color(self) -> QColor:
@@ -27,6 +29,9 @@ class AnnotationType(Enum):
 
     def uses_strand(self) -> bool:
         return self in (AnnotationType.PRIMER, AnnotationType.PROBE,)
+
+    def participates_in_lane_assignment(self) -> bool:
+        return self != AnnotationType.MISMATCH_MARKER
 
 @dataclass
 class Annotation:
@@ -40,6 +45,9 @@ class Annotation:
     tm:          Optional[float]  = None
     gc_percent:  Optional[float]  = None
     notes:       str              = ""
+    parent_id:   Optional[str]    = None
+    mismatch_base: Optional[str]  = None
+    expected_base: Optional[str]  = None
     id:          str              = field(default_factory=lambda: str(uuid.uuid4()))
 
     def __post_init__(self) -> None:
@@ -56,6 +64,16 @@ class Annotation:
         return self.start <= other.end and self.end >= other.start
 
     def tooltip_text(self) -> str:
+        if self.type == AnnotationType.MISMATCH_MARKER:
+            base = self.mismatch_base or self.label or "?"
+            lines = [
+                f"<b>{base}</b>",
+                f"Tip: {self.type.display_name()}",
+                f"Pozisyon: {self.start + 1}",
+            ]
+            if self.notes:
+                lines.append(f"Notlar: {self.notes}")
+            return "<br>".join(lines)
         lines = [
             f"<b>{self.label or '(isimsiz)'}</b>",
             f"Tip: {self.type.display_name()}",

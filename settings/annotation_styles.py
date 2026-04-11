@@ -18,11 +18,13 @@ _STYLES_LIGHT = {
     AnnotationType.PRIMER:          AnnotationTypeStyle(255, 0,   0.0, 20, 11, "Arial"),
     AnnotationType.PROBE:           AnnotationTypeStyle(165, 220, 1.5, 20, 11, "Arial"),
     AnnotationType.REPEATED_REGION: AnnotationTypeStyle(55,  170, 1.0, 24, 11, "Arial"),
+    AnnotationType.MISMATCH_MARKER: AnnotationTypeStyle(255, 255, 1.2, 1, 11, "Arial"),
 }
 _STYLES_DARK = {
     AnnotationType.PRIMER:          AnnotationTypeStyle(210, 0,   0.0, 20, 11, "Arial"),
     AnnotationType.PROBE:           AnnotationTypeStyle(150, 190, 1.5, 20, 11, "Arial"),
     AnnotationType.REPEATED_REGION: AnnotationTypeStyle(75,  160, 1.0, 24, 11, "Arial"),
+    AnnotationType.MISMATCH_MARKER: AnnotationTypeStyle(255, 255, 1.2, 1, 11, "Arial"),
 }
 
 class _AnnotationStyleManager(QObject):

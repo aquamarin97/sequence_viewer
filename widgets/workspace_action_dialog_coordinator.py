@@ -1,7 +1,7 @@
 # widgets/workspace_action_dialog_coordinator.py
 from __future__ import annotations
 from typing import FrozenSet, Optional, TYPE_CHECKING
-from model.annotation import Annotation
+from model.annotation import Annotation, AnnotationType
 from settings.mouse_binding_manager import mouse_binding_manager, MouseAction
 if TYPE_CHECKING:
     from widgets.workspace import SequenceWorkspaceWidget
@@ -19,6 +19,14 @@ class WorkspaceActionDialogCoordinator:
             ann_id if not is_layer else None, ctrl=ctrl)
         ws.annotation_layer.set_selected_annotation(
             ann_id if is_layer else None, ctrl=ctrl)
+
+    @staticmethod
+    def _annotation_focus_range(annotation):
+        return (annotation.start, annotation.start + 1) if annotation.type == AnnotationType.MISMATCH_MARKER else (annotation.start, annotation.end + 1)
+
+    @staticmethod
+    def _annotation_guide_boundaries(annotation):
+        return [annotation.start] if annotation.type == AnnotationType.MISMATCH_MARKER else [annotation.start, annotation.end + 1]
 
     def _clear_all_annotation_visuals(self):
         """Tüm seçili annotation görsellerini ve dim overlay'ini temizler."""
@@ -78,13 +86,13 @@ class WorkspaceActionDialogCoordinator:
         boundaries: list = []
         focus_ranges: list = []
         for ann, _ in self._selected_annotations:
-            if ann.start not in boundaries: boundaries.append(ann.start)
-            if ann.end + 1 not in boundaries: boundaries.append(ann.end + 1)
-            focus_ranges.append((ann.start, ann.end + 1))
+            for boundary in self._annotation_guide_boundaries(ann):
+                if boundary not in boundaries: boundaries.append(boundary)
+            focus_ranges.append(self._annotation_focus_range(ann))
         for ann in cr_anns:
-            if ann.start not in boundaries: boundaries.append(ann.start)
-            if ann.end + 1 not in boundaries: boundaries.append(ann.end + 1)
-            focus_ranges.append((ann.start, ann.end + 1))
+            for boundary in self._annotation_guide_boundaries(ann):
+                if boundary not in boundaries: boundaries.append(boundary)
+            focus_ranges.append(self._annotation_focus_range(ann))
         boundaries.sort()
 
         # Controller güncellenmesi set_v_guides'dan ÖNCE olmalı
@@ -125,19 +133,22 @@ class WorkspaceActionDialogCoordinator:
         self._selected_annotations = [(annotation, None)]
         self._update_selection_visuals(annotation.id, is_layer=True)
         self.workspace.setFocus()
-        _boundaries = [annotation.start, annotation.end + 1]
+        _boundaries = self._annotation_guide_boundaries(annotation)
         _seq_ctrl = self.workspace.sequence_viewer._controller
         if _seq_ctrl is not None:
             _seq_ctrl._v_guide_cols = list(_boundaries)
         self.workspace.sequence_viewer.set_v_guides(_boundaries)
-        self.workspace.sequence_viewer.set_selection_dim_range(annotation.start, annotation.end + 1)
+        focus_start, focus_end = self._annotation_focus_range(annotation)
+        self.workspace.sequence_viewer.set_selection_dim_range(focus_start, focus_end)
         n = self.workspace.model.row_count()
         if n > 0:
-            self.workspace.sequence_viewer.set_visual_selection(0, n-1, annotation.start, annotation.end)
-            self.workspace.sequence_viewer._model.start_selection(0, annotation.start)
-            self.workspace.sequence_viewer._model.update_selection(n-1, annotation.end)
+            self.workspace.sequence_viewer.set_visual_selection(0, n-1, focus_start, focus_end - 1)
+            self.workspace.sequence_viewer._model.start_selection(0, focus_start)
+            self.workspace.sequence_viewer._model.update_selection(n-1, focus_end - 1)
 
     def on_annotation_layer_double_clicked(self, annotation):
+        if annotation.type == AnnotationType.MISMATCH_MARKER:
+            return
         self.do_edit_dialog(annotation, row_index=None)
 
     def on_ann_item_clicked(self, annotation, row_index):
@@ -183,20 +194,23 @@ class WorkspaceActionDialogCoordinator:
             ws.sequence_viewer.clear_h_guides()
 
         # V-guide: annotation sütun aralığı
-        _boundaries = [annotation.start, annotation.end + 1]
+        _boundaries = self._annotation_guide_boundaries(annotation)
         _seq_ctrl = ws.sequence_viewer._controller
         if _seq_ctrl is not None:
             _seq_ctrl._v_guide_cols = list(_boundaries)
         ws.sequence_viewer.set_v_guides(_boundaries)
-        ws.sequence_viewer.set_selection_dim_range(annotation.start, annotation.end + 1)
+        focus_start, focus_end = self._annotation_focus_range(annotation)
+        ws.sequence_viewer.set_selection_dim_range(focus_start, focus_end)
 
         # Görsel seçim: sadece annotation sütun aralığı
         if 0 <= row_index < n:
-            ws.sequence_viewer.set_visual_selection(row_index, row_index, annotation.start, annotation.end)
-            ws.sequence_viewer._model.start_selection(row_index, annotation.start)
-            ws.sequence_viewer._model.update_selection(row_index, annotation.end)
+            ws.sequence_viewer.set_visual_selection(row_index, row_index, focus_start, focus_end - 1)
+            ws.sequence_viewer._model.start_selection(row_index, focus_start)
+            ws.sequence_viewer._model.update_selection(row_index, focus_end - 1)
 
     def on_ann_item_double_clicked(self, annotation, _row_index):
+        if annotation.type == AnnotationType.MISMATCH_MARKER:
+            return
         self.workspace.open_edit_annotation_dialog(annotation)
 
     def on_consensus_annotation_double_clicked(self, annotation):
