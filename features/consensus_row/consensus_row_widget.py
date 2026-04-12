@@ -753,7 +753,7 @@ class ConsensusRowWidget(QWidget):
                         ann.expected_base or ann.mismatch_base or ann.label,
                         char_width=cw,
                         font_family=self._font.family(),
-                        font_size=self._font.pointSizeF(),
+                        font_size=display_settings_manager.consensus_font_size_base,
                     )
                 else:
                     draw_repeated_region(painter, clipped_x, ann_y, clipped_w, ann_h_draw, ann_color, ann.label)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from PyQt5.QtCore import Qt, QRectF, QPointF
 from PyQt5.QtGui import (
-    QPainter, QPen, QBrush, QColor, QFont, QFontMetrics,
+    QPainter, QPen, QBrush, QColor, QFont, QFontMetrics, QFontMetricsF,
     QPainterPath, QLinearGradient,
 )
 from model.annotation import AnnotationType
@@ -261,8 +261,9 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
                     font_family=style.label_font_family)
 
 
-_MM_V_PAD = 3       # marker ile lane üst/alt kenarı arasındaki dikey boşluk (px)
-_MM_TEXT_THRESHOLD = 8.0  # char_width bu değerin altındaysa (box/line mod) metin gizlenir
+_MM_V_PAD = 1        # marker ile lane üst/alt kenarı arasındaki dikey boşluk (px)
+_MM_TEXT_THRESHOLD   = 8.0   # bu char_width'in altında → box/line mod, metin gizlenir
+_MM_FULL_FONT_CW     = 12.0  # bu char_width'in üstünde → tam font boyutu
 
 
 def draw_mismatch_marker(painter, x, y, w, h, color, label,
@@ -273,10 +274,11 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
     Parameters
     ----------
     label       : Gösterilecek tek karakter (beklenen NA / expected base).
-    char_width  : Mevcut karakter genişliği (px). 8.0'ın altındaysa metin
-                  gizlenir (box/line mod uyumu).
+    char_width  : Mevcut karakter genişliği (px).
     font_family : Metin için font ailesi; None → annotation style varsayılanı.
-    font_size   : Metin için font boyutu (pt); None → annotation style varsayılanı.
+    font_size   : Bağlam için MAKSIMUM (base) font boyutu (pt).
+                  Scaling bu fonksiyon içinde char_width'e göre hesaplanır;
+                  çağıran her zaman base (zoom-independent) değeri geçmelidir.
     """
     if w <= 0 or h <= 0:
         return
@@ -285,12 +287,17 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
     # Dikey padding — box lane kenarlarından görsel boşluk
     box_y = y + _MM_V_PAD
     box_h = max(1.0, h - 2 * _MM_V_PAD)
+    box_left = int(round(x))
+    box_top = int(round(box_y))
+    box_right = max(box_left + 1, int(round(x + w)))
+    box_bottom = max(box_top + 1, int(round(box_y + box_h)))
+    box_rect = QRectF(box_left, box_top, box_right - box_left, box_bottom - box_top)
 
     painter.save()
     painter.setRenderHint(QPainter.Antialiasing, True)
 
     path = QPainterPath()
-    path.addRoundedRect(QRectF(x, box_y, w, box_h), _CORNER_RADIUS, _CORNER_RADIUS)
+    path.addRoundedRect(box_rect, _CORNER_RADIUS, _CORNER_RADIUS)
 
     painter.setBrush(QBrush(QColor(color)))
     painter.setPen(Qt.NoPen)   # Border yok; seçim durumunda draw_selection_outline kullanılır
@@ -303,12 +310,25 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
         lum = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
         text_color = _LABEL_TEXT_ON_DARK if lum < 140 else _LABEL_TEXT_ON_LIGHT
         ff = font_family if font_family else style.label_font_family
-        fs = font_size if font_size else style.label_font_size
-        font = QFont(ff, max(6, int(round(fs))))
+        base_fs = float(font_size) if font_size else float(style.label_font_size)
+
+        # Sequence viewer ile aynı LOD adımları:
+        #   char_width >= 12 → tam boyut  (SequenceItemModel scale >= 1.8)
+        #   char_width >=  8 → 10/12 oranı (scale >= 1.2, text mod alt sınırı)
+        if char_width >= _MM_FULL_FONT_CW:
+            effective_fs = base_fs
+        else:
+            effective_fs = max(6.0, base_fs * (10.0 / 12.0))
+
+        font = QFont(ff)
+        font.setPointSizeF(max(6.0, effective_fs))
         font.setBold(True)
         painter.setFont(font)
         painter.setPen(QPen(text_color))
-        painter.drawText(QRectF(x, box_y, w, box_h), Qt.AlignVCenter | Qt.AlignHCenter, label[:1])
+        ch = label[0]
+        # Point/baseline tabanlı çizim max zoom-out'ta alt-piksel snap nedeniyle
+        # hafif sola kaymış görünebiliyor; rect içi merkezleme daha kararlı.
+        painter.drawText(box_rect, Qt.AlignCenter, ch)
 
     painter.restore()
 
@@ -360,6 +380,27 @@ def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
     """
     if w <= 0:
         return
+
+    # Mismatch marker: kutu sınırlarına tam oturan, taşmayan ince outline
+    if ann_type == AnnotationType.MISMATCH_MARKER:
+        box_y = y + _MM_V_PAD
+        box_h = max(1.0, h - 2 * _MM_V_PAD)
+        path = _build_repeated_region_path(x, box_y, w, box_h)
+        halo_color, inner_color = _selection_colors(base_color)
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setBrush(Qt.NoBrush)
+        halo_pen = QPen(halo_color, 2.5)
+        halo_pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(halo_pen)
+        painter.drawPath(path)
+        inner_pen = QPen(inner_color, 1.0)
+        inner_pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(inner_pen)
+        painter.drawPath(path)
+        painter.restore()
+        return
+
     if ann_type in (AnnotationType.PRIMER, AnnotationType.PROBE):
         path = _build_primer_probe_path(x, y, w, h, strand, char_width)
     else:

@@ -234,6 +234,7 @@ class SequenceWorkspaceWidget(QWidget):
         """Ctrl+C — seçili satırların sadece dizilerini kopyalar."""
         from PyQt5.QtWidgets import QApplication
         lines = []
+        selected = self.header_viewer._selection.selected_rows()
         # Consensus seçili mi?
         if self.consensus_spacer._selected:
             from features.consensus_row.consensus_calculator import ConsensusCalculator
@@ -241,20 +242,18 @@ class SequenceWorkspaceWidget(QWidget):
             if seqs:
                 consensus = ConsensusCalculator.compute(seqs)
                 lines.append(consensus)
-        else:
+        elif selected:
             # Header seçimi varsa ona göre, yoksa sequence viewer seçimine göre
-            selected = self.header_viewer._selection.selected_rows()
-            if selected:
-                for i, (_, sequence) in enumerate(self._model.all_rows()):
-                    if i in selected:
-                        lines.append(sequence)
-            else:
+            for i, (_, sequence) in enumerate(self._model.all_rows()):
+                if i in selected:
+                    lines.append(sequence)
+        else:
                 # Sequence viewer'da kısmi seçim
-                for item in self.sequence_viewer.sequence_items:
-                    if item.selection_range is not None:
-                        s, e = item.selection_range
-                        fragment = item.sequence[s:e]
-                        if fragment: lines.append(fragment)
+            for item in self.sequence_viewer.sequence_items:
+                if item.selection_range is not None:
+                    s, e = item.selection_range
+                    fragment = item.sequence[s:e]
+                    if fragment: lines.append(fragment)
         if lines:
             QApplication.clipboard().setText("\n".join(lines))
 
@@ -262,20 +261,23 @@ class SequenceWorkspaceWidget(QWidget):
         """Ctrl+Shift+C — seçili satırları FASTA formatında kopyalar."""
         from PyQt5.QtWidgets import QApplication
         blocks = []
+        has_sequence_fragment_selection = any(
+            item.selection_range is not None for item in self.sequence_viewer.sequence_items
+        )
         selected = self.header_viewer._selection.selected_rows()
-        if selected:
-            for i, (header, sequence) in enumerate(self._model.all_rows()):
-                if i in selected:
-                    blocks.append(f">{header}\n{sequence}")
-        else:
-            # Sequence viewer seçimi varsa kısmi fasta
-            for i, (item) in enumerate(self.sequence_viewer.sequence_items):
+        if has_sequence_fragment_selection:
+            for i, item in enumerate(self.sequence_viewer.sequence_items):
                 if item.selection_range is not None:
                     s, e = item.selection_range
                     fragment = item.sequence[s:e]
                     if fragment:
                         header = self._model.get_header(i)
                         blocks.append(f">{header}\n{fragment}")
+        elif selected:
+            # Sequence viewer seçimi varsa kısmi fasta
+            for i, (header, sequence) in enumerate(self._model.all_rows()):
+                if i in selected:
+                    blocks.append(f">{header}\n{sequence}")
         if blocks:
             QApplication.clipboard().setText("\n".join(blocks))
 

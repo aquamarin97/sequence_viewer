@@ -32,7 +32,17 @@ class SequenceViewerWidget(SequenceViewerView):
     def get_sequences(self): return self._model.get_sequences()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_C and event.modifiers() & Qt.ControlModifier:
+        ctrl = bool(event.modifiers() & Qt.ControlModifier)
+        shift = bool(event.modifiers() & Qt.ShiftModifier)
+        if event.key() == Qt.Key_C and ctrl and shift:
+            parent = self.parent()
+            while parent is not None:
+                if hasattr(parent, "_copy_fasta"):
+                    parent._copy_fasta()
+                    event.accept()
+                    return
+                parent = parent.parent()
+        if event.key() == Qt.Key_C and ctrl and not shift:
             self._copy_selection_to_clipboard(); event.accept(); return
         super().keyPressEvent(event)
 
