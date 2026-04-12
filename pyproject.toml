@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sequence-viewer"
+version = "0.1.0"
+description = "Desktop multiple sequence alignment viewer widget and development app"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "PyQt5>=5.15",
+    "biopython>=1.80",
+    "pydantic>=1.10",
+]
+
+[project.scripts]
+sequence-viewer = "sequence_viewer.app.run:run"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["sequence_viewer*"]
+
+[tool.setuptools.package-data]
+sequence_viewer = [
+    "assets/fonts/monospace/*.ttf",
+    "data/*.json",
+    "settings/i18n/strings/*.json",
+]
