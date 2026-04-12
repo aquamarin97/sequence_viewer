@@ -1,10 +1,21 @@
 # model/alignment_data_model.py
 from __future__ import annotations
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 from PyQt5.QtCore import QObject, pyqtSignal
 from model.alignment_metadata import AlignmentMetadata
 from model.annotation import Annotation
 from model.sequence_record import SequenceRecord
+
+
+@dataclass
+class AlignmentDataModelSnapshot:
+    rows: List[SequenceRecord]
+    is_aligned: bool
+    alignment_meta: Optional[AlignmentMetadata]
+    global_annotations: List[Annotation]
+    consensus_annotations: List[Annotation]
 
 class AlignmentDataModel(QObject):
     rowAppended    = pyqtSignal(int, str, str)
@@ -201,3 +212,23 @@ class AlignmentDataModel(QObject):
 
     def clear_consensus_annotations(self):
         self._consensus_annotations.clear()
+
+    def create_snapshot(self):
+        return AlignmentDataModelSnapshot(
+            rows=deepcopy(self._rows),
+            is_aligned=self._is_aligned,
+            alignment_meta=deepcopy(self._alignment_meta),
+            global_annotations=deepcopy(self._global_annotations),
+            consensus_annotations=deepcopy(self._consensus_annotations),
+        )
+
+    def restore_snapshot(self, snapshot: AlignmentDataModelSnapshot):
+        alignment_changed = self._is_aligned != snapshot.is_aligned
+        self._rows = deepcopy(snapshot.rows)
+        self._is_aligned = snapshot.is_aligned
+        self._alignment_meta = deepcopy(snapshot.alignment_meta)
+        self._global_annotations = deepcopy(snapshot.global_annotations)
+        self._consensus_annotations = deepcopy(snapshot.consensus_annotations)
+        self.modelReset.emit()
+        if alignment_changed:
+            self.alignmentStateChanged.emit(self._is_aligned)

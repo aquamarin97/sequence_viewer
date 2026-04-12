@@ -254,11 +254,7 @@ class WorkspaceActionDialogCoordinator:
         except IndexError: pass
 
     def on_rows_delete_requested(self, rows):
-        for row in sorted(rows, reverse=True):
-            try:
-                self.workspace.header_viewer._selection.remove_row(row)
-                self.workspace.model.remove_row(row)
-            except IndexError: pass
+        self.workspace.delete_rows_with_undo(rows)
 
     def on_selection_changed(self, selected_rows):
         from PyQt5.QtWidgets import QApplication
@@ -380,24 +376,7 @@ class WorkspaceActionDialogCoordinator:
         """Seçili annotation'ları sil (Delete tuşu)."""
         if not self._selected_annotations:
             return
-        to_delete = list(self._selected_annotations)
-        self._selected_annotations.clear()
-        self._clear_all_annotation_visuals()
-        ws = self.workspace
-        ws.sequence_viewer.clear_visual_selection()
-        try: ws.sequence_viewer._model.clear_selection()
-        except: pass
-        ws.sequence_viewer.clear_h_guides()
-        ws.sequence_viewer.clear_v_guides()
-        ws.sequence_viewer.clear_selection_dim_range()
-        for ann, row_index in to_delete:
-            try:
-                if row_index is None:
-                    ws.model.remove_global_annotation(ann.id)
-                else:
-                    ws.model.remove_annotation(row_index, ann.id)
-            except (KeyError, IndexError):
-                pass
+        self.workspace.delete_annotations_with_undo(self._selected_annotations)
 
     def on_consensus_spacer_clicked(self, ctrl=False):
         """Consensus spacer'a tıklama.

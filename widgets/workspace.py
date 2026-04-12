@@ -22,6 +22,7 @@ from features.position_ruler.position_ruler_widget import SequencePositionRulerW
 from features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 from model.alignment_data_model import AlignmentDataModel
 from model.annotation import Annotation
+from model.undo_stack import ModelSnapshotCommand, UndoStack
 from settings.display_settings_manager import display_settings_manager
 from settings.scrollbar_style import apply_scrollbar_style
 from widgets import workspace_action_dialog_coordinator
@@ -35,6 +36,7 @@ class SequenceWorkspaceWidget(QWidget):
             char_height = display_settings_manager.sequence_char_height
         row_height = int(round(char_height))
         self._model = AlignmentDataModel(parent=self)
+        self._undo_stack = UndoStack(self)
 
         # Sol panel
         self.header_top = HeaderTopWidget(height=28, parent=self)
@@ -217,6 +219,10 @@ class SequenceWorkspaceWidget(QWidget):
     def keyPressEvent(self, event):
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)
+        if ctrl and not shift and event.key() == Qt.Key_Z:
+            if self._undo_stack.undo():
+                event.accept()
+                return
         if ctrl and shift and event.key() == Qt.Key_C:
             self._copy_fasta(); event.accept(); return
         if ctrl and not shift and event.key() == Qt.Key_C:
@@ -280,6 +286,98 @@ class SequenceWorkspaceWidget(QWidget):
                     blocks.append(f">{header}\n{sequence}")
         if blocks:
             QApplication.clipboard().setText("\n".join(blocks))
+
+    def _clear_interaction_state(self):
+        self._action_dialogs._selected_annotations.clear()
+        self._annotation_presentation.clear_annotation_selection()
+        self.annotation_layer.clear_annotation_selection()
+        self.sequence_viewer.clear_visual_selection()
+        try:
+            self.sequence_viewer._model.clear_selection()
+        except:
+            pass
+        self.sequence_viewer.clear_h_guides()
+        self.sequence_viewer.clear_v_guides()
+        self.sequence_viewer.clear_selection_dim_range()
+        changed = self.header_viewer._selection.clear()
+        self.header_viewer.apply_selection_to_items(changed)
+        self.consensus_spacer.set_selected(False)
+        self.consensus_row.clear_selection()
+
+    def _push_delete_command(self, text, mutate):
+        self._undo_stack.push(ModelSnapshotCommand(
+            text=text,
+            model=self._model,
+            mutate=mutate,
+            after_restore=self._clear_interaction_state,
+        ))
+
+    def delete_rows_with_undo(self, rows):
+        rows = sorted(set(rows), reverse=True)
+        if not rows:
+            return
+
+        def mutate():
+            for row in rows:
+                try:
+                    self.header_viewer._selection.remove_row(row)
+                    self.model.remove_row(row)
+                except IndexError:
+                    pass
+
+        self._push_delete_command("Delete rows", mutate)
+
+    def delete_annotations_with_undo(self, annotations):
+        to_delete = list(annotations)
+        if not to_delete:
+            return
+
+        def mutate():
+            self._action_dialogs._selected_annotations.clear()
+            self._action_dialogs._clear_all_annotation_visuals()
+            ws = self
+            ws.sequence_viewer.clear_visual_selection()
+            try:
+                ws.sequence_viewer._model.clear_selection()
+            except:
+                pass
+            ws.sequence_viewer.clear_h_guides()
+            ws.sequence_viewer.clear_v_guides()
+            ws.sequence_viewer.clear_selection_dim_range()
+            for ann, row_index in to_delete:
+                try:
+                    if row_index is None:
+                        ws.model.remove_global_annotation(ann.id)
+                    else:
+                        ws.model.remove_annotation(row_index, ann.id)
+                except (KeyError, IndexError):
+                    pass
+
+        self._push_delete_command("Delete annotations", mutate)
+
+    def delete_consensus_annotations_with_undo(self, annotation_ids):
+        ann_ids = list(annotation_ids)
+        if not ann_ids:
+            return
+
+        def mutate():
+            self.consensus_row._selected_ann_ids.clear()
+            self.consensus_row._selection_ranges = []
+            self.consensus_row._is_selected = False
+            self.consensus_spacer.set_selected(False)
+            self.sequence_viewer.clear_selection_dim_range()
+            ctrl = getattr(self.sequence_viewer, "_controller", None)
+            if ctrl is not None:
+                ctrl._v_guide_cols = []
+            self.sequence_viewer.set_v_guides([])
+            self.consensus_row.update()
+            for ann_id in ann_ids:
+                try:
+                    self.model.remove_consensus_annotation(ann_id)
+                except (KeyError, Exception):
+                    pass
+
+        self._push_delete_command("Delete consensus annotations", mutate)
 
     def _on_display_settings_changed(self):
         layout = self._compute_row_layout()
