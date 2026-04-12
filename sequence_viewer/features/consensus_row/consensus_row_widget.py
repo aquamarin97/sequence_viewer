@@ -23,6 +23,8 @@ from sequence_viewer.model.consensus_calculator import ConsensusMethod
 from sequence_viewer.settings.theme import theme_manager
 from sequence_viewer.settings.mouse_binding_manager import mouse_binding_manager, MouseAction
 from sequence_viewer.settings.display_settings_manager import display_settings_manager
+from sequence_viewer.utils.drag_tooltip import DragTooltip
+from sequence_viewer.utils.sequence_utils import selection_bp, calculate_tm
 
 
 def _paint_dim_overlay(painter, sequence_viewer, cw, widget_w, widget_h, t):
@@ -61,6 +63,7 @@ class ConsensusRowWidget(QWidget):
         self._color_map = _csm.consensus_nucleotide_color_map()
         self._press_col = None; self._is_selected = False
         self._press_pos = None; self._drag_started = False; self._press_scene_col = None
+        self._drag_tooltip = DragTooltip()
         self._hit_rects: list = []
         self._press_on_annotation = False
         self._hovered_ann_id: str | None = None
@@ -308,6 +311,25 @@ class ConsensusRowWidget(QWidget):
             self.update()
         super().leaveEvent(event)
 
+    # ------------------------------------------------------------------
+    # Drag tooltip
+    # ------------------------------------------------------------------
+    def _update_drag_tooltip(self, event) -> None:
+        """Show / update the floating Bp/Tm panel near the cursor."""
+        sel = self._selection   # (start_incl, end_incl) or None
+        if sel is None:
+            self._drag_tooltip.clear_tooltip()
+            return
+        lo, hi = sel
+        if hi <= lo:
+            self._drag_tooltip.clear_tooltip()
+            return
+        bp = selection_bp(lo, hi)
+        consensus = self._get_consensus()
+        tm = calculate_tm(consensus[lo:hi + 1]) if consensus else None
+        global_pos = self.mapToGlobal(event.pos())
+        self._drag_tooltip.show_bp_tm(global_pos, bp, tm)
+
     def mouseDoubleClickEvent(self, event):
         if mouse_binding_manager.is_annotation_edit_event(event.modifiers(), event.button()):
             ann = self._annotation_at(event.pos())
@@ -508,6 +530,7 @@ class ConsensusRowWidget(QWidget):
                     self._selection = None
                     if c is not None:
                         self._sequence_viewer.set_v_guides(c._v_guide_cols)
+                self._update_drag_tooltip(event)
                 self.update()
             event.accept()
         else:
@@ -519,6 +542,7 @@ class ConsensusRowWidget(QWidget):
             self.setCursor(Qt.IBeamCursor)
 
             if self._drag_started:
+                self._drag_tooltip.clear_tooltip()
                 # Drag bitti â€” guide'larÄ± kalÄ±cÄ± hale getir
                 self._drag_started = False
                 self._press_pos = None

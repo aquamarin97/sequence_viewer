@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "description": "Sequence Viewer — Tm hesaplama parametreleri.",
+
+  "method": "NN",
+
+  "parameters": {
+    "na":    50.0,
+    "mg":     0.0,
+    "dnac1": 25.0,
+    "dnac2": 25.0,
+    "dntps":  0.0
+  },
+
+  "_comments": {
+    "method":       "'Wallace' | 'GC' | 'NN'  —  NN (Nearest-Neighbor) en doğru sonucu verir.",
+    "na":           "Na⁺ konsantrasyonu (mM). Tipik PCR: 50 mM.",
+    "mg":           "Mg²⁺ konsantrasyonu (mM). 0 = serbest Mg²⁺ yok (saf Na⁺ rejimi).",
+    "dnac1":        "Primer / oligo konsantrasyonu (nM). Tipik PCR: 250 nM.",
+    "dnac2":        "Tamamlayıcı strand konsantrasyonu (nM). Simetrik tasarım için dnac1 ile eşit bırakın.",
+    "dntps":        "Toplam dNTP konsantrasyonu (mM). Serbest Mg²⁺'yi etkiler (dNTPs Mg²⁺ bağlar)."
+  }
+}

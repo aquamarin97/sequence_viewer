@@ -6,6 +6,8 @@ from PyQt5.QtWidgets import QScrollBar
 from .sequence_viewer_model import SequenceViewerModel
 from .sequence_viewer_view import SequenceViewerView
 from sequence_viewer.settings.mouse_binding_manager import mouse_binding_manager, MouseAction
+from sequence_viewer.utils.drag_tooltip import DragTooltip
+from sequence_viewer.utils.sequence_utils import selection_bp, calculate_tm
 
 
 class SequenceViewerController:
@@ -24,6 +26,7 @@ class SequenceViewerController:
         self._on_row_clicked = on_row_clicked
         # Ã‡oklu dikey guide: her eleman bir col index (NA'nÄ±n solundaki sÄ±nÄ±r)
         self._v_guide_cols: List[int] = []
+        self._drag_tooltip = DragTooltip()
 
     # ------------------------------------------------------------------
     # YardÄ±mcÄ±: viewport px â†’ sahne kolonu (NA sÄ±nÄ±rÄ± yuvarlama)
@@ -50,6 +53,7 @@ class SequenceViewerController:
         self._view.add_sequence_item(sequence_string)
 
     def clear(self):
+        self._drag_tooltip.clear_tooltip()
         self._model.clear_sequences(); self._view.clear_items()
         self._is_selecting = False; self._drag_started = False
         self._press_pos = None
@@ -121,11 +125,14 @@ class SequenceViewerController:
                     self._view.set_v_guides(self._v_guide_cols)
                     self._view.set_selection_dim_range(left_b, right_b)
                 else:
+                    self._v_guide_cols.clear()
                     self._view.set_v_guides(self._v_guide_cols)
+                    self._view.clear_selection_dim_range()
             else:
                 self._view.clear_visual_selection()
                 self._view.set_v_guides(self._v_guide_cols)
             self._notify_selection_changed()
+            self._update_drag_tooltip(event, sel_range)
             # SatÄ±r aralÄ±ÄŸÄ± deÄŸiÅŸtiyse row highlight'Ä± canlÄ± gÃ¼ncelle
             r0 = self._press_scene_row
             r1 = row
@@ -145,6 +152,7 @@ class SequenceViewerController:
         self._view.viewport().setCursor(Qt.IBeamCursor)
 
         if self._drag_started:
+            self._drag_tooltip.clear_tooltip()
             self._is_selecting = False
             self._drag_started = False
             row_start = self._press_scene_row
@@ -167,8 +175,10 @@ class SequenceViewerController:
                     # Dim range'i koru (mouse release'den sonra da efekt kalÄ±r)
                     self._view.set_selection_dim_range(left_boundary, right_boundary)
                 else:
+                    self._v_guide_cols.clear()
                     self._view.clear_selection_dim_range()
             else:
+                self._v_guide_cols.clear()
                 self._view.clear_selection_dim_range()
             self._view.set_v_guides(self._v_guide_cols)
             self._notify_selection_changed()
@@ -244,6 +254,30 @@ class SequenceViewerController:
         if abs(target_cw - current_cw) < 0.0001: return True
         self._view.start_zoom_animation(target_char_width=target_cw, center_nt=center_nt, view_width_px=view_width_px)
         return True
+
+    # ------------------------------------------------------------------
+    # Drag tooltip
+    # ------------------------------------------------------------------
+    def _update_drag_tooltip(self, event, sel_range):
+        """Show / update the floating Bp/Tm panel near the cursor."""
+        if sel_range is None:
+            self._drag_tooltip.clear_tooltip()
+            return
+        row_start, row_end, col_start, col_end = sel_range
+        if col_end <= col_start:
+            self._drag_tooltip.clear_tooltip()
+            return
+        bp = selection_bp(col_start, col_end)
+        global_pos = self._view.viewport().mapToGlobal(event.pos())
+        if row_start == row_end:
+            sequences = self._model.get_sequences()
+            tm = None
+            if 0 <= row_start < len(sequences):
+                fragment = sequences[row_start][col_start:col_end + 1]
+                tm = calculate_tm(fragment)
+            self._drag_tooltip.show_bp_tm(global_pos, bp, tm)
+        else:
+            self._drag_tooltip.show_bp_only(global_pos, bp)
 
     def _notify_selection_changed(self):
         if self._on_selection_changed: self._on_selection_changed()
