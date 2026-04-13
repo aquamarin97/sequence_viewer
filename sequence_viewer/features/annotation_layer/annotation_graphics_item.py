@@ -2,9 +2,14 @@
 from __future__ import annotations
 import weakref
 from typing import Callable, Optional
-from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtCore import Qt, QRectF, QTimer
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem, QToolTip
+
+# Tıklama animasyonu: büyüyüp küçülme kareleri (scale çarpanı)
+_ANIM_FRAMES = (1.00, 1.04, 1.07, 1.09, 1.07, 1.04, 1.00)
+_ANIM_INTERVAL_MS = 22   # ~45fps, toplam ~150ms
+_ANIM_MARGIN = 6         # boundingRect taşma payı (px)
 from sequence_viewer.features.annotation_layer.annotation_painter import (
     draw_primer, draw_probe, draw_repeated_region, draw_mismatch_marker,
     draw_selection_outline, draw_hover_overlay,
@@ -26,7 +31,11 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self.setAcceptHoverEvents(True); self.setZValue(10.0)
         self._selected = False
         self._hovered  = False
+        self._anim_scale = 1.0
+        self._anim_frame = 0
         _ref = weakref.ref(self)
+        self._anim_timer = QTimer()
+        self._anim_timer.timeout.connect(lambda r=_ref: (s := r()) and s._anim_step())
         theme_manager.themeChanged.connect(lambda _, r=_ref: (s := r()) and s.update())
         try:
             from sequence_viewer.settings.annotation_styles import annotation_style_manager as _asm
@@ -45,15 +54,36 @@ class AnnotationGraphicsItem(QGraphicsItem):
         if self._selected == selected:
             return
         self._selected = selected
+        if selected:
+            self._anim_frame = 0
+            self._anim_scale = _ANIM_FRAMES[0]
+            self._anim_timer.start(_ANIM_INTERVAL_MS)
+        self.update()
+
+    def _anim_step(self):
+        self._anim_frame += 1
+        if self._anim_frame >= len(_ANIM_FRAMES):
+            self._anim_timer.stop()
+            self._anim_scale = 1.0
+            self._anim_frame = 0
+        else:
+            self._anim_scale = _ANIM_FRAMES[self._anim_frame]
         self.update()
 
     def boundingRect(self):
-        return QRectF(0, 0, self._w, self._h)
+        m = _ANIM_MARGIN
+        return QRectF(-m, -m, self._w + 2 * m, self._h + 2 * m)
 
     def paint(self, painter, option, widget=None):
         ann = self.annotation
         color = ann.resolved_color()
         painter.setRenderHint(QPainter.Antialiasing, True)
+        s = self._anim_scale
+        if abs(s - 1.0) > 0.001:
+            cx, cy = self._w / 2.0, self._h / 2.0
+            painter.translate(cx, cy)
+            painter.scale(s, s)
+            painter.translate(-cx, -cy)
         char_width = self._w / max(ann.length(), 1)
         strand = getattr(ann, "strand", "+")
         if ann.type == AnnotationType.PRIMER:

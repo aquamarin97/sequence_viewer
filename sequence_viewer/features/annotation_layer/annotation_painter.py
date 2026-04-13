@@ -412,12 +412,12 @@ def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
     painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setBrush(Qt.NoBrush)
     # DÄ±ÅŸ halo â€” annotation renginden tÃ¼retilmiÅŸ geniÅŸ parlama
-    halo_pen = QPen(halo_color, 5.0)
+    halo_pen = QPen(halo_color, 3.0)
     halo_pen.setJoinStyle(Qt.RoundJoin)
     painter.setPen(halo_pen)
     painter.drawPath(path)
     # Ä°Ã§ keskin Ã§izgi â€” kontrast renk
-    inner_pen = QPen(inner_color, 1.5)
+    inner_pen = QPen(inner_color, 1.0)
     inner_pen.setJoinStyle(Qt.RoundJoin)
     painter.setPen(inner_pen)
     painter.drawPath(path)
