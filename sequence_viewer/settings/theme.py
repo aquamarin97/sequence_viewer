@@ -146,7 +146,7 @@ DARK_THEME = AppTheme(
     # Guide lines - tutarlÄ± mavi ton (magenta yerine)
     guide_line_color=QColor(100, 160, 255, 160),
     # Selection dim overlay
-    selection_dim_color=QColor(0, 0, 0, 155),
+    selection_dim_color=QColor(0, 0, 0, 120),
     # Navigation ruler
     nav_ruler_viewport_fill=QColor(0, 180, 0, 55),
     nav_ruler_viewport_border=QColor(0, 140, 0),

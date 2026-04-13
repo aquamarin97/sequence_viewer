@@ -63,6 +63,13 @@ class InteractionMixin:
                 return
         super().mouseMoveEvent(event)
 
+    def leaveEvent(self, event):
+        """Cursor viewport dışına çıktığında ghost I-beam'i temizle."""
+        clear_fn = getattr(self, "clear_hover_caret", None)
+        if callable(clear_fn):
+            clear_fn()
+        super().leaveEvent(event)
+
     def mouseReleaseEvent(self, event):
         if self._controller:
             handled = getattr(self._controller, "handle_mouse_release", None)

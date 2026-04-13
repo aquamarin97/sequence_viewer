@@ -56,6 +56,7 @@ class SequenceViewerController:
         self._v_guide_cols.clear()
         self._view.set_v_guides(self._v_guide_cols)
         self._view.clear_caret()
+        self._view.clear_hover_caret()
         self._view.clear_selection_dim_range()
         self._wheel_zoom_streak_dir = None; self._wheel_zoom_streak_len = 0
         self._notify_selection_changed()
@@ -71,6 +72,9 @@ class SequenceViewerController:
             self._model.clear_selection(); self._view.clear_visual_selection()
             self._v_guide_cols.clear(); self._view.set_v_guides(self._v_guide_cols)
             self._notify_selection_changed(); return True
+
+        # Basışta ghost cursor'ı gizle — aktif caret/drag devralacak
+        self._view.clear_hover_caret()
 
         scene_pos = self._view.mapToScene(event.pos())
         row, col = self._view.scene_pos_to_row_col(scene_pos)
@@ -104,6 +108,7 @@ class SequenceViewerController:
                 self._v_guide_cols.clear()
                 self._view.set_v_guides(self._v_guide_cols)
             self._view.clear_caret()
+            self._view.clear_hover_caret()   # drag başlarken ghost'u temizle
             self._view.viewport().setCursor(Qt.SizeHorCursor)
 
         if self._drag_started and self._is_selecting:
@@ -294,9 +299,22 @@ class SequenceViewerController:
 
     def _handle_hover(self, event) -> None:
         """
-        Drag dışı mouse hareketi: seçim alanı üzerindeyse paneli göster,
-        dışındaysa gizle. Zoom/scroll sonrası hover ile panel yeniden açılır.
+        Drag dışı mouse hareketi:
+        - Ghost I-beam: cursor'ın bulunduğu satırda en yakın sınır kolonuna yerleşir
+        - Info panel: seçim alanı üzerindeyse gösterilir, dışındaysa gizlenir
         """
+        scene_pos = self._view.mapToScene(event.pos())
+        hover_row, hover_col = self._view.scene_pos_to_row_col(scene_pos)
+        row_count = self._model.get_row_count()
+
+        # ── Ghost I-beam (hover caret) ─────────────────────────────────
+        if row_count > 0 and 0 <= hover_row < row_count:
+            boundary_col = self._boundary_col_at(float(scene_pos.x()))
+            self._view.set_hover_caret(boundary_col, hover_row)
+        else:
+            self._view.clear_hover_caret()
+
+        # ── Info panel (bp / Tm) ───────────────────────────────────────
         sel = self._model.get_selection_column_range()
         if sel is None or self._last_sel_range is None:
             if self._drag_tooltip.isVisible():
@@ -305,10 +323,6 @@ class SequenceViewerController:
 
         col_start, col_end = sel
         row_start, row_end = self._last_sel_range[0], self._last_sel_range[1]
-
-        scene_pos = self._view.mapToScene(event.pos())
-        hover_row, hover_col = self._view.scene_pos_to_row_col(scene_pos)
-
         over_selection = (
             row_start <= hover_row <= row_end
             and col_start <= hover_col <= col_end

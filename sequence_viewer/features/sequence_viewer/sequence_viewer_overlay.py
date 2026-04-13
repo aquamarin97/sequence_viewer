@@ -31,8 +31,9 @@ class OverlayMixin:
         self._v_guide_cols: list = []
         self._v_guide_observers: list = []
         self._h_guide_rows: frozenset = frozenset()
-        self._selection_dim_ranges: list = []  # [(left_col, right_col), ...] focus alanlarÄ±
-        self._caret = None  # (col, row) veya None â€” tek tÄ±klama pozisyonu
+        self._selection_dim_ranges: list = []  # [(left_col, right_col), ...] focus alanları
+        self._caret = None        # (col, row) | None — aktif I-beam (tıklama sonrası)
+        self._hover_caret = None  # (col, row) | None — ghost I-beam (hover preview)
 
     # ------------------------------------------------------------------
     # Vertical guide public API
@@ -58,13 +59,26 @@ class OverlayMixin:
     # ------------------------------------------------------------------
 
     def set_caret(self, col: int, row: int):
-        """Belirtilen kolon/satÄ±r kesiÅŸimine I-beam caret koy."""
+        """Belirtilen kolon/satır kesişimine aktif I-beam caret koy."""
         self._caret = (col, row)
         self.viewport().update()
 
     def clear_caret(self):
         if self._caret is not None:
             self._caret = None
+            self.viewport().update()
+
+    def set_hover_caret(self, col: int, row: int):
+        """Ghost I-beam preview cursor'ı konumlandır (hover state)."""
+        if self._hover_caret == (col, row):
+            return
+        self._hover_caret = (col, row)
+        self.viewport().update()
+
+    def clear_hover_caret(self):
+        """Ghost I-beam preview cursor'ı temizle."""
+        if self._hover_caret is not None:
+            self._hover_caret = None
             self.viewport().update()
 
     # Backwards-compat single-guide API
@@ -152,6 +166,7 @@ class OverlayMixin:
         self._draw_row_band_border_lines(painter, t)
         self._draw_selection_dim_overlay(painter, t)
         self._draw_vertical_guides(painter, t)
+        self._draw_hover_caret(painter, t)   # ghost önce → aktif üstte
         self._draw_caret(painter, t)
 
     # ------------------------------------------------------------------
@@ -242,8 +257,51 @@ class OverlayMixin:
                 painter.drawLine(QPointF(vp_x, draw_top), QPointF(vp_x, draw_bottom))
         painter.restore()
 
+    def _draw_hover_caret(self, painter, t):
+        """Ghost I-beam — hover preview (tıklama öncesi pozisyon ipucu)."""
+        if self._hover_caret is None:
+            return
+        col, row = self._hover_caret
+        # Aktif caret ile aynı konumdaysa çizme (aktif zaten üstte görünür)
+        if self._caret is not None and self._caret == self._hover_caret:
+            return
+        cw = self._effective_char_width()
+        if cw <= 0:
+            return
+        layout = self._row_layout
+        if layout is None or row < 0 or row >= layout.row_count:
+            return
+
+        offset_h = self._viewport_horizontal_offset()
+        offset_v = self._viewport_vertical_offset()
+        vp_w = float(self.viewport().width())
+        vp_h = float(self.viewport().height())
+
+        x = col * cw - offset_h
+        if not (-10 <= x <= vp_w + 10):
+            return
+
+        y_top = float(layout.seq_y_offsets[row]) - offset_v
+        y_bottom = float(layout.below_y_offsets[row]) - offset_v
+        if y_bottom < 0 or y_top > vp_h:
+            return
+
+        # Temaya göre muted/gray — aktif i_beam'den belirgin biçimde farklı
+        ghost_color = (
+            QColor(175, 178, 192, 155) if t.name == "dark"
+            else QColor(105, 108, 122, 150)
+        )
+
+        painter.save()
+        painter.resetTransform()
+        pen = QPen(ghost_color, 2, Qt.SolidLine)
+        pen.setCapStyle(Qt.FlatCap)
+        painter.setPen(pen)
+        painter.drawLine(QPointF(x, y_top), QPointF(x, y_bottom))
+        painter.restore()
+
     def _draw_caret(self, painter, t):
-        """TÄ±klanan satÄ±rda dÃ¼z I-beam (metin kursÃ¶rÃ¼) Ã§izer."""
+        """Tıklanan satırda düz I-beam (metin kursörü) çizer — aktif renk."""
         if self._caret is None:
             return
         col, row = self._caret
