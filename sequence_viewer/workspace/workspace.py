@@ -245,7 +245,7 @@ class SequenceWorkspaceWidget(QWidget):
         selected = self.header_viewer._selection.selected_rows()
         # Consensus seÃ§ili mi?
         if self.consensus_spacer._selected:
-            from sequence_viewer.features.consensus_row.consensus_calculator import ConsensusCalculator
+            from sequence_viewer.model.consensus_calculator import ConsensusCalculator
             seqs = [seq for _, seq in self._model.all_rows()]
             if seqs:
                 consensus = ConsensusCalculator.compute(seqs)
@@ -392,5 +392,3 @@ class SequenceWorkspaceWidget(QWidget):
     def _connect_scroll_sync(self): self._layout_sync.connect_scroll_sync()
     def _on_splitter_moved(self, pos, index): self._layout_sync.on_splitter_moved(pos, index)
     def _update_header_max_width(self): self._layout_sync.update_header_max_width()
-
-
