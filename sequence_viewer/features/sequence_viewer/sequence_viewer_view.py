@@ -202,4 +202,21 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         col = int(scene_pos.x() // cw)
         return raw_row, col
 
+    def selection_viewport_anchor(self, row_end: int, col_end: int):
+        """
+        Seçimin sağ-alt köşesinin viewport koordinatını döndürür.
+        Dönen nokta FloatingPanel.show_at() için anchor olarak kullanılır.
+        """
+        from PyQt5.QtCore import QPoint, QPointF
+        cw = self._effective_char_width()
+        scene_x = (col_end + 1) * cw
+        layout = self._row_layout
+        if layout is not None and 0 <= row_end < layout.row_count:
+            scene_y = float(layout.seq_y_offsets[row_end]) + float(self.char_height)
+        else:
+            stride = self._per_row_annot_h + self.char_height
+            scene_y = float(row_end * stride + self._per_row_annot_h + self.char_height)
+        vp = self.mapFromScene(QPointF(scene_x, scene_y))
+        return QPoint(int(vp.x()), int(vp.y()))
+
 

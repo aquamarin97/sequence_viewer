@@ -39,12 +39,16 @@ def calculate_tm(sequence: str) -> Optional[float]:
       "Wallace" -> Tm_Wallace — klasik kısa-oligo kural-parmak formülü
 
     Geçersiz veya boş dizi için None döner.
+    Hizalama boşlukları ('-', '.') ve standart olmayan IUPAC karakterleri
+    hesaplamadan önce otomatik olarak temizlenir.
     """
-    if not sequence:
+    # Hizalama boşluklarını ve ACGT dışındaki karakterleri temizle
+    cleaned = "".join(ch for ch in sequence.upper() if ch in "ACGTU")
+    if not cleaned:
         return None
 
     try:
-        seq = Seq(sequence)
+        seq = Seq(cleaned)
         method = tm_settings_manager.method.upper()
 
         if method == "WALLACE":

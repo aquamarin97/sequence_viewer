@@ -144,6 +144,7 @@ class WorkspaceActionDialogCoordinator:
             self.workspace.sequence_viewer.set_visual_selection(0, n-1, focus_start, focus_end - 1)
             self.workspace.sequence_viewer._model.start_selection(0, focus_start)
             self.workspace.sequence_viewer._model.update_selection(n-1, focus_end - 1)
+            self.workspace.sequence_viewer.show_info_panel(0, n - 1, focus_start, focus_end - 1)
 
     def on_annotation_layer_double_clicked(self, annotation):
         if annotation.type == AnnotationType.MISMATCH_MARKER:
@@ -206,6 +207,7 @@ class WorkspaceActionDialogCoordinator:
             ws.sequence_viewer.set_visual_selection(row_index, row_index, focus_start, focus_end - 1)
             ws.sequence_viewer._model.start_selection(row_index, focus_start)
             ws.sequence_viewer._model.update_selection(row_index, focus_end - 1)
+            ws.sequence_viewer.show_info_panel(row_index, row_index, focus_start, focus_end - 1)
 
     def on_ann_item_double_clicked(self, annotation, _row_index):
         if annotation.type == AnnotationType.MISMATCH_MARKER:
