@@ -92,6 +92,10 @@ class ConsensusSpacerWidget(QWidget):
     @label.setter
     def label(self, value): self._label = value; self.update()
 
+    @property
+    def is_selected(self) -> bool:
+        return self._selected
+
     def set_selected(self, selected: bool):
         if self._selected == selected: return
         self._selected = selected; self.update()

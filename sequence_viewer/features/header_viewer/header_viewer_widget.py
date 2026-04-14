@@ -30,6 +30,17 @@ class HeaderViewerWidget(HeaderViewerView):
     def get_headers(self): return self._model.get_headers()
     def get_row_count(self): return self._model.get_row_count()
 
+    def selected_rows(self):
+        return self._selection.selected_rows()
+
+    def deselect_row(self, row: int) -> None:
+        self._selection.remove_row(row)
+
+    def clear_interaction_state(self) -> None:
+        """Satır seçim state'ini temizler ve görsel güncellemesini yapar."""
+        changed = self._selection.clear()
+        self.apply_selection_to_items(changed)
+
     def clear_selection(self):
         changed = self._selection.clear()
         self.apply_selection_to_items(changed)

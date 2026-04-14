@@ -1,6 +1,8 @@
 # sequence_viewer/workspace/ui/layout_manager.py
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QHBoxLayout, QSplitter, QVBoxLayout, QWidget
 
@@ -17,61 +19,68 @@ from sequence_viewer.features.navigation_ruler.navigation_ruler_widget import Ru
 from sequence_viewer.features.position_ruler.position_ruler_widget import SequencePositionRulerWidget
 from sequence_viewer.features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 
+if TYPE_CHECKING:
+    from sequence_viewer.workspace.context import WorkspaceContext
+
 
 class WorkspaceLayoutManager:
-    """Builds and wires the workspace UI structure."""
+    """Workspace UI yapısını kurar ve WorkspaceContext'i doldurur."""
 
-    def __init__(self, workspace, *, char_width: float, row_height: int):
-        self.workspace = workspace
+    def __init__(self, workspace: QWidget, *, char_width: float, row_height: int) -> None:
+        self._workspace = workspace  # Yalnızca Qt parent olarak kullanılır
         self.char_width = char_width
         self.row_height = row_height
 
-    def setup_ui(self) -> None:
-        self._build_left_panel()
-        right_panel = self._build_right_panel()
-        self._build_splitter(right_panel)
-        self._build_root_layout()
-        self._apply_viewport_margins()
+    def setup_ui(self, ctx: "WorkspaceContext") -> None:
+        self._build_left_panel(ctx)
+        right_panel = self._build_right_panel(ctx)
+        self._build_splitter(ctx, right_panel)
+        self._build_root_layout(ctx)
+        self._apply_viewport_margins(ctx)
 
-    def _build_left_panel(self) -> None:
-        ws = self.workspace
-        ws.header_top = HeaderTopWidget(height=28, parent=ws)
-        ws.header_pos_spacer = HeaderPositionSpacerWidget(height=24, parent=ws)
-        ws.annotation_spacer = AnnotationSpacerWidget(parent=ws)
-        ws.consensus_spacer = ConsensusSpacerWidget(parent=ws)
-        ws.header_viewer = HeaderViewerWidget(parent=ws, row_height=self.row_height, initial_width=160.0)
+    # ── Sol panel ────────────────────────────────────────────────────────
 
-        ws.left_panel = QWidget(ws)
-        layout = QVBoxLayout(ws.left_panel)
+    def _build_left_panel(self, ctx: "WorkspaceContext") -> None:
+        ws = self._workspace
+        header_top = HeaderTopWidget(height=28, parent=ws)
+        header_pos_spacer = HeaderPositionSpacerWidget(height=24, parent=ws)
+        ctx.annotation_spacer = AnnotationSpacerWidget(parent=ws)
+        ctx.consensus_spacer = ConsensusSpacerWidget(parent=ws)
+        ctx.header_viewer = HeaderViewerWidget(parent=ws, row_height=self.row_height, initial_width=160.0)
+
+        ctx.left_panel = QWidget(ws)
+        layout = QVBoxLayout(ctx.left_panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         for widget in (
-            ws.header_top,
-            ws.header_pos_spacer,
-            ws.annotation_spacer,
-            ws.consensus_spacer,
-            ws.header_viewer,
+            header_top,
+            header_pos_spacer,
+            ctx.annotation_spacer,
+            ctx.consensus_spacer,
+            ctx.header_viewer,
         ):
             layout.addWidget(widget)
 
-    def _build_right_panel(self) -> QWidget:
-        ws = self.workspace
-        ws.sequence_viewer = SequenceViewerWidget(
+    # ── Sağ panel ────────────────────────────────────────────────────────
+
+    def _build_right_panel(self, ctx: "WorkspaceContext") -> QWidget:
+        ws = self._workspace
+        ctx.sequence_viewer = SequenceViewerWidget(
             parent=ws,
             char_width=self.char_width,
             char_height=self.row_height,
         )
-        ws.sequence_viewer.set_alignment_model(ws._model)
-        ws.ruler = RulerWidget(ws.sequence_viewer, parent=ws)
-        ws.pos_ruler = SequencePositionRulerWidget(ws.sequence_viewer, parent=ws)
-        ws.annotation_layer = AnnotationLayerWidget(
-            model=ws._model,
-            sequence_viewer=ws.sequence_viewer,
+        ctx.sequence_viewer.set_alignment_model(ctx.model)
+        ctx.ruler = RulerWidget(ctx.sequence_viewer, parent=ws)
+        ctx.pos_ruler = SequencePositionRulerWidget(ctx.sequence_viewer, parent=ws)
+        ctx.annotation_layer = AnnotationLayerWidget(
+            model=ctx.model,
+            sequence_viewer=ctx.sequence_viewer,
             parent=ws,
         )
-        ws.consensus_row = ConsensusRowWidget(
-            alignment_model=ws._model,
-            sequence_viewer=ws.sequence_viewer,
+        ctx.consensus_row = ConsensusRowWidget(
+            alignment_model=ctx.model,
+            sequence_viewer=ctx.sequence_viewer,
             parent=ws,
         )
 
@@ -80,33 +89,33 @@ class WorkspaceLayoutManager:
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         for widget in (
-            ws.ruler,
-            ws.pos_ruler,
-            ws.annotation_layer,
-            ws.consensus_row,
-            ws.sequence_viewer,
+            ctx.ruler,
+            ctx.pos_ruler,
+            ctx.annotation_layer,
+            ctx.consensus_row,
+            ctx.sequence_viewer,
         ):
             layout.addWidget(widget)
         return right_panel
 
-    def _build_splitter(self, right_panel: QWidget) -> None:
-        ws = self.workspace
-        ws.splitter = QSplitter(Qt.Horizontal, ws)
-        ws.splitter.addWidget(ws.left_panel)
-        ws.splitter.addWidget(right_panel)
-        ws.splitter.setSizes([130, 500])
+    # ── Splitter & kök layout ─────────────────────────────────────────────
 
-    def _build_root_layout(self) -> None:
-        ws = self.workspace
+    def _build_splitter(self, ctx: "WorkspaceContext", right_panel: QWidget) -> None:
+        ws = self._workspace
+        ctx.splitter = QSplitter(Qt.Horizontal, ws)
+        ctx.splitter.addWidget(ctx.left_panel)
+        ctx.splitter.addWidget(right_panel)
+        ctx.splitter.setSizes([130, 500])
+
+    def _build_root_layout(self, ctx: "WorkspaceContext") -> None:
+        ws = self._workspace
         layout = QHBoxLayout(ws)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(ws.splitter)
+        layout.addWidget(ctx.splitter)
         ws.setLayout(layout)
         ws.setFocusPolicy(Qt.StrongFocus)
 
-    def _apply_viewport_margins(self) -> None:
-        ws = self.workspace
-        hsb_h = ws.sequence_viewer.horizontalScrollBar().sizeHint().height()
-        ws.header_viewer.setViewportMargins(0, 0, 0, hsb_h)
-
+    def _apply_viewport_margins(self, ctx: "WorkspaceContext") -> None:
+        hsb_h = ctx.sequence_viewer.horizontalScrollBar().sizeHint().height()
+        ctx.header_viewer.setViewportMargins(0, 0, 0, hsb_h)

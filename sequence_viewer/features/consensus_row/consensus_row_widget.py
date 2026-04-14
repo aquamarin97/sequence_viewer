@@ -183,6 +183,12 @@ class ConsensusRowWidget(QWidget):
             s, e = value  # end inclusive
             self._selection_ranges = [(s, e + 1)]
 
+    def has_selected_annotations(self) -> bool:
+        return bool(self._selected_ann_ids)
+
+    def get_selected_annotation_ids(self) -> set:
+        return set(self._selected_ann_ids)
+
     def clear_selection(self):
         self._selection_ranges = []
         self._is_selected = False

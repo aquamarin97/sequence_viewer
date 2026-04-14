@@ -58,6 +58,18 @@ class SequenceViewerWidget(SequenceViewerView):
         """Annotation click gibi dış olaylardan bp/Tm panelini gösterir."""
         self._controller.show_info_panel(row_start, row_end, col_start, col_end)
 
+    def clear_interaction_state(self) -> None:
+        """Tüm etkileşim state'ini temizler: seçim, guide çizgileri, boyutlandırma aralığı."""
+        self.clear_visual_selection()
+        try:
+            self._model.clear_selection()
+        except Exception:
+            pass
+        self.clear_h_guides()
+        self.clear_v_guides()
+        self._controller._v_guide_cols.clear()  # overlay ile senkronize controller backing store
+        self.clear_selection_dim_range()
+
     def keyPressEvent(self, event):
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)

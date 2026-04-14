@@ -1,70 +1,78 @@
 # sequence_viewer/workspace/coordinators/action_dialog.py
 from __future__ import annotations
-from typing import FrozenSet, Optional, TYPE_CHECKING
+
+from typing import TYPE_CHECKING
+
 from sequence_viewer.model.annotation import Annotation, AnnotationType
-from sequence_viewer.settings.mouse_binding_manager import mouse_binding_manager, MouseAction
+from sequence_viewer.settings.mouse_binding_manager import MouseAction, mouse_binding_manager
+
 if TYPE_CHECKING:
-    from sequence_viewer.workspace.workspace import SequenceWorkspaceWidget
+    from sequence_viewer.workspace.context import WorkspaceContext
+
 
 class WorkspaceActionDialogCoordinator:
-    def __init__(self, workspace):
-        self.workspace = workspace
+    def __init__(self, ctx: "WorkspaceContext") -> None:
+        self._ctx = ctx
         self._selected_annotations: list = []  # [(annotation, row_index_or_None), ...]
         self._last_clicked_row: int = 0  # Shift+click anchor
 
-    def _update_selection_visuals(self, ann_id, is_layer, ctrl=False):
-        """Per-row ve layer annotation seÃƒÂ§im gÃƒÂ¶rsellerini senkronize eder."""
-        ws = self.workspace
-        ws._annotation_presentation.set_selected_annotation(
-            ann_id if not is_layer else None, ctrl=ctrl)
-        ws.annotation_layer.set_selected_annotation(
-            ann_id if is_layer else None, ctrl=ctrl)
+    # ── Seçim görsel senkronizasyonu ─────────────────────────────────────
+
+    def _update_selection_visuals(self, ann_id, is_layer: bool, ctrl: bool = False) -> None:
+        self._ctx.annotation_presentation.set_selected_annotation(
+            ann_id if not is_layer else None, ctrl=ctrl
+        )
+        self._ctx.annotation_layer.set_selected_annotation(
+            ann_id if is_layer else None, ctrl=ctrl
+        )
 
     @staticmethod
     def _annotation_focus_range(annotation):
-        return (annotation.start, annotation.start + 1) if annotation.type == AnnotationType.MISMATCH_MARKER else (annotation.start, annotation.end + 1)
+        return (
+            (annotation.start, annotation.start + 1)
+            if annotation.type == AnnotationType.MISMATCH_MARKER
+            else (annotation.start, annotation.end + 1)
+        )
 
     @staticmethod
     def _annotation_guide_boundaries(annotation):
-        return [annotation.start] if annotation.type == AnnotationType.MISMATCH_MARKER else [annotation.start, annotation.end + 1]
+        return (
+            [annotation.start]
+            if annotation.type == AnnotationType.MISMATCH_MARKER
+            else [annotation.start, annotation.end + 1]
+        )
 
-    def _clear_all_annotation_visuals(self):
-        """TÃƒÂ¼m seÃƒÂ§ili annotation gÃƒÂ¶rsellerini ve dim overlay'ini temizler."""
-        ws = self.workspace
-        ws._annotation_presentation.clear_annotation_selection()
-        ws.annotation_layer.clear_annotation_selection()
-        ws.sequence_viewer.clear_selection_dim_range()
+    def _clear_all_annotation_visuals(self) -> None:
+        self._ctx.annotation_presentation.clear_annotation_selection()
+        self._ctx.annotation_layer.clear_annotation_selection()
+        self._ctx.sequence_viewer.clear_selection_dim_range()
 
-    def _apply_union_selection(self):
-        """
-        Coordinator'Ã„Â±n seÃƒÂ§imlerini uygular. Consensus annotation'lar kendi widget'Ã„Â±nda
-        render edilir (regular sequence items'a yazÃ„Â±lmaz). V-guide + dim iÃƒÂ§in merge.
-        """
-        ws = self.workspace
-        n = ws.model.row_count()
-        ws.sequence_viewer.clear_visual_selection()
-        try: ws.sequence_viewer._model.clear_selection()
-        except: pass
-        ws.sequence_viewer.clear_selection_dim_range()
+    def _apply_union_selection(self) -> None:
+        ctx = self._ctx
+        n = ctx.model.row_count()
+        ctx.sequence_viewer.clear_visual_selection()
+        try:
+            ctx.sequence_viewer._model.clear_selection()
+        except Exception:
+            pass
+        ctx.sequence_viewer.clear_selection_dim_range()
 
-        # Consensus row'un seÃƒÂ§ili annotation'larÃ„Â±nÃ„Â± sadece guide/dim hesabÃ„Â± iÃƒÂ§in al
-        cr = ws.consensus_row
-        cr_ann_ids = set(getattr(cr, '_selected_ann_ids', set()))
+        cr = ctx.consensus_row
+        cr_ann_ids = set(getattr(cr, "_selected_ann_ids", set()))
         cr_anns: list = []
-        if cr_ann_ids and getattr(ws.model, 'is_aligned', False):
-            ann_map = {a.id: a for a in ws.model.consensus_annotations}
+        if cr_ann_ids and getattr(ctx.model, "is_aligned", False):
+            ann_map = {a.id: a for a in ctx.model.consensus_annotations}
             cr_anns = [ann_map[aid] for aid in cr_ann_ids if aid in ann_map]
 
         has_any = bool(self._selected_annotations or cr_anns)
         if not has_any or n == 0:
-            ws.sequence_viewer.clear_h_guides()
-            clear_changed = ws.header_viewer._selection.clear()
-            ws.header_viewer.apply_selection_to_items(clear_changed)
+            ctx.sequence_viewer.clear_h_guides()
+            clear_changed = ctx.header_viewer._selection.clear()
+            ctx.header_viewer.apply_selection_to_items(clear_changed)
             return
 
-        items = ws.sequence_viewer.sequence_items
-        # Her satÃ„Â±r iÃƒÂ§in ayrÃ„Â± aralÃ„Â±klarÃ„Â± topla ââ‚¬" SADECE coordinator annotation'larÃ„Â±
-        row_ranges_map: dict = {}  # row_index ââ€ ' [(start, end), ...]
+        items = ctx.sequence_viewer.sequence_items
+        row_ranges_map: dict = {}
         per_row_indices: set = set()
         for ann, row_index in self._selected_annotations:
             if row_index is None:
@@ -79,367 +87,396 @@ class WorkspaceActionDialogCoordinator:
                 items[row_index].set_selection(ranges[0][0], ranges[0][1])
             else:
                 items[row_index].set_multi_selection(ranges)
-        ws.sequence_viewer.scene.invalidate()
-        ws.sequence_viewer.viewport().update()
+        ctx.sequence_viewer.scene.invalidate()
+        ctx.sequence_viewer.viewport().update()
 
-        # V-guide + focus: coordinator + consensus annotation sÃ„Â±nÃ„Â±rlarÃ„Â±nÃ„Â± birleÃ…Å¸tir
         boundaries: list = []
         focus_ranges: list = []
         for ann, _ in self._selected_annotations:
             for boundary in self._annotation_guide_boundaries(ann):
-                if boundary not in boundaries: boundaries.append(boundary)
+                if boundary not in boundaries:
+                    boundaries.append(boundary)
             focus_ranges.append(self._annotation_focus_range(ann))
         for ann in cr_anns:
             for boundary in self._annotation_guide_boundaries(ann):
-                if boundary not in boundaries: boundaries.append(boundary)
+                if boundary not in boundaries:
+                    boundaries.append(boundary)
             focus_ranges.append(self._annotation_focus_range(ann))
         boundaries.sort()
 
-        # Controller gÃƒÂ¼ncellenmesi set_v_guides'dan Ãƒâ€“NCE olmalÃ„Â±
-        seq_ctrl = ws.sequence_viewer._controller
+        seq_ctrl = ctx.sequence_viewer._controller
         if seq_ctrl is not None:
             seq_ctrl._v_guide_cols = list(boundaries)
-        ws.sequence_viewer.set_v_guides(boundaries)
+        ctx.sequence_viewer.set_v_guides(boundaries)
         if focus_ranges:
-            ws.sequence_viewer.set_selection_focus_ranges(focus_ranges)
+            ctx.sequence_viewer.set_selection_focus_ranges(focus_ranges)
 
-        # H-guide: sadece per-row annotation satÃ„Â±rlarÃ„Â±
         if per_row_indices:
-            ws.sequence_viewer.set_h_guides(frozenset(per_row_indices))
+            ctx.sequence_viewer.set_h_guides(frozenset(per_row_indices))
         else:
-            ws.sequence_viewer.clear_h_guides()
-        # Header: per-row annotation satÃ„Â±rlarÃ„Â±nÃ„Â± vurgula
-        changed = ws.header_viewer._selection.clear()
+            ctx.sequence_viewer.clear_h_guides()
+        changed = ctx.header_viewer._selection.clear()
         for ri in per_row_indices:
-            changed = changed | ws.header_viewer._selection.handle_ctrl_click(ri, n)
-        ws.header_viewer.apply_selection_to_items(changed)
+            changed = changed | ctx.header_viewer._selection.handle_ctrl_click(ri, n)
+        ctx.header_viewer.apply_selection_to_items(changed)
 
-    def on_annotation_layer_clicked(self, annotation):
+    # ── Annotation layer click handler'ları ──────────────────────────────
+
+    def on_annotation_layer_clicked(self, annotation) -> None:
         from PyQt5.QtWidgets import QApplication
+
         action = mouse_binding_manager.resolve_annotation_click(QApplication.keyboardModifiers())
         is_multi = action == MouseAction.ANNOTATION_MULTI_SELECT
         if is_multi:
-            existing = next((i for i, (a, _) in enumerate(self._selected_annotations)
-                             if a.id == annotation.id), -1)
+            existing = next(
+                (i for i, (a, _) in enumerate(self._selected_annotations) if a.id == annotation.id),
+                -1,
+            )
             if existing >= 0:
                 self._selected_annotations.pop(existing)
             else:
                 self._selected_annotations.append((annotation, None))
-            self.workspace.annotation_layer.set_selected_annotation(annotation.id, ctrl=True)
+            self._ctx.annotation_layer.set_selected_annotation(annotation.id, ctrl=True)
             self._apply_union_selection()
             return
-        # Non-ctrl tekil seÃƒÂ§im: consensus row'u temizle
-        self.workspace.consensus_row.clear_selection()
+        self._ctx.consensus_row.clear_selection()
         self._selected_annotations = [(annotation, None)]
         self._update_selection_visuals(annotation.id, is_layer=True)
-        self.workspace.setFocus()
+        self._ctx.root_widget.setFocus()
         _boundaries = self._annotation_guide_boundaries(annotation)
-        _seq_ctrl = self.workspace.sequence_viewer._controller
+        _seq_ctrl = self._ctx.sequence_viewer._controller
         if _seq_ctrl is not None:
             _seq_ctrl._v_guide_cols = list(_boundaries)
-        self.workspace.sequence_viewer.set_v_guides(_boundaries)
+        self._ctx.sequence_viewer.set_v_guides(_boundaries)
         focus_start, focus_end = self._annotation_focus_range(annotation)
-        self.workspace.sequence_viewer.set_selection_dim_range(focus_start, focus_end)
-        n = self.workspace.model.row_count()
+        self._ctx.sequence_viewer.set_selection_dim_range(focus_start, focus_end)
+        n = self._ctx.model.row_count()
         if n > 0:
-            self.workspace.sequence_viewer.set_visual_selection(0, n-1, focus_start, focus_end - 1)
-            self.workspace.sequence_viewer._model.start_selection(0, focus_start)
-            self.workspace.sequence_viewer._model.update_selection(n-1, focus_end - 1)
-            self.workspace.sequence_viewer.show_info_panel(0, n - 1, focus_start, focus_end - 1)
+            self._ctx.sequence_viewer.set_visual_selection(0, n - 1, focus_start, focus_end - 1)
+            self._ctx.sequence_viewer._model.start_selection(0, focus_start)
+            self._ctx.sequence_viewer._model.update_selection(n - 1, focus_end - 1)
+            self._ctx.sequence_viewer.show_info_panel(0, n - 1, focus_start, focus_end - 1)
 
-    def on_annotation_layer_double_clicked(self, annotation):
+    def on_annotation_layer_double_clicked(self, annotation) -> None:
         if annotation.type == AnnotationType.MISMATCH_MARKER:
             return
         self.do_edit_dialog(annotation, row_index=None)
 
-    def on_ann_item_clicked(self, annotation, row_index):
+    # ── Per-row annotation item click handler'ları ───────────────────────
+
+    def on_ann_item_clicked(self, annotation, row_index) -> None:
         from PyQt5.QtWidgets import QApplication
+
+        ctx = self._ctx
         action = mouse_binding_manager.resolve_annotation_click(QApplication.keyboardModifiers())
         is_multi = action == MouseAction.ANNOTATION_MULTI_SELECT
         if is_multi:
-            self.workspace.sequence_viewer.clear_caret()
-            existing = next((i for i, (a, _) in enumerate(self._selected_annotations)
-                             if a.id == annotation.id), -1)
+            ctx.sequence_viewer.clear_caret()
+            existing = next(
+                (i for i, (a, _) in enumerate(self._selected_annotations) if a.id == annotation.id),
+                -1,
+            )
             if existing >= 0:
                 self._selected_annotations.pop(existing)
             else:
                 self._selected_annotations.append((annotation, row_index))
-            self.workspace._annotation_presentation.set_selected_annotation(annotation.id, ctrl=True)
+            ctx.annotation_presentation.set_selected_annotation(annotation.id, ctrl=True)
             self._apply_union_selection()
             return
-        # Non-ctrl tekil seÃƒÂ§im: consensus row'u temizle
-        self.workspace.consensus_row.clear_selection()
-        self.workspace.sequence_viewer.clear_caret()
+        ctx.consensus_row.clear_selection()
+        ctx.sequence_viewer.clear_caret()
         self._selected_annotations = [(annotation, row_index)]
         self._update_selection_visuals(annotation.id, is_layer=False)
-        self.workspace.setFocus()
-        ws = self.workspace
-        n = ws.model.row_count()
+        ctx.root_widget.setFocus()
+        n = ctx.model.row_count()
 
-        # Header seÃƒÂ§imini temizle + row_index'i vurgula (on_selection_changed tetiklenmeden)
-        clear_changed = ws.header_viewer._selection.clear()
+        clear_changed = ctx.header_viewer._selection.clear()
         if 0 <= row_index < n:
-            click_changed = ws.header_viewer._selection.handle_click(row_index, n)
-            ws.header_viewer.apply_selection_to_items(clear_changed | click_changed)
+            click_changed = ctx.header_viewer._selection.handle_click(row_index, n)
+            ctx.header_viewer.apply_selection_to_items(clear_changed | click_changed)
         else:
-            ws.header_viewer.apply_selection_to_items(clear_changed)
+            ctx.header_viewer.apply_selection_to_items(clear_changed)
 
-        # Consensus row/spacer temizle
-        ws.consensus_spacer.set_selected(False)
-        ws.consensus_row.clear_selection()
+        ctx.consensus_spacer.set_selected(False)
+        ctx.consensus_row.clear_selection()
 
-        # H-guide: annotation satÃ„Â±rÃ„Â±nÃ„Â± vurgula (bant + ÃƒÂ¼st/alt ÃƒÂ§izgi)
         if 0 <= row_index < n:
-            ws.sequence_viewer.set_h_guides(frozenset({row_index}))
+            ctx.sequence_viewer.set_h_guides(frozenset({row_index}))
         else:
-            ws.sequence_viewer.clear_h_guides()
+            ctx.sequence_viewer.clear_h_guides()
 
-        # V-guide: annotation sÃƒÂ¼tun aralÃ„Â±Ã„Å¸Ã„Â±
         _boundaries = self._annotation_guide_boundaries(annotation)
-        _seq_ctrl = ws.sequence_viewer._controller
+        _seq_ctrl = ctx.sequence_viewer._controller
         if _seq_ctrl is not None:
             _seq_ctrl._v_guide_cols = list(_boundaries)
-        ws.sequence_viewer.set_v_guides(_boundaries)
+        ctx.sequence_viewer.set_v_guides(_boundaries)
         focus_start, focus_end = self._annotation_focus_range(annotation)
-        ws.sequence_viewer.set_selection_dim_range(focus_start, focus_end)
+        ctx.sequence_viewer.set_selection_dim_range(focus_start, focus_end)
 
-        # GÃƒÂ¶rsel seÃƒÂ§im: sadece annotation sÃƒÂ¼tun aralÃ„Â±Ã„Å¸Ã„Â±
         if 0 <= row_index < n:
-            ws.sequence_viewer.set_visual_selection(row_index, row_index, focus_start, focus_end - 1)
-            ws.sequence_viewer._model.start_selection(row_index, focus_start)
-            ws.sequence_viewer._model.update_selection(row_index, focus_end - 1)
-            ws.sequence_viewer.show_info_panel(row_index, row_index, focus_start, focus_end - 1)
+            ctx.sequence_viewer.set_visual_selection(row_index, row_index, focus_start, focus_end - 1)
+            ctx.sequence_viewer._model.start_selection(row_index, focus_start)
+            ctx.sequence_viewer._model.update_selection(row_index, focus_end - 1)
+            ctx.sequence_viewer.show_info_panel(row_index, row_index, focus_start, focus_end - 1)
 
-    def on_ann_item_double_clicked(self, annotation, _row_index):
+    def on_ann_item_double_clicked(self, annotation, _row_index) -> None:
         if annotation.type == AnnotationType.MISMATCH_MARKER:
             return
-        self.workspace.open_edit_annotation_dialog(annotation)
+        self.open_edit_annotation_dialog(annotation)
 
-    def on_consensus_annotation_double_clicked(self, annotation):
+    # ── Consensus annotation ──────────────────────────────────────────────
+
+    def on_consensus_annotation_double_clicked(self, annotation) -> None:
         from sequence_viewer.dialogs.edit_annotation_dialog import EditAnnotationDialog
-        dlg = EditAnnotationDialog(annotation=annotation, parent=self.workspace)
+
+        dlg = EditAnnotationDialog(annotation=annotation, parent=self._ctx.root_widget)
         if dlg.exec_() == EditAnnotationDialog.Accepted:
             updated = dlg.result_annotation()
-            if updated is None: return
+            if updated is None:
+                return
             try:
-                self.workspace.model.update_consensus_annotation(updated)
+                self._ctx.model.update_consensus_annotation(updated)
             except Exception:
                 pass
 
-    def open_find_motifs_dialog(self):
-        from sequence_viewer.dialogs.find_motifs_dialog import FindMotifsDialog
-        FindMotifsDialog(model=self.workspace.model, parent=self.workspace).exec_()
+    # ── Dialog açma ───────────────────────────────────────────────────────
 
-    def open_edit_annotation_dialog(self, annotation):
-        result = self.workspace.model.find_annotation(annotation.id)
-        if result is None: return
+    def open_find_motifs_dialog(self) -> None:
+        from sequence_viewer.dialogs.find_motifs_dialog import FindMotifsDialog
+
+        FindMotifsDialog(model=self._ctx.model, parent=self._ctx.root_widget).exec_()
+
+    def open_edit_annotation_dialog(self, annotation) -> None:
+        result = self._ctx.model.find_annotation(annotation.id)
+        if result is None:
+            return
         row_index, _ = result
         self.do_edit_dialog(annotation, row_index=row_index)
 
-    def do_edit_dialog(self, annotation, row_index=None):
+    def do_edit_dialog(self, annotation, row_index=None) -> None:
         from sequence_viewer.dialogs.edit_annotation_dialog import EditAnnotationDialog
-        dlg = EditAnnotationDialog(annotation=annotation, parent=self.workspace)
+
+        dlg = EditAnnotationDialog(annotation=annotation, parent=self._ctx.root_widget)
         if dlg.exec_() == EditAnnotationDialog.Accepted:
             updated = dlg.result_annotation()
-            if updated is None: return
+            if updated is None:
+                return
             try:
-                if row_index is not None: self.workspace.model.update_annotation(row_index, updated)
-                else: self.workspace.model.update_global_annotation(updated)
-            except: pass
+                if row_index is not None:
+                    self._ctx.model.update_annotation(row_index, updated)
+                else:
+                    self._ctx.model.update_global_annotation(updated)
+            except Exception:
+                pass
 
-    def on_header_edited(self, row_index, new_text):
-        try: self.workspace.model.set_header(row_index, new_text)
-        except IndexError: pass
+    # ── Header & model event handler'ları ────────────────────────────────
 
-    def on_row_move_requested(self, from_index, to_index):
-        try: self.workspace.model.move_row(from_index, to_index)
-        except IndexError: pass
+    def on_header_edited(self, row_index: int, new_text: str) -> None:
+        try:
+            self._ctx.model.set_header(row_index, new_text)
+        except IndexError:
+            pass
 
-    def on_rows_delete_requested(self, rows):
-        self.workspace.delete_rows_with_undo(rows)
+    def on_row_move_requested(self, from_index: int, to_index: int) -> None:
+        try:
+            self._ctx.model.move_row(from_index, to_index)
+        except IndexError:
+            pass
 
-    def on_selection_changed(self, selected_rows):
+    def on_rows_delete_requested(self, rows) -> None:
+        self._ctx.command_controller.delete_rows_with_undo(rows)
+
+    def on_selection_changed(self, selected_rows) -> None:
         from PyQt5.QtWidgets import QApplication
+
+        ctx = self._ctx
         header_action = mouse_binding_manager.resolve_header_click(QApplication.keyboardModifiers())
         is_multi = header_action == MouseAction.ROW_MULTI_SELECT
         if self._selected_annotations:
             self._clear_all_annotation_visuals()
             self._selected_annotations.clear()
-        # Consensus row: ctrl+click'te koru, non-ctrl'da temizle
         if not is_multi:
-            self.workspace.consensus_spacer.set_selected(False)
-            self.workspace.consensus_row.clear_selection()
-        self.workspace.sequence_viewer.clear_v_guides()
-        self.workspace.sequence_viewer.clear_selection_dim_range()
+            ctx.consensus_spacer.set_selected(False)
+            ctx.consensus_row.clear_selection()
+        ctx.sequence_viewer.clear_v_guides()
+        ctx.sequence_viewer.clear_selection_dim_range()
         if not selected_rows:
-            self.workspace.sequence_viewer.clear_h_guides()
+            ctx.sequence_viewer.clear_h_guides()
         else:
-            self.workspace.sequence_viewer.set_h_guides(frozenset(selected_rows))
-            # Header seÃƒÂ§ildiÃ„Å¸inde ilgili satÃ„Â±rlarÃ„Â±n dizilerini de seÃƒÂ§ili yap
-            n = self.workspace.model.row_count()
-            max_len = self.workspace.model.max_sequence_length
+            ctx.sequence_viewer.set_h_guides(frozenset(selected_rows))
+            n = ctx.model.row_count()
+            max_len = ctx.model.max_sequence_length
             if n > 0 and max_len > 0:
-                rows = sorted(selected_rows)
-                # TÃƒÂ¼m satÃ„Â±rlarÃ„Â±n tÃƒÂ¼m kolonlarÃ„Â±nÃ„Â± seÃƒÂ§ili yap
-                for i, item in enumerate(self.workspace.sequence_viewer.sequence_items):
+                for i, item in enumerate(ctx.sequence_viewer.sequence_items):
                     if i in selected_rows:
                         item.set_selection(0, max_len)
                     else:
                         item.clear_selection()
-                self.workspace.sequence_viewer.scene.invalidate()
-                self.workspace.sequence_viewer.viewport().update()
+                ctx.sequence_viewer.scene.invalidate()
+                ctx.sequence_viewer.viewport().update()
 
-    def on_seq_row_clicked(self, row_start, row_end):
-        """Sequence view'da satÃ„Â±r(lar)a tÃ„Â±klanÃ„Â±nca: header highlight + h-guide, full selection yok."""
+    def on_seq_row_clicked(self, row_start: int, row_end: int) -> None:
         from PyQt5.QtWidgets import QApplication
-        ws = self.workspace
-        n = ws.model.row_count()
-        if n == 0: return
+
+        ctx = self._ctx
+        n = ctx.model.row_count()
+        if n == 0:
+            return
         click_action = mouse_binding_manager.resolve_header_click(QApplication.keyboardModifiers())
         is_multi = click_action == MouseAction.ROW_MULTI_SELECT
         is_range = click_action == MouseAction.ROW_RANGE_SELECT
-
-        # Drag (row_start != row_end) ââ€ ' her zaman temizle ve yeni aralÃ„Â±Ã„Å¸Ã„Â± seÃƒÂ§
-        is_drag = (row_start != row_end)
+        is_drag = row_start != row_end
 
         if is_drag or click_action in (MouseAction.ROW_SELECT, MouseAction.NONE):
-            # Normal tÃ„Â±klama veya drag: annotation + consensus temizle, yeni seÃƒÂ§im
             if self._selected_annotations:
                 self._clear_all_annotation_visuals()
                 self._selected_annotations.clear()
-            ws.consensus_spacer.set_selected(False)
-            ws.consensus_row.clear_selection()
+            ctx.consensus_spacer.set_selected(False)
+            ctx.consensus_row.clear_selection()
             rows = frozenset(range(row_start, row_end + 1)) if 0 <= row_start < n else frozenset()
-            clear_changed = ws.header_viewer._selection.clear()
+            clear_changed = ctx.header_viewer._selection.clear()
             click_changed: frozenset = frozenset()
             if rows:
                 for r in rows:
-                    click_changed = click_changed | ws.header_viewer._selection.handle_ctrl_click(r, n)
-            ws.header_viewer.apply_selection_to_items(clear_changed | click_changed)
+                    click_changed = click_changed | ctx.header_viewer._selection.handle_ctrl_click(r, n)
+            ctx.header_viewer.apply_selection_to_items(clear_changed | click_changed)
             self._last_clicked_row = row_start
             if rows:
-                ws.sequence_viewer.set_h_guides(rows)
+                ctx.sequence_viewer.set_h_guides(rows)
             else:
-                ws.sequence_viewer.clear_h_guides()
+                ctx.sequence_viewer.clear_h_guides()
 
         elif is_multi:
-            # Ctrl+click: toggle bu satÃ„Â±rÃ„Â±, mevcut seÃƒÂ§imi koru
             row = row_start
-            if not (0 <= row < n): return
-            changed = ws.header_viewer._selection.handle_ctrl_click(row, n)
-            ws.header_viewer.apply_selection_to_items(changed)
-            selected = ws.header_viewer._selection.selected_rows()
+            if not (0 <= row < n):
+                return
+            changed = ctx.header_viewer._selection.handle_ctrl_click(row, n)
+            ctx.header_viewer.apply_selection_to_items(changed)
+            selected = ctx.header_viewer._selection.selected_rows()
             self._last_clicked_row = row
             if selected:
-                ws.sequence_viewer.set_h_guides(frozenset(selected))
+                ctx.sequence_viewer.set_h_guides(frozenset(selected))
             else:
-                ws.sequence_viewer.clear_h_guides()
+                ctx.sequence_viewer.clear_h_guides()
 
         elif is_range:
-            # Shift+click: _last_clicked_row ile row_start arasÃ„Â±ndaki tÃƒÂ¼m satÃ„Â±rlar
-            anchor = getattr(self, '_last_clicked_row', row_start)
+            anchor = getattr(self, "_last_clicked_row", row_start)
             lo, hi = min(anchor, row_start), max(anchor, row_start)
             rows = frozenset(range(lo, hi + 1)) if 0 <= lo < n else frozenset()
-            # Mevcut seÃƒÂ§imi koru, range'i ekle
             click_changed = frozenset()
             for r in rows:
-                if not ws.header_viewer._selection.is_selected(r):
-                    click_changed = click_changed | ws.header_viewer._selection.handle_ctrl_click(r, n)
-            ws.header_viewer.apply_selection_to_items(click_changed)
-            selected = ws.header_viewer._selection.selected_rows()
+                if not ctx.header_viewer._selection.is_selected(r):
+                    click_changed = click_changed | ctx.header_viewer._selection.handle_ctrl_click(r, n)
+            ctx.header_viewer.apply_selection_to_items(click_changed)
+            selected = ctx.header_viewer._selection.selected_rows()
             if selected:
-                ws.sequence_viewer.set_h_guides(frozenset(selected))
+                ctx.sequence_viewer.set_h_guides(frozenset(selected))
             else:
-                ws.sequence_viewer.clear_h_guides()
+                ctx.sequence_viewer.clear_h_guides()
 
-    def on_row_appended(self, index, header, sequence):
-        self.workspace.header_viewer.add_header_item(f"{index + 1}. {header}")
-        self.workspace.sequence_viewer.add_sequence(sequence)
-        self.workspace.ruler.update()
-        self.workspace._update_header_max_width()
-        layout = self.workspace._compute_row_layout()
-        self.workspace._apply_layout(layout)
-        self.workspace._rebuild_ann_items(layout)
+    def on_row_appended(self, index: int, header: str, sequence: str) -> None:
+        ctx = self._ctx
+        ctx.header_viewer.add_header_item(f"{index + 1}. {header}")
+        ctx.sequence_viewer.add_sequence(sequence)
+        ctx.ruler.update()
+        ctx.layout_sync.update_header_max_width()
+        layout = ctx.layout_sync.compute_row_layout()
+        ctx.layout_sync.apply_layout(layout)
+        ctx.annotation_presentation.rebuild_ann_items(layout)
 
-    def on_row_removed(self, _index): self.rebuild_views()
-    def on_row_moved(self, from_index, to_index):
-        self.workspace.header_viewer._selection.move_row(from_index, to_index)
+    def on_row_removed(self, _index) -> None:
         self.rebuild_views()
 
-    def on_header_changed(self, index, new_header):
-        if index < 0 or index >= len(self.workspace.header_viewer.header_items): return
-        self.workspace.header_viewer.header_items[index]._model.full_text = f"{index + 1}. {new_header}"
-        self.workspace.header_viewer.header_items[index].update()
-        self.workspace._update_header_max_width()
+    def on_row_moved(self, from_index: int, to_index: int) -> None:
+        self._ctx.header_viewer._selection.move_row(from_index, to_index)
+        self.rebuild_views()
 
-    def on_model_reset(self): self.rebuild_views()
+    def on_header_changed(self, index: int, new_header: str) -> None:
+        ctx = self._ctx
+        if index < 0 or index >= len(ctx.header_viewer.header_items):
+            return
+        ctx.header_viewer.header_items[index]._model.full_text = f"{index + 1}. {new_header}"
+        ctx.header_viewer.header_items[index].update()
+        ctx.layout_sync.update_header_max_width()
 
-    def delete_selected_annotation(self):
-        """SeÃƒÂ§ili annotation'larÃ„Â± sil (Delete tuÃ…Å¸u)."""
+    def on_model_reset(self) -> None:
+        self.rebuild_views()
+
+    # ── Seçim durumu sorgu / değişim ─────────────────────────────────────
+
+    def has_selected_annotations(self) -> bool:
+        return bool(self._selected_annotations)
+
+    def get_selected_annotations(self) -> list:
+        return list(self._selected_annotations)
+
+    def clear_selected_annotations(self) -> None:
+        self._selected_annotations.clear()
+
+    # ── Annotation silme ──────────────────────────────────────────────────
+
+    def delete_selected_annotation(self) -> None:
         if not self._selected_annotations:
             return
-        self.workspace.delete_annotations_with_undo(self._selected_annotations)
+        self._ctx.command_controller.delete_annotations_with_undo(self._selected_annotations)
 
-    def on_consensus_spacer_clicked(self, ctrl=False):
-        """Consensus spacer'a tÃ„Â±klama.
-        ctrl=False: exclusive ââ‚¬" header + annotation seÃƒÂ§imlerini sÃ„Â±fÃ„Â±rla, sadece consensus seÃƒÂ§.
-        ctrl=True:  additive  ââ‚¬" header seÃƒÂ§imlerini koru, consensus'u toggle et.
-        """
+    # ── Consensus spacer ──────────────────────────────────────────────────
+
+    def on_consensus_spacer_clicked(self, ctrl: bool = False) -> None:
         if self._selected_annotations:
             self._clear_all_annotation_visuals()
             self._selected_annotations.clear()
-        ws = self.workspace
-        # Annotation seÃƒÂ§imini temizle (her iki modda da)
-        ws.consensus_row._selected_ann_ids.clear()
-        ws.sequence_viewer.clear_v_guides()
-        ws.sequence_viewer.clear_selection_dim_range()
+        ctx = self._ctx
+        ctx.consensus_row._selected_ann_ids.clear()
+        ctx.sequence_viewer.clear_v_guides()
+        ctx.sequence_viewer.clear_selection_dim_range()
         if ctrl:
-            # Additive: header seÃƒÂ§imini koru, consensus'u toggle et
-            if ws.consensus_spacer._selected:
-                # SeÃƒÂ§imi kaldÃ„Â±r
-                ws.consensus_spacer.set_selected(False)
-                ws.consensus_row.clear_selection()
+            if ctx.consensus_spacer._selected:
+                ctx.consensus_spacer.set_selected(False)
+                ctx.consensus_row.clear_selection()
             else:
-                # Ekle
-                ws.consensus_spacer.set_selected(True)
-                ws.consensus_spacer.setFocus()
-                ws.consensus_row.set_selected(True)
-                ws.consensus_row.select_all()
+                ctx.consensus_spacer.set_selected(True)
+                ctx.consensus_spacer.setFocus()
+                ctx.consensus_row.set_selected(True)
+                ctx.consensus_row.select_all()
         else:
-            # Exclusive: header seÃƒÂ§imini temizle
-            changed = ws.header_viewer._selection.clear()
-            ws.header_viewer.apply_selection_to_items(changed)
-            ws.sequence_viewer.clear_h_guides()
-            ws.sequence_viewer.clear_visual_selection()
-            try: ws.sequence_viewer._model.clear_selection()
-            except: pass
-            ws.consensus_spacer.set_selected(True)
-            ws.consensus_spacer.setFocus()
-            ws.consensus_row.set_selected(True)
-            ws.consensus_row.select_all()
+            changed = ctx.header_viewer._selection.clear()
+            ctx.header_viewer.apply_selection_to_items(changed)
+            ctx.sequence_viewer.clear_h_guides()
+            ctx.sequence_viewer.clear_visual_selection()
+            try:
+                ctx.sequence_viewer._model.clear_selection()
+            except Exception:
+                pass
+            ctx.consensus_spacer.set_selected(True)
+            ctx.consensus_spacer.setFocus()
+            ctx.consensus_row.set_selected(True)
+            ctx.consensus_row.select_all()
 
-    def rebuild_views(self):
-        h_scroll = self.workspace.sequence_viewer.horizontalScrollBar().value()
-        v_scroll = self.workspace.sequence_viewer.verticalScrollBar().value()
-        self.workspace._remove_all_ann_items()
-        self.workspace.header_viewer.clear(); self.workspace.sequence_viewer.clear()
-        for i, (header, sequence) in enumerate(self.workspace.model.all_rows()):
-            item = self.workspace.header_viewer.add_header_item(f"{i + 1}. {header}")
+    # ── View yeniden inşası ───────────────────────────────────────────────
+
+    def rebuild_views(self) -> None:
+        ctx = self._ctx
+        h_scroll = ctx.sequence_viewer.horizontalScrollBar().value()
+        v_scroll = ctx.sequence_viewer.verticalScrollBar().value()
+        ctx.annotation_presentation.remove_all_ann_items()
+        ctx.header_viewer.clear()
+        ctx.sequence_viewer.clear()
+        for i, (header, sequence) in enumerate(ctx.model.all_rows()):
+            item = ctx.header_viewer.add_header_item(f"{i + 1}. {header}")
             item.set_row_index(i)
-            if self.workspace.header_viewer._selection.is_selected(i): item.set_selected(True)
-            self.workspace.sequence_viewer.add_sequence(sequence)
-        layout = self.workspace._compute_row_layout()
-        self.workspace._apply_layout(layout)
-        self.workspace.ruler.update()
-        self.workspace._update_header_max_width()
-        self.workspace._rebuild_ann_items(layout)
-        self.workspace.sequence_viewer.horizontalScrollBar().setValue(h_scroll)
-        self.workspace.sequence_viewer.verticalScrollBar().setValue(v_scroll)
-        # clear() sÃ„Â±rasÃ„Â±nda sÃ„Â±fÃ„Â±rlanan h_guide'larÃ„Â± mevcut seÃƒÂ§ime gÃƒÂ¶re yeniden uygula
-        selected_rows = self.workspace.header_viewer._selection.selected_rows()
+            if ctx.header_viewer._selection.is_selected(i):
+                item.set_selected(True)
+            ctx.sequence_viewer.add_sequence(sequence)
+        layout = ctx.layout_sync.compute_row_layout()
+        ctx.layout_sync.apply_layout(layout)
+        ctx.ruler.update()
+        ctx.layout_sync.update_header_max_width()
+        ctx.annotation_presentation.rebuild_ann_items(layout)
+        ctx.sequence_viewer.horizontalScrollBar().setValue(h_scroll)
+        ctx.sequence_viewer.verticalScrollBar().setValue(v_scroll)
+        selected_rows = ctx.header_viewer._selection.selected_rows()
         if selected_rows:
-            self.workspace.sequence_viewer.set_h_guides(frozenset(selected_rows))
+            ctx.sequence_viewer.set_h_guides(frozenset(selected_rows))
         else:
-            self.workspace.sequence_viewer.clear_h_guides()
-
-
+            ctx.sequence_viewer.clear_h_guides()

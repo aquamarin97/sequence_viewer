@@ -1,138 +1,87 @@
 # sequence_viewer/workspace/controllers/command_controller.py
 from __future__ import annotations
 
-from PyQt5.QtCore import Qt
+from typing import TYPE_CHECKING
 
 from sequence_viewer.model.undo_stack import ModelSnapshotCommand
+from sequence_viewer.workspace.controllers.state_cleaner import WorkspaceStateCleaner
+
+if TYPE_CHECKING:
+    from sequence_viewer.workspace.context import WorkspaceContext
 
 
 class WorkspaceCommandController:
-    """Handles delete/undo command flows and interaction-state resets."""
+    """Silme/undo komut akışlarını ve etkileşim state sıfırlamalarını yönetir."""
 
-    def __init__(self, workspace, undo_stack):
-        self.workspace = workspace
-        self.undo_stack = undo_stack
+    def __init__(self, ctx: "WorkspaceContext") -> None:
+        self._ctx = ctx
+        self._state_cleaner = WorkspaceStateCleaner(ctx)
 
-    def handle_keypress(self, event) -> bool:
-        ctrl = bool(event.modifiers() & Qt.ControlModifier)
-        shift = bool(event.modifiers() & Qt.ShiftModifier)
-        if ctrl and not shift and event.key() == Qt.Key_Z:
-            if self.undo_stack.undo():
-                event.accept()
-                return True
-        if ctrl and shift and event.key() == Qt.Key_C:
-            self.workspace._copy_fasta()
-            event.accept()
-            return True
-        if ctrl and not shift and event.key() == Qt.Key_C:
-            self.workspace._copy_sequences()
-            event.accept()
-            return True
-        if event.key() == Qt.Key_Delete:
-            has_coord = bool(self.workspace._action_dialogs._selected_annotations)
-            has_cons = bool(self.workspace.consensus_row._selected_ann_ids)
-            if has_coord or has_cons:
-                if has_coord:
-                    self.workspace._action_dialogs.delete_selected_annotation()
-                if has_cons:
-                    self.workspace.consensus_row.delete_selected_annotations()
-                event.accept()
-                return True
-        return False
-
-    def clear_interaction_state(self) -> None:
-        ws = self.workspace
-        ws._action_dialogs._selected_annotations.clear()
-        ws._annotation_presentation.clear_annotation_selection()
-        ws.annotation_layer.clear_annotation_selection()
-        ws.sequence_viewer.clear_visual_selection()
-        try:
-            ws.sequence_viewer._model.clear_selection()
-        except Exception:
-            pass
-        ws.sequence_viewer.clear_h_guides()
-        ws.sequence_viewer.clear_v_guides()
-        ws.sequence_viewer.clear_selection_dim_range()
-        changed = ws.header_viewer._selection.clear()
-        ws.header_viewer.apply_selection_to_items(changed)
-        ws.consensus_spacer.set_selected(False)
-        ws.consensus_row.clear_selection()
+    # ── Undo altyapısı ───────────────────────────────────────────────────
 
     def push_delete_command(self, text: str, mutate) -> None:
-        self.undo_stack.push(
+        self._ctx.undo_stack.push(
             ModelSnapshotCommand(
                 text=text,
-                model=self.workspace.model,
+                model=self._ctx.model,
                 mutate=mutate,
-                after_restore=self.clear_interaction_state,
+                after_restore=self._state_cleaner.clear_all_interaction_state,
             )
         )
+
+    # ── Row silme ────────────────────────────────────────────────────────
 
     def delete_rows_with_undo(self, rows) -> None:
         rows = sorted(set(rows), reverse=True)
         if not rows:
             return
+        self.push_delete_command("Delete rows", lambda: self._mutate_delete_rows(rows))
 
-        def mutate():
-            for row in rows:
-                try:
-                    self.workspace.header_viewer._selection.remove_row(row)
-                    self.workspace.model.remove_row(row)
-                except IndexError:
-                    pass
+    def _mutate_delete_rows(self, rows) -> None:
+        for row in rows:
+            try:
+                self._ctx.header_viewer.deselect_row(row)
+                self._ctx.model.remove_row(row)
+            except IndexError:
+                pass
 
-        self.push_delete_command("Delete rows", mutate)
+    # ── Annotation silme ─────────────────────────────────────────────────
 
     def delete_annotations_with_undo(self, annotations) -> None:
         to_delete = list(annotations)
         if not to_delete:
             return
+        self.push_delete_command(
+            "Delete annotations", lambda: self._mutate_delete_annotations(to_delete)
+        )
 
-        def mutate():
-            ws = self.workspace
-            ws._action_dialogs._selected_annotations.clear()
-            ws._action_dialogs._clear_all_annotation_visuals()
-            ws.sequence_viewer.clear_visual_selection()
+    def _mutate_delete_annotations(self, to_delete) -> None:
+        self._state_cleaner.clear_annotation_delete_state()
+        for ann, row_index in to_delete:
             try:
-                ws.sequence_viewer._model.clear_selection()
-            except Exception:
+                if row_index is None:
+                    self._ctx.model.remove_global_annotation(ann.id)
+                else:
+                    self._ctx.model.remove_annotation(row_index, ann.id)
+            except (KeyError, IndexError):
                 pass
-            ws.sequence_viewer.clear_h_guides()
-            ws.sequence_viewer.clear_v_guides()
-            ws.sequence_viewer.clear_selection_dim_range()
-            for ann, row_index in to_delete:
-                try:
-                    if row_index is None:
-                        ws.model.remove_global_annotation(ann.id)
-                    else:
-                        ws.model.remove_annotation(row_index, ann.id)
-                except (KeyError, IndexError):
-                    pass
 
-        self.push_delete_command("Delete annotations", mutate)
+    # ── Consensus annotation silme ───────────────────────────────────────
 
     def delete_consensus_annotations_with_undo(self, annotation_ids) -> None:
         ann_ids = list(annotation_ids)
         if not ann_ids:
             return
+        self.push_delete_command(
+            "Delete consensus annotations",
+            lambda: self._mutate_delete_consensus_annotations(ann_ids),
+        )
 
-        def mutate():
-            ws = self.workspace
-            ws.consensus_row._selected_ann_ids.clear()
-            ws.consensus_row._selection_ranges = []
-            ws.consensus_row._is_selected = False
-            ws.consensus_spacer.set_selected(False)
-            ws.sequence_viewer.clear_selection_dim_range()
-            ctrl = getattr(ws.sequence_viewer, "_controller", None)
-            if ctrl is not None:
-                ctrl._v_guide_cols = []
-            ws.sequence_viewer.set_v_guides([])
-            ws.consensus_row.update()
-            for ann_id in ann_ids:
-                try:
-                    ws.model.remove_consensus_annotation(ann_id)
-                except (KeyError, Exception):
-                    pass
-
-        self.push_delete_command("Delete consensus annotations", mutate)
+    def _mutate_delete_consensus_annotations(self, ann_ids) -> None:
+        self._state_cleaner.clear_consensus_delete_state()
+        for ann_id in ann_ids:
+            try:
+                self._ctx.model.remove_consensus_annotation(ann_id)
+            except (KeyError, Exception):
+                pass
 
