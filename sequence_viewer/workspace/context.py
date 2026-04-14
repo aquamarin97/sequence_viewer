@@ -22,9 +22,11 @@ if TYPE_CHECKING:
         AnnotationLayerWidget,
     )
     from sequence_viewer.features.consensus_row.consensus_row_widget import ConsensusRowWidget
+    from sequence_viewer.features.consensus_row.consensus_spacer_widget import (
+        ConsensusSpacerWidget,
+    )
     from sequence_viewer.features.header_viewer.header_spacer_widgets import (
         AnnotationSpacerWidget,
-        ConsensusSpacerWidget,
     )
     from sequence_viewer.features.header_viewer.header_viewer_widget import HeaderViewerWidget
     from sequence_viewer.features.navigation_ruler.navigation_ruler_widget import RulerWidget

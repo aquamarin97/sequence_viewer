@@ -1,5 +1,4 @@
 # sequence_viewer/features/header_viewer/header_spacer_widgets.py
-# features/header_viewer/header_spacer_widgets.py
 """
 MODIFIED:
 - ConsensusSpacerWidget: click = select all consensus, double-click = edit name

@@ -73,6 +73,8 @@ class WorkspaceSignalMapper:
     def _connect_consensus_signals(self) -> None:
         ctx = self._ctx
         ctx.consensus_spacer.clicked.connect(ctx.action_dialogs.on_consensus_spacer_clicked)
+        ctx.consensus_spacer.copySequenceRequested.connect(ctx.clipboard_controller.copy_consensus_sequence)
+        ctx.consensus_spacer.copyFastaRequested.connect(ctx.clipboard_controller.copy_consensus_fasta)
         ctx.sequence_viewer.rowClicked.connect(ctx.action_dialogs.on_seq_row_clicked)
         ctx.sequence_viewer.selectionChanged.connect(ctx.consensus_row.clear_selection)
         ctx.sequence_viewer.selectionChanged.connect(
@@ -80,6 +82,22 @@ class WorkspaceSignalMapper:
         )
         ctx.sequence_viewer.add_v_guide_observer(ctx.consensus_row.update)
         ctx.sequence_viewer.add_v_guide_observer(ctx.pos_ruler.update)
+        ctx.consensus_row.annotationEditRequested.connect(
+            ctx.action_dialogs.on_consensus_annotation_double_clicked
+        )
+        ctx.consensus_row.workspaceAnnotationClearRequested.connect(
+            self._clear_workspace_annotation_selection
+        )
+        ctx.consensus_row.spacerSelectionChanged.connect(ctx.consensus_spacer.set_selected)
+        ctx.consensus_row.coordinatorRefreshRequested.connect(ctx.action_dialogs._apply_union_selection)
+        ctx.consensus_row.copySequenceRequested.connect(ctx.clipboard_controller.copy_consensus_sequence)
+        ctx.consensus_row.copyFastaRequested.connect(ctx.clipboard_controller.copy_consensus_fasta)
+        ctx.consensus_row.deleteAnnotationsRequested.connect(
+            ctx.command_controller.delete_consensus_annotations_with_undo
+        )
+        ctx.consensus_row.headerClearRequested.connect(self._clear_header_selection_for_consensus)
+        ctx.consensus_row.spacerSyncRequested.connect(self._sync_consensus_spacer)
+        ctx.consensus_row.positionRulerRefreshRequested.connect(ctx.pos_ruler.update)
 
     def _connect_theme_and_settings_signals(self) -> None:
         from sequence_viewer.settings.annotation_styles import annotation_style_manager
@@ -102,3 +120,27 @@ class WorkspaceSignalMapper:
         ctx.sequence_viewer.horizontalScrollBar().rangeChanged.connect(
             ctx.annotation_presentation.on_zoom_changed
         )
+
+    def _clear_workspace_annotation_selection(self) -> None:
+        ctx = self._ctx
+        if ctx.action_dialogs._selected_annotations:
+            ctx.action_dialogs._selected_annotations.clear()
+            ctx.action_dialogs._clear_all_annotation_visuals()
+
+    def _clear_header_selection_for_consensus(self) -> None:
+        ctx = self._ctx
+        ctx.consensus_spacer.set_selected(True)
+        changed = ctx.header_viewer.selection.clear()
+        ctx.header_viewer.apply_selection_to_items(changed)
+        ctx.sequence_viewer.clear_h_guides()
+        for item in ctx.sequence_viewer.sequence_items:
+            item.clear_selection()
+        ctx.sequence_viewer.scene.invalidate()
+        ctx.sequence_viewer.viewport().update()
+
+    def _sync_consensus_spacer(self, height: int, visible: bool, above_h: float, char_h: float) -> None:
+        ctx = self._ctx
+        ctx.consensus_spacer.setFixedHeight(height if visible else 0)
+        ctx.consensus_spacer.setVisible(visible)
+        if visible:
+            ctx.consensus_spacer.sync_seq_region(above_h, char_h)

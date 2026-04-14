@@ -8,9 +8,9 @@ from PyQt5.QtWidgets import QHBoxLayout, QSplitter, QVBoxLayout, QWidget
 
 from sequence_viewer.features.annotation_layer.annotation_layer_widget import AnnotationLayerWidget
 from sequence_viewer.features.consensus_row.consensus_row_widget import ConsensusRowWidget
+from sequence_viewer.features.consensus_row.consensus_spacer_widget import ConsensusSpacerWidget
 from sequence_viewer.features.header_viewer.header_spacer_widgets import (
     AnnotationSpacerWidget,
-    ConsensusSpacerWidget,
     HeaderPositionSpacerWidget,
     HeaderTopWidget,
 )

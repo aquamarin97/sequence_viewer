@@ -61,3 +61,12 @@ class WorkspaceClipboardController:
         if blocks:
             QApplication.clipboard().setText("\n".join(blocks))
 
+    def copy_consensus_sequence(self) -> None:
+        text = self._ctx.consensus_row.clipboard_sequence_text()
+        if text:
+            QApplication.clipboard().setText(text)
+
+    def copy_consensus_fasta(self) -> None:
+        text = self._ctx.consensus_row.clipboard_fasta_text(self._ctx.consensus_spacer.label)
+        if text:
+            QApplication.clipboard().setText(text)
