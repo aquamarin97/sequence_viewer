@@ -137,6 +137,14 @@ class OverlayMixin:
         """Geriye dönük uyumluluk: ilk aralıĞŸı döndürür veya None."""
         return self._selection_dim_ranges[0] if self._selection_dim_ranges else None
 
+    @property
+    def selection_dim_range(self):
+        return self._selection_dim_range
+
+    @property
+    def selection_dim_ranges(self):
+        return list(self._selection_dim_ranges)
+
     # ------------------------------------------------------------------
     # QGraphicsView paint hooks
     # ------------------------------------------------------------------
@@ -397,5 +405,4 @@ class OverlayMixin:
         except Exception:
             pass
         return default
-
 
