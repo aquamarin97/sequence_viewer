@@ -2,7 +2,6 @@
 # features/sequence_viewer/sequence_viewer_widget.py
 from typing import Optional, Tuple, List
 from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtWidgets import QApplication
 from .sequence_viewer_model import SequenceViewerModel
 from .sequence_viewer_view import SequenceViewerView
 from .sequence_viewer_controller import SequenceViewerController
@@ -10,6 +9,7 @@ from .sequence_viewer_controller import SequenceViewerController
 class SequenceViewerWidget(SequenceViewerView):
     selectionChanged = pyqtSignal()
     rowClicked = pyqtSignal(int, int)  # (row_start, row_end)
+    copyFastaRequested = pyqtSignal()
 
     def __init__(self, parent=None, *, char_width=12.0, char_height=18.0):
         super().__init__(parent=parent, char_width=char_width, char_height=char_height)
@@ -67,29 +67,19 @@ class SequenceViewerWidget(SequenceViewerView):
             pass
         self.clear_h_guides()
         self.clear_v_guides()
-        self._controller._v_guide_cols.clear()  # overlay ile senkronize controller backing store
+        self._controller.clear_v_guides()
         self.clear_selection_dim_range()
 
     def keyPressEvent(self, event):
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
         shift = bool(event.modifiers() & Qt.ShiftModifier)
         if event.key() == Qt.Key_C and ctrl and shift:
-            parent = self.parent()
-            while parent is not None:
-                if hasattr(parent, "_copy_fasta"):
-                    parent._copy_fasta()
-                    event.accept()
-                    return
-                parent = parent.parent()
+            self.copyFastaRequested.emit()
+            event.accept()
+            return
         if event.key() == Qt.Key_C and ctrl and not shift:
             self._copy_selection_to_clipboard(); event.accept(); return
         super().keyPressEvent(event)
 
     def _copy_selection_to_clipboard(self):
-        lines = []
-        for item in self.sequence_items:
-            if item.selection_range is not None:
-                start, end = item.selection_range
-                fragment = item.sequence[start:end]
-                if fragment: lines.append(fragment)
-        if lines: QApplication.clipboard().setText("\n".join(lines))
+        self._controller.copy_selection_to_clipboard()

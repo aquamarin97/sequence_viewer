@@ -58,6 +58,7 @@ class SequenceWorkspaceWidget(QWidget):
             splitter=ctx.splitter,
             sequence_viewer=ctx.sequence_viewer,
         )
+        ctx.sequence_viewer.copyFastaRequested.connect(ctx.clipboard_controller.copy_fasta)
 
         ctx.annotation_layer.installEventFilter(self)
 

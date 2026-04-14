@@ -38,7 +38,7 @@ class SequencePositionRulerWidget(QWidget):
                 if s > e: s, e = e, s
                 sel_boundaries = {s, e + 1}  # sol ve saĞŸ guide sütunları
             extra = []
-            for col in ctrl._v_guide_cols:
+            for col in ctrl.v_guide_cols:
                 if col in sel_boundaries:
                     continue
                 extra.append(col + 1)
@@ -126,4 +126,3 @@ class SequencePositionRulerWidget(QWidget):
                 drawn_special_rects.append(cand)
                 painter.drawText(cand, Qt.AlignHCenter|Qt.AlignTop, label)
         painter.end()
-

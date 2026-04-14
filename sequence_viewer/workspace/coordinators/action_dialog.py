@@ -106,8 +106,9 @@ class WorkspaceActionDialogCoordinator:
 
         seq_ctrl = ctx.sequence_viewer._controller
         if seq_ctrl is not None:
-            seq_ctrl._v_guide_cols = list(boundaries)
-        ctx.sequence_viewer.set_v_guides(boundaries)
+            seq_ctrl.set_v_guides(boundaries)
+        else:
+            ctx.sequence_viewer.set_v_guides(boundaries)
         if focus_ranges:
             ctx.sequence_viewer.set_selection_focus_ranges(focus_ranges)
 
@@ -146,8 +147,9 @@ class WorkspaceActionDialogCoordinator:
         _boundaries = self._annotation_guide_boundaries(annotation)
         _seq_ctrl = self._ctx.sequence_viewer._controller
         if _seq_ctrl is not None:
-            _seq_ctrl._v_guide_cols = list(_boundaries)
-        self._ctx.sequence_viewer.set_v_guides(_boundaries)
+            _seq_ctrl.set_v_guides(_boundaries)
+        else:
+            self._ctx.sequence_viewer.set_v_guides(_boundaries)
         focus_start, focus_end = self._annotation_focus_range(annotation)
         self._ctx.sequence_viewer.set_selection_dim_range(focus_start, focus_end)
         n = self._ctx.model.row_count()
@@ -208,8 +210,9 @@ class WorkspaceActionDialogCoordinator:
         _boundaries = self._annotation_guide_boundaries(annotation)
         _seq_ctrl = ctx.sequence_viewer._controller
         if _seq_ctrl is not None:
-            _seq_ctrl._v_guide_cols = list(_boundaries)
-        ctx.sequence_viewer.set_v_guides(_boundaries)
+            _seq_ctrl.set_v_guides(_boundaries)
+        else:
+            ctx.sequence_viewer.set_v_guides(_boundaries)
         focus_start, focus_end = self._annotation_focus_range(annotation)
         ctx.sequence_viewer.set_selection_dim_range(focus_start, focus_end)
 

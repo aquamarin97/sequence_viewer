@@ -1,9 +1,8 @@
 # sequence_viewer/model/alignment_data_model.py
-# model/alignment_data_model.py
 from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from PyQt5.QtCore import QObject, pyqtSignal
 from sequence_viewer.model.alignment_metadata import AlignmentMetadata
 from sequence_viewer.model.annotation import Annotation
@@ -112,6 +111,7 @@ class AlignmentDataModel(QObject):
     def reset_from_list(self, rows):
         self._rows = [SequenceRecord(header=h, sequence=s) for h, s in rows]
         self._global_annotations.clear()
+        self._consensus_annotations.clear()
         self._is_aligned = False
         self._alignment_meta = None
         self.modelReset.emit()
@@ -152,64 +152,87 @@ class AlignmentDataModel(QObject):
                 result.append((i, ann))
         return result
 
+    def _add_collection_annotation(self, collection, annotation, scope_name, signal):
+        if any(item.id == annotation.id for item in collection):
+            raise ValueError(f"{scope_name} annotation id '{annotation.id}' already exists.")
+        collection.append(annotation)
+        signal.emit(annotation)
+
+    def _remove_collection_annotation(self, collection, annotation_id, scope_name, signal):
+        remove_ids = {annotation_id}
+        target = next((item for item in collection if item.id == annotation_id), None)
+        if target is not None and target.parent_id is None:
+            remove_ids.update(item.id for item in collection if item.parent_id == annotation_id)
+
+        kept = [item for item in collection if item.id not in remove_ids]
+        if len(kept) == len(collection):
+            raise KeyError(f"{scope_name} annotation '{annotation_id}' not found.")
+
+        collection[:] = kept
+        signal.emit(annotation_id)
+
+    def _update_collection_annotation(self, collection, annotation, scope_name, signal):
+        for index, item in enumerate(collection):
+            if item.id == annotation.id:
+                collection[index] = annotation
+                signal.emit(annotation)
+                return
+        raise KeyError(f"{scope_name} annotation '{annotation.id}' not found.")
+
     @property
     def global_annotations(self): return self._global_annotations
 
     def add_global_annotation(self, annotation):
-        if any(a.id == annotation.id for a in self._global_annotations):
-            raise ValueError(f"Global annotation id '{annotation.id}' already exists.")
-        self._global_annotations.append(annotation)
-        self.globalAnnotationAdded.emit(annotation)
+        self._add_collection_annotation(
+            self._global_annotations,
+            annotation,
+            "Global",
+            self.globalAnnotationAdded,
+        )
 
     def remove_global_annotation(self, annotation_id):
-        remove_ids = {annotation_id}
-        target = next((ann for ann in self._global_annotations if ann.id == annotation_id), None)
-        if target is not None and target.parent_id is None:
-            remove_ids.update(ann.id for ann in self._global_annotations if ann.parent_id == annotation_id)
-        kept = [ann for ann in self._global_annotations if ann.id not in remove_ids]
-        if len(kept) != len(self._global_annotations):
-            self._global_annotations[:] = kept
-            self.globalAnnotationRemoved.emit(annotation_id)
-            return
-        raise KeyError(f"Global annotation '{annotation_id}' not found.")
+        self._remove_collection_annotation(
+            self._global_annotations,
+            annotation_id,
+            "Global",
+            self.globalAnnotationRemoved,
+        )
 
     def update_global_annotation(self, annotation):
-        for i, ann in enumerate(self._global_annotations):
-            if ann.id == annotation.id:
-                self._global_annotations[i] = annotation
-                self.globalAnnotationUpdated.emit(annotation)
-                return
-        raise KeyError(f"Global annotation '{annotation.id}' not found.")
+        self._update_collection_annotation(
+            self._global_annotations,
+            annotation,
+            "Global",
+            self.globalAnnotationUpdated,
+        )
 
     # ---- Consensus Annotation API ----
     @property
     def consensus_annotations(self): return list(self._consensus_annotations)
 
     def add_consensus_annotation(self, annotation):
-        if any(a.id == annotation.id for a in self._consensus_annotations):
-            raise ValueError(f"Consensus annotation id '{annotation.id}' already exists.")
-        self._consensus_annotations.append(annotation)
-        self.consensusAnnotationAdded.emit(annotation)
+        self._add_collection_annotation(
+            self._consensus_annotations,
+            annotation,
+            "Consensus",
+            self.consensusAnnotationAdded,
+        )
 
     def remove_consensus_annotation(self, annotation_id):
-        remove_ids = {annotation_id}
-        target = next((ann for ann in self._consensus_annotations if ann.id == annotation_id), None)
-        if target is not None and target.parent_id is None:
-            remove_ids.update(ann.id for ann in self._consensus_annotations if ann.parent_id == annotation_id)
-        kept = [ann for ann in self._consensus_annotations if ann.id not in remove_ids]
-        if len(kept) != len(self._consensus_annotations):
-            self._consensus_annotations[:] = kept
-            self.consensusAnnotationRemoved.emit(annotation_id)
-            return
-        raise KeyError(f"Consensus annotation '{annotation_id}' not found.")
+        self._remove_collection_annotation(
+            self._consensus_annotations,
+            annotation_id,
+            "Consensus",
+            self.consensusAnnotationRemoved,
+        )
 
     def update_consensus_annotation(self, annotation):
-        for i, ann in enumerate(self._consensus_annotations):
-            if ann.id == annotation.id:
-                self._consensus_annotations[i] = annotation
-                self.consensusAnnotationUpdated.emit(annotation)
-                return
-        raise KeyError(f"Consensus annotation '{annotation.id}' not found.")
+        self._update_collection_annotation(
+            self._consensus_annotations,
+            annotation,
+            "Consensus",
+            self.consensusAnnotationUpdated,
+        )
 
     def clear_consensus_annotations(self):
         self._consensus_annotations.clear()
@@ -233,5 +256,3 @@ class AlignmentDataModel(QObject):
         self.modelReset.emit()
         if alignment_changed:
             self.alignmentStateChanged.emit(self._is_aligned)
-
-
