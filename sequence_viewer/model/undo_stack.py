@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/model/undo_stack.py
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable, Optional

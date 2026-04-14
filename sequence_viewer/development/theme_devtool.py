@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/development/theme_devtool.py
+from __future__ import annotations
 
 from dataclasses import fields
 

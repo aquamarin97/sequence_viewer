@@ -1,3 +1,4 @@
+# sequence_viewer/utils/drag_tooltip.py
 # utils/drag_tooltip.py
 """
 DragTooltip — selection info overlay (bp + Tm).

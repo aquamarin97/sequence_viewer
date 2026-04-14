@@ -1,3 +1,4 @@
+# sequence_viewer/features/sequence_viewer/sequence_viewer_widget.py
 # features/sequence_viewer/sequence_viewer_widget.py
 from typing import Optional, Tuple, List
 from PyQt5.QtCore import pyqtSignal, Qt

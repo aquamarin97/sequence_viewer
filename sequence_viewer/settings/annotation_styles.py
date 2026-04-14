@@ -1,4 +1,5 @@
-﻿# settings/annotation_styles.py
+# sequence_viewer/settings/annotation_styles.py
+# settings/annotation_styles.py
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict
@@ -47,7 +48,7 @@ class _AnnotationStyleManager(QObject):
                 self._styles[ann_type] = base_style
                 changed = True
                 continue
-            # YalnÄ±zca tema-Ã¶zgÃ¼ alanlarÄ± gÃ¼ncelle; kullanÄ±cÄ± ayarlarÄ±nÄ± koru.
+            # Yalnızca tema-özgü alanları güncelle; kullanıcı ayarlarını koru.
             merged = dataclasses.replace(
                 current,
                 fill_alpha=base_style.fill_alpha,
@@ -66,7 +67,7 @@ class _AnnotationStyleManager(QObject):
             self.stylesChanged.emit()
 
     def set_label_font_size(self, ann_type, size):
-        """label_font_size'Ä± 6pt minimumla gÃ¼nceller; Ã¼st sÄ±nÄ±r yoktur."""
+        """label_font_size'ı 6pt minimumla günceller; üst sınır yoktur."""
         clamped = max(6, int(round(size)))
         current = self._styles.get(ann_type)
         if current is None or current.label_font_size == clamped:
@@ -76,7 +77,7 @@ class _AnnotationStyleManager(QObject):
         self.stylesChanged.emit()
 
     def set_label_font_family(self, ann_type, family):
-        """label_font_family'yi gÃ¼nceller."""
+        """label_font_family'yi günceller."""
         current = self._styles.get(ann_type)
         if current is None or current.label_font_family == family:
             return
@@ -86,21 +87,21 @@ class _AnnotationStyleManager(QObject):
 
     def get_lane_height(self) -> int:
         """
-        TÃ¼m annotation tiplerindeki gerÃ§ek font metriklerine gÃ¶re lane
-        yÃ¼ksekliÄŸini hesaplar.
+        Tüm annotation tiplerindeki gerçek font metriklerine göre lane
+        yüksekliĞŸini hesaplar.
 
-        QFontMetrics.height() = ascent + descent kullanÄ±lÄ±r; bu deÄŸer
-        "p", "g", "y", "q" gibi descender'lÄ± karakterleri tam kapsar.
-        Font-agnostic: farklÄ± font family'lerde de doÄŸru Ã§alÄ±ÅŸÄ±r.
+        QFontMetrics.height() = ascent + descent kullanılır; bu deĞŸer
+        "p", "g", "y", "q" gibi descender'lı karakterleri tam kapsar.
+        Font-agnostic: farklı font family'lerde de doĞŸru çalışır.
         """
         from PyQt5.QtGui import QFont, QFontMetrics
-        _V_PAD = 4  # Ã¼st + alt boÅŸluk toplamÄ± (px)
+        _V_PAD = 4  # üst + alt boşluk toplamı (px)
         max_h = 0
         for s in self._styles.values():
             font = QFont(s.label_font_family, s.label_font_size)
             font.setBold(True)
             fm = QFontMetrics(font)
-            # height() descender'larÄ± da iÃ§erir
+            # height() descender'ları da içerir
             actual_h = fm.height() + _V_PAD
             max_h = max(max_h, actual_h)
         return max(16, max_h) if max_h > 0 else 16

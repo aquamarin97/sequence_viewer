@@ -1,8 +1,8 @@
-﻿# features/consensus_row/consensus_row_widget.py
+# sequence_viewer/features/consensus_row/consensus_row_widget.py
 """
 MODIFIED:
-- init_state: gizli (is_aligned==False iken). is_aligned==True olunca gÃ¶rÃ¼nÃ¼r.
-- alignmentStateChanged sinyaline baÄŸlÄ±.
+- init_state: gizli (is_aligned==False iken). is_aligned==True olunca görünür.
+- alignmentStateChanged sinyaline baĞŸlı.
 """
 from __future__ import annotations
 import math
@@ -28,7 +28,7 @@ from sequence_viewer.utils.sequence_utils import selection_bp, calculate_tm
 
 
 def _paint_dim_overlay(painter, sequence_viewer, cw, widget_w, widget_h, t):
-    """SeÃ§im dÄ±ÅŸÄ± sÃ¼tunlar Ã¼zerine solduklaÅŸtÄ±rma katmanÄ± Ã§izer (Ã§oklu focus aralÄ±ÄŸÄ± destekli)."""
+    """Seçim dışı sütunlar üzerine solduklaştırma katmanı çizer (çoklu focus aralıĞŸı destekli)."""
     dim_ranges = getattr(sequence_viewer, '_selection_dim_ranges', None)
     if not dim_ranges or cw <= 0:
         return
@@ -84,7 +84,7 @@ class ConsensusRowWidget(QWidget):
         self._alignment_model.consensusAnnotationAdded.connect(lambda _: self._update_visibility())
         self._alignment_model.consensusAnnotationRemoved.connect(lambda _: self._update_visibility())
         self._alignment_model.consensusAnnotationUpdated.connect(lambda _: self._update_visibility())
-        # is_aligned durumuna gÃ¶re gÃ¶rÃ¼nÃ¼rlÃ¼ÄŸÃ¼ gÃ¼ncelle
+        # is_aligned durumuna göre görünürlüĞŸü güncelle
         self._alignment_model.alignmentStateChanged.connect(self._on_alignment_changed)
 
         hbar = self._sequence_viewer.horizontalScrollBar()
@@ -104,11 +104,11 @@ class ConsensusRowWidget(QWidget):
             _asm2.stylesChanged.connect(self._update_visibility)
         except: pass
 
-        # BaÅŸlangÄ±Ã§ta gizli
+        # Başlangıçta gizli
         self._update_visibility()
 
     def _compute_heights(self):
-        """Ãœst annotation, dizi ve alt annotation yÃ¼ksekliklerini hesapla."""
+        """Üst annotation, dizi ve alt annotation yüksekliklerini hesapla."""
         ch = int(round(self._sequence_viewer.char_height))
         annotations = list(self._alignment_model.consensus_annotations) if self._alignment_model.is_aligned else []
         above_anns, below_anns = partition_annotations_by_side(annotations)
@@ -117,13 +117,13 @@ class ConsensusRowWidget(QWidget):
         return above_h, ch, below_h
 
     def _update_visibility(self):
-        """is_aligned durumuna gÃ¶re gÃ¶rÃ¼nÃ¼rlÃ¼k ve yÃ¼ksekliÄŸi ayarla."""
+        """is_aligned durumuna göre görünürlük ve yüksekliĞŸi ayarla."""
         if self._alignment_model.is_aligned:
             above_h, ch, below_h = self._compute_heights()
             total = above_h + ch + below_h
             self.setFixedHeight(total)
             self.setVisible(True)
-            # Spacer'Ä± senkronize et
+            # Spacer'ı senkronize et
             self._sync_spacer()
         else:
             self.setFixedHeight(0)
@@ -132,7 +132,7 @@ class ConsensusRowWidget(QWidget):
         self.update()
 
     def _sync_spacer(self):
-        """Sol paneldeki ConsensusSpacerWidget'Ä± yÃ¼kseklikle senkronize et."""
+        """Sol paneldeki ConsensusSpacerWidget'ı yükseklikle senkronize et."""
         try:
             p = self.parent()
             while p is not None:
@@ -164,12 +164,12 @@ class ConsensusRowWidget(QWidget):
     def current_threshold(self): return self._model.threshold
 
     # ------------------------------------------------------------------
-    # _selection: drag ve tekli annotation seÃ§imi iÃ§in backward-compat property
+    # _selection: drag ve tekli annotation seçimi için backward-compat property
     # backing store: _selection_ranges [(start_incl, end_excl), ...]
     # ------------------------------------------------------------------
     @property
     def _selection(self):
-        """Ä°lk aralÄ±ÄŸÄ± (start_incl, end_incl) olarak dÃ¶ndÃ¼rÃ¼r; yoksa None."""
+        """ğlk aralıĞŸı (start_incl, end_incl) olarak döndürür; yoksa None."""
         if self._selection_ranges:
             s, e = self._selection_ranges[0]
             return (s, e - 1)
@@ -195,7 +195,7 @@ class ConsensusRowWidget(QWidget):
         self._is_selected = selected; self.update()
 
     def select_all(self):
-        """TÃ¼m konsensÃ¼s dizisini seÃ§ili hale getirir."""
+        """Tüm konsensüs dizisini seçili hale getirir."""
         consensus = self._get_consensus()
         if consensus:
             self._selection_ranges = [(0, len(consensus))]
@@ -262,7 +262,7 @@ class ConsensusRowWidget(QWidget):
         return int(scene_x / cw)
 
     def _boundary_col_at_x(self, vp_x: float) -> int:
-        """Viewport x â†’ en yakÄ±n NA sÄ±nÄ±rÄ± (yarÄ±-yarÄ±ya bÃ¶lÃ¼nmÃ¼ÅŸ)."""
+        """Viewport x â†’ en yakın NA sınırı (yarı-yarıya bölünmüş)."""
         cw = self._get_char_width()
         if cw <= 0: return 0
         scene_x = vp_x + self._get_view_left()
@@ -273,7 +273,7 @@ class ConsensusRowWidget(QWidget):
         return ctrl
 
     def _notify_header_cleared(self):
-        """Header seÃ§imini temizle, workspace'e bildir â€” guide'larÄ± etkileme."""
+        """Header seçimini temizle, workspace'e bildir â€” guide'ları etkileme."""
         try:
             p = self.parent()
             while p is not None:
@@ -281,8 +281,8 @@ class ConsensusRowWidget(QWidget):
                     p.consensus_spacer.set_selected(True)
                     changed = p.header_viewer._selection.clear()
                     p.header_viewer.apply_selection_to_items(changed)
-                    # on_selection_changed'i Ã‡AÄIRMA â€” o clear_v_guides yapar
-                    # Sadece h_guides'Ä± temizle, v_guides'a dokunma
+                    # on_selection_changed'i ÇAĞIRMA â€” o clear_v_guides yapar
+                    # Sadece h_guides'ı temizle, v_guides'a dokunma
                     p.sequence_viewer.clear_h_guides()
                     for item in p.sequence_viewer.sequence_items:
                         item.clear_selection()
@@ -293,7 +293,7 @@ class ConsensusRowWidget(QWidget):
         except: pass
 
     def _notify_edit_annotation(self, ann):
-        """Consensus annotation dÃ¼zenleme diyaloÄŸunu workspace Ã¼zerinden aÃ§."""
+        """Consensus annotation düzenleme diyaloĞŸunu workspace üzerinden aç."""
         try:
             p = self.parent()
             while p is not None:
@@ -341,7 +341,7 @@ class ConsensusRowWidget(QWidget):
         super().mouseDoubleClickEvent(event)
 
     def _notify_workspace_ann_cleared(self):
-        """Workspace coordinator'Ä±n annotation seÃ§imini temizle (koordinasyon)."""
+        """Workspace coordinator'ın annotation seçimini temizle (koordinasyon)."""
         try:
             p = self.parent()
             while p is not None:
@@ -356,7 +356,7 @@ class ConsensusRowWidget(QWidget):
             pass
 
     def _notify_spacer_selected(self, selected: bool):
-        """Sol paneldeki consensus_spacer'Ä± seÃ§im durumuna gÃ¶re gÃ¼ncelle."""
+        """Sol paneldeki consensus_spacer'ı seçim durumuna göre güncelle."""
         try:
             p = self.parent()
             while p is not None:
@@ -368,7 +368,7 @@ class ConsensusRowWidget(QWidget):
             pass
 
     def _notify_coordinator_refresh(self):
-        """Coordinator'Ä±n _apply_union_selection'Ä±nÄ± tetikle (cross-widget merge)."""
+        """Coordinator'ın _apply_union_selection'ını tetikle (cross-widget merge)."""
         try:
             p = self.parent()
             while p is not None:
@@ -380,18 +380,18 @@ class ConsensusRowWidget(QWidget):
             pass
 
     def _select_annotation_range(self, ann, ctrl=False):
-        """Annotation aralÄ±ÄŸÄ±nÄ± seÃ§ili yap ve guide Ã§izgileri oluÅŸtur."""
+        """Annotation aralıĞŸını seçili yap ve guide çizgileri oluştur."""
         c = self._get_controller()
 
         if ctrl:
-            # Additive: coordinator seÃ§imini KORU, sadece kendi state'ini gÃ¼ncelle
+            # Additive: coordinator seçimini KORU, sadece kendi state'ini güncelle
             if ann.id in self._selected_ann_ids:
                 self._selected_ann_ids.discard(ann.id)
             else:
                 self._selected_ann_ids.add(ann.id)
             self._is_selected = bool(self._selected_ann_ids)
             self._notify_spacer_selected(self._is_selected)
-            # SeÃ§ili annotation nesnelerini bul ve _selection_ranges'i gÃ¼ncelle
+            # Seçili annotation nesnelerini bul ve _selection_ranges'i güncelle
             ann_map = {a.id: a for a in (
                 self._alignment_model.consensus_annotations
                 if self._alignment_model.is_aligned else [])}
@@ -408,13 +408,13 @@ class ConsensusRowWidget(QWidget):
             self._notify_coordinator_refresh()
             return
 
-        # Tekil seÃ§im: coordinator'Ä± temizle, kendi seÃ§imini yap
+        # Tekil seçim: coordinator'ı temizle, kendi seçimini yap
         self._notify_workspace_ann_cleared()
         self._selected_ann_ids = {ann.id}
         self._selection_ranges = [(ann.start, ann.start + 1) if ann.type == AnnotationType.MISMATCH_MARKER else (ann.start, ann.end + 1)]
         self._is_selected = True
         self._notify_spacer_selected(True)
-        # Controller Ã–NCE gÃ¼ncelle â€” observers paint sÄ±rasÄ±nda okur
+        # Controller ÖNCE güncelle â€” observers paint sırasında okur
         if c is not None:
             c._v_guide_cols = [ann.start] if ann.type == AnnotationType.MISMATCH_MARKER else [ann.start, ann.end + 1]
         self._sequence_viewer.set_v_guides([ann.start] if ann.type == AnnotationType.MISMATCH_MARKER else [ann.start, ann.end + 1])
@@ -429,7 +429,7 @@ class ConsensusRowWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            # Annotation tÄ±klamasÄ± â€” seÃ§im + guide
+            # Annotation tıklaması â€” seçim + guide
             ann = self._annotation_at(event.pos())
             if ann:
                 self._press_on_annotation = True
@@ -443,7 +443,7 @@ class ConsensusRowWidget(QWidget):
             self._press_on_annotation = False
             self._selected_ann_ids.clear()
             self._notify_workspace_ann_cleared()
-            # Annotation seÃ§iminin bÄ±raktÄ±ÄŸÄ± dim + v_guide'larÄ± temizle
+            # Annotation seçiminin bıraktıĞŸı dim + v_guide'ları temizle
             self._sequence_viewer.clear_selection_dim_range()
             c = self._get_controller()
             if c is not None:
@@ -454,14 +454,14 @@ class ConsensusRowWidget(QWidget):
             self._sequence_viewer.clear_visual_selection()
             try: self._sequence_viewer._model.clear_selection()
             except: pass
-            # Drag threshold iÃ§in press pozisyonunu sakla
+            # Drag threshold için press pozisyonunu sakla
             from PyQt5.QtCore import QPoint
             self._press_pos = QPoint(event.pos())
             self._press_scene_col = self._scene_col_at_x(float(event.pos().x()))
             self._drag_started = False
             self._is_selected = True
             self._notify_header_cleared()
-            # Position ruler'Ä± gÃ¼ncelle
+            # Position ruler'ı güncelle
             try:
                 p = self.parent()
                 while p is not None:
@@ -502,7 +502,7 @@ class ConsensusRowWidget(QWidget):
                 self._sequence_viewer.set_v_guides(c._v_guide_cols)
             self._sequence_viewer.clear_caret()
             self.setCursor(Qt.SizeHorCursor)
-            # Drag baÅŸladÄ±ÄŸÄ± anda baÅŸlangÄ±Ã§ kolonu iÃ§in guide'Ä± hemen gÃ¶ster
+            # Drag başladıĞŸı anda başlangıç kolonu için guide'ı hemen göster
             if c is not None and self._press_scene_col is not None:
                 col = self._scene_col_at_x(float(event.pos().x()))
                 lo, hi = min(self._press_scene_col, col), max(self._press_scene_col, col)
@@ -523,7 +523,7 @@ class ConsensusRowWidget(QWidget):
                     self._selection = (lo, hi)
                     if c is not None:
                         left_b, right_b = lo, hi + 1
-                        # Drag aktifken sadece bu ikisini gÃ¶ster â€” Ã¶nceki drag deÄŸerlerini biriktirme
+                        # Drag aktifken sadece bu ikisini göster â€” önceki drag deĞŸerlerini biriktirme
                         c._v_guide_cols = [left_b, right_b]
                         self._sequence_viewer.set_v_guides(c._v_guide_cols)
                 else:
@@ -543,7 +543,7 @@ class ConsensusRowWidget(QWidget):
 
             if self._drag_started:
                 self._drag_tooltip.clear_tooltip()
-                # Drag bitti â€” guide'larÄ± kalÄ±cÄ± hale getir
+                # Drag bitti â€” guide'ları kalıcı hale getir
                 self._drag_started = False
                 self._press_pos = None
                 c = self._get_controller()
@@ -566,7 +566,7 @@ class ConsensusRowWidget(QWidget):
                     self.update()
                     event.accept()
                     return
-                # Drag yok â†’ boundary tÄ±klama â†’ guide
+                # Drag yok â†’ boundary tıklama â†’ guide
                 self._selection = None
                 boundary_col = self._boundary_col_at_x(float(event.pos().x()))
                 c = self._get_controller()
@@ -651,12 +651,12 @@ class ConsensusRowWidget(QWidget):
         painter.setRenderHint(QPainter.TextAntialiasing, True)
         rect = self.rect(); width = rect.width(); height = rect.height()
         t = theme_manager.current
-        # SeÃ§im vurgusu: seÃ§iliyse row_band_highlight, deÄŸilse row_bg_odd
+        # Seçim vurgusu: seçiliyse row_band_highlight, deĞŸilse row_bg_odd
         is_selected = self._is_selected
         bg_color = QColor(t.row_band_highlight) if is_selected else t.row_bg_odd
         painter.fillRect(rect, QBrush(bg_color))
         painter.setPen(QPen(t.border_normal)); painter.drawLine(0, height-1, width, height-1)
-        # Yatay kÄ±lavuz Ã§izgileri: dizi seÃ§iliyken ve annotation seÃ§imi yokken
+        # Yatay kılavuz çizgileri: dizi seçiliyken ve annotation seçimi yokken
         if is_selected and not self._selected_ann_ids:
             h_pen = QPen(t.guide_line_color, 1, Qt.SolidLine)
             painter.setPen(h_pen)
@@ -675,17 +675,17 @@ class ConsensusRowWidget(QWidget):
         if cw <= 0: painter.end(); return
         self._sync_font_from_viewer(); painter.setFont(self._font)
         mode = self._effective_mode()
-        # Annotation lane yÃ¼ksekliklerini hesapla
+        # Annotation lane yüksekliklerini hesapla
         _anns = list(self._alignment_model.consensus_annotations) if self._alignment_model.is_aligned else []
         _above_anns, _ = partition_annotations_by_side(_anns)
         _above_h = float(side_strip_height(_above_anns))
         seq_char_h = float(int(round(self._sequence_viewer.char_height)))
-        seq_top = _above_h  # dizi bu y'den baÅŸlar
+        seq_top = _above_h  # dizi bu y'den başlar
         length = len(consensus)
         start_col = max(0, int(math.floor(view_left / cw)))
         end_col = min(length, int(math.ceil((view_left + width) / cw)))
         sel_ranges = self._selection_ranges  # [(start_incl, end_excl), ...]
-        ch = seq_char_h  # dizi satÄ±rÄ±nÄ±n yÃ¼ksekliÄŸi
+        ch = seq_char_h  # dizi satırının yüksekliĞŸi
         if mode == "line":
             line_h = ch * 0.3; y = seq_top + (ch - line_h) / 2.0
             x_start = max(0.0, start_col * cw - view_left)
@@ -737,7 +737,7 @@ class ConsensusRowWidget(QWidget):
             above_assignment = above_geometry.lane_assignment
             below_assignment = below_geometry.lane_assignment
             above_h = side_strip_height(above_anns)
-            # dizi alanÄ± above_h'den baÅŸlar
+            # dizi alanı above_h'den başlar
             seq_top = float(above_h)
             painter.setRenderHint(QPainter.Antialiasing, True)
             widget_w = float(width)
@@ -789,10 +789,10 @@ class ConsensusRowWidget(QWidget):
                 self._hit_rects.append((QRectF(clipped_x, ann_y, clipped_w, ann_h_draw), ann))
             painter.setRenderHint(QPainter.Antialiasing, False)
 
-        # ---- SeÃ§im odak efekti ----
+        # ---- Seçim odak efekti ----
         _paint_dim_overlay(painter, self._sequence_viewer, cw, float(width), float(height), t)
 
-        # ---- Dikey kÄ±lavuz Ã§izgileri ----
+        # ---- Dikey kılavuz çizgileri ----
         ctrl = self._get_controller()
         if ctrl is not None and ctrl._v_guide_cols:
             hbar = self._sequence_viewer.horizontalScrollBar()
@@ -805,7 +805,7 @@ class ConsensusRowWidget(QWidget):
                 if -10 <= vp_x <= vp_w + 10:
                     painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, float(height)))
 
-        # ---- I-beam caret (yalnÄ±zca consensus row tÄ±klamasÄ±nda, row == -1) ----
+        # ---- I-beam caret (yalnızca consensus row tıklamasında, row == -1) ----
         caret = getattr(self._sequence_viewer, '_caret', None)
         if caret is not None and caret[1] == -1:
             hbar = self._sequence_viewer.horizontalScrollBar()

@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/workspace/row_layout.py
+from __future__ import annotations
 import bisect
 from dataclasses import dataclass, field
 from typing import List

@@ -1,3 +1,4 @@
-﻿# features/annotation_layer/__init__.py
+# sequence_viewer/features/annotation_layer/__init__.py
+# features/annotation_layer/__init__.py
 
 

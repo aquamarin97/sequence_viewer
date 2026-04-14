@@ -1,4 +1,5 @@
-﻿# graphics/sequence_item/sequence_item.py
+# sequence_viewer/graphics/sequence_item/sequence_item.py
+# graphics/sequence_item/sequence_item.py
 from typing import Optional
 import weakref
 from PyQt5.QtCore import Qt, QRectF, QPointF
@@ -74,7 +75,7 @@ class SequenceGraphicsItem(QGraphicsItem):
         self._model.set_lod_max_mode(mode); self.update()
 
     def refresh_display_settings(self):
-        """Font family, char_height ve size'Ä± display_settings_manager'dan yeniden uygula."""
+        """Font family, char_height ve size'ı display_settings_manager'dan yeniden uygula."""
         self.font.setFamily(display_settings_manager.sequence_font_family)
         new_ch = display_settings_manager.sequence_char_height
         if self._model.char_height != new_ch:

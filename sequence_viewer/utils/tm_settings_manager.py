@@ -1,3 +1,4 @@
+# sequence_viewer/utils/tm_settings_manager.py
 # utils/tm_settings_manager.py
 """
 Tm Hesaplama Parametreleri Yöneticisi

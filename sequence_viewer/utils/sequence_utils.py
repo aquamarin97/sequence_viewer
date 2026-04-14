@@ -1,3 +1,4 @@
+# sequence_viewer/utils/sequence_utils.py
 # utils/sequence_utils.py
 """
 Sequence analysis utility functions.

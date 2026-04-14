@@ -1,3 +1,4 @@
+# sequence_viewer/utils/floating_panel.py
 # utils/floating_panel.py
 """
 FloatingPanel — theme-aware embedded overlay panel.

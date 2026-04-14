@@ -1,4 +1,5 @@
-﻿import sys
+# main.py
+import sys
 
 from sequence_viewer.app.run import run
 

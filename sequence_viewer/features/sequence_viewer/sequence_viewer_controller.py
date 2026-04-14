@@ -1,3 +1,4 @@
+# sequence_viewer/features/sequence_viewer/sequence_viewer_controller.py
 # features/sequence_viewer/sequence_viewer_controller.py
 from typing import Optional, Callable, List
 from math import pow

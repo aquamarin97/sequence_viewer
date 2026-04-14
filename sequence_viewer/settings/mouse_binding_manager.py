@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/settings/mouse_binding_manager.py
+from __future__ import annotations
 
 import json
 import os

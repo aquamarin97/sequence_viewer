@@ -1,4 +1,5 @@
-﻿# features/sequence_viewer/sequence_viewer_interaction.py
+# sequence_viewer/features/sequence_viewer/sequence_viewer_interaction.py
+# features/sequence_viewer/sequence_viewer_interaction.py
 from __future__ import annotations
 from PyQt5.QtCore import Qt
 

@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/development/annotation_devtool.py
+from __future__ import annotations
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor

@@ -1,4 +1,5 @@
-﻿# model/alignment_data_model.py
+# sequence_viewer/model/alignment_data_model.py
+# model/alignment_data_model.py
 from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass

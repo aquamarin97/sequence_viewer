@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/workspace/coordinators/layout_scroll_sync.py
+from __future__ import annotations
 from typing import TYPE_CHECKING, List
 from PyQt5.QtWidgets import QScrollBar
 from sequence_viewer.features.annotation_layer.annotation_layout_engine import partition_annotations_by_side, side_strip_height

@@ -1,4 +1,5 @@
-﻿# model/motif_finder.py
+# sequence_viewer/model/motif_finder.py
+# model/motif_finder.py
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Sequence

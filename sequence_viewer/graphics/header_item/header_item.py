@@ -1,6 +1,7 @@
-﻿# graphics/header_item/header_item.py
+# sequence_viewer/graphics/header_item/header_item.py
+# graphics/header_item/header_item.py
 """
-Header satÄ±r item'Ä± â€” v4: seÃ§im durumunda annotation boÅŸluklarÄ±nÄ± da
+Header satır item'ı â€” v4: seçim durumunda annotation boşluklarını da
 row_band_highlight ile boyar.
 """
 from __future__ import annotations
@@ -88,7 +89,7 @@ class HeaderRowItem(QGraphicsItem):
         ann_h = float(self.annot_height)
         row_h = float(self.row_height)
 
-        # ---- Ãœst annotation bÃ¶lgesi ----
+        # ---- Üst annotation bölgesi ----
         if ann_h > 0:
             if self._selected:
                 ann_bg = QColor(t.row_band_highlight)
@@ -98,7 +99,7 @@ class HeaderRowItem(QGraphicsItem):
                 ann_bg = t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
             painter.fillRect(QRectF(0, 0, total_w, ann_h), QBrush(ann_bg))
 
-        # ---- Header metin bÃ¶lgesi ----
+        # ---- Header metin bölgesi ----
         text_top = ann_h
         text_rect_full = QRectF(0, text_top, total_w, row_h)
         bg = self._resolve_bg_color()
@@ -126,7 +127,7 @@ class HeaderRowItem(QGraphicsItem):
         draw_rect = QRectF(self._model.left_padding + (3 if self._selected else 0), text_top, total_w - self._model.left_padding - self._model.right_padding, row_h)
         painter.drawText(draw_rect, Qt.AlignVCenter | Qt.AlignLeft, display_txt)
 
-        # ---- Alt annotation bÃ¶lgesi ----
+        # ---- Alt annotation bölgesi ----
         below_h = float(self.below_ann_height)
         if below_h > 0:
             below_top = ann_h + row_h

@@ -1,4 +1,5 @@
-﻿# features/annotation_layer/annotation_layout_engine.py
+# sequence_viewer/features/annotation_layer/annotation_layout_engine.py
+
 from __future__ import annotations
 
 from dataclasses import dataclass

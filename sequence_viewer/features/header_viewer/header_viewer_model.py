@@ -1,4 +1,5 @@
-﻿# features/header_viewer/header_viewer_model.py
+# sequence_viewer/features/header_viewer/header_viewer_model.py
+# features/header_viewer/header_viewer_model.py
 from typing import List
 
 class HeaderViewerModel:

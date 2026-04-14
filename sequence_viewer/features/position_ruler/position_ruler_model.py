@@ -1,4 +1,5 @@
-﻿# features/position_ruler/position_ruler_model.py
+# sequence_viewer/features/position_ruler/position_ruler_model.py
+# features/position_ruler/position_ruler_model.py
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
 import math

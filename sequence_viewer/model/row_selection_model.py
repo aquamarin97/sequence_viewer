@@ -1,4 +1,5 @@
-﻿# model/row_selection_model.py
+# sequence_viewer/model/row_selection_model.py
+# model/row_selection_model.py
 from __future__ import annotations
 from typing import FrozenSet, Optional, Set
 

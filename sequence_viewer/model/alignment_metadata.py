@@ -1,4 +1,5 @@
-﻿# model/alignment_metadata.py
+# sequence_viewer/model/alignment_metadata.py
+# model/alignment_metadata.py
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone

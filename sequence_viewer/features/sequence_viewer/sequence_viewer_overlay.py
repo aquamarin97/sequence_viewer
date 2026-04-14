@@ -1,4 +1,5 @@
-﻿# features/sequence_viewer/sequence_viewer_overlay.py
+# sequence_viewer/features/sequence_viewer/sequence_viewer_overlay.py
+# features/sequence_viewer/sequence_viewer_overlay.py
 from __future__ import annotations
 from PyQt5.QtCore import Qt, QPointF, QRectF
 from PyQt5.QtGui import QPainter, QPen, QColor, QBrush
@@ -55,7 +56,7 @@ class OverlayMixin:
         self._v_guide_observers.append(callback)
 
     # ------------------------------------------------------------------
-    # Caret (metin kursÃ¶rÃ¼) public API
+    # Caret (metin kursörü) public API
     # ------------------------------------------------------------------
 
     def set_caret(self, col: int, row: int):
@@ -118,7 +119,7 @@ class OverlayMixin:
             cb()
 
     def set_selection_focus_ranges(self, ranges: list):
-        """Birden fazla focus aralÄ±ÄŸÄ± ayarla â€” aralarÄ±ndaki boÅŸluklar karartÄ±lÄ±r."""
+        """Birden fazla focus aralıĞŸı ayarla â€” aralarındaki boşluklar karartılır."""
         self._selection_dim_ranges = list(ranges)
         self.viewport().update()
         for cb in self._v_guide_observers:
@@ -133,7 +134,7 @@ class OverlayMixin:
 
     @property
     def _selection_dim_range(self):
-        """Geriye dÃ¶nÃ¼k uyumluluk: ilk aralÄ±ÄŸÄ± dÃ¶ndÃ¼rÃ¼r veya None."""
+        """Geriye dönük uyumluluk: ilk aralıĞŸı döndürür veya None."""
         return self._selection_dim_ranges[0] if self._selection_dim_ranges else None
 
     # ------------------------------------------------------------------
@@ -153,7 +154,7 @@ class OverlayMixin:
             y_bottom = y_top + float(layout.row_strides[i])
             if y_bottom < vis_top or y_top > vis_bottom:
                 continue
-            # SeÃ§ili satÄ±r ise row_band_highlight, deÄŸilse normal arka plan
+            # Seçili satır ise row_band_highlight, deĞŸilse normal arka plan
             if i in self._h_guide_rows:
                 row_bg = QColor(t.row_band_highlight)
             else:
@@ -174,7 +175,7 @@ class OverlayMixin:
     # ------------------------------------------------------------------
 
     def _draw_row_band_border_lines(self, painter, t):
-        """SeÃ§ili satÄ±rlarÄ±n Ã¼st ve alt kenar Ã§izgilerini Ã§izer."""
+        """Seçili satırların üst ve alt kenar çizgilerini çizer."""
         if not self._h_guide_rows:
             return
         layout = self._row_layout
@@ -185,7 +186,7 @@ class OverlayMixin:
         painter.save()
         painter.resetTransform()
 
-        # Sadece kenar Ã§izgilerini Ã§iz
+        # Sadece kenar çizgilerini çiz
         h_pen = QPen(theme_manager.current.guide_line_color, _GUIDE_WIDTH, Qt.SolidLine)
         painter.setPen(h_pen)
         for row in self._h_guide_rows:
@@ -216,7 +217,7 @@ class OverlayMixin:
         for left_col, right_col in sorted_ranges:
             left_px = left_col * cw - offset
             right_px = right_col * cw - offset
-            # Focus aralÄ±ÄŸÄ±nÄ±n solundaki boÅŸluÄŸu karart
+            # Focus aralıĞŸının solundaki boşluĞŸu karart
             if left_px > prev_right_px:
                 x = max(prev_right_px, 0.0)
                 w = min(left_px, vp_w) - x
@@ -224,7 +225,7 @@ class OverlayMixin:
                     painter.fillRect(QRectF(x, 0.0, w, vp_h), dim_color)
             prev_right_px = max(prev_right_px, right_px)
 
-        # Son focus aralÄ±ÄŸÄ±nÄ±n saÄŸÄ±ndaki her ÅŸeyi karart
+        # Son focus aralıĞŸının saĞŸındaki her şeyi karart
         if prev_right_px < vp_w:
             r = max(prev_right_px, 0.0)
             painter.fillRect(QRectF(r, 0.0, vp_w - r, vp_h), dim_color)

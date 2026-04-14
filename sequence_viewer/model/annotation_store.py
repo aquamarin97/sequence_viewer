@@ -1,4 +1,5 @@
-﻿# model/annotation_store.py
+# sequence_viewer/model/annotation_store.py
+# model/annotation_store.py
 from __future__ import annotations
 from typing import Dict, Iterable, List, Optional
 from PyQt5.QtCore import QObject, pyqtSignal

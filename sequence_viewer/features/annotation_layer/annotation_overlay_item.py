@@ -1,4 +1,4 @@
-﻿# features/annotation_layer/annotation_overlay_item.py
+# sequence_viewer/features/annotation_layer/annotation_overlay_item.py
 from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 from PyQt5.QtCore import Qt, QRectF

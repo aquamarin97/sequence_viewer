@@ -1,4 +1,5 @@
-﻿# features/sequence_viewer/sequence_viewer_model.py
+# sequence_viewer/features/sequence_viewer/sequence_viewer_model.py
+# features/sequence_viewer/sequence_viewer_model.py
 from typing import List, Optional, Tuple
 
 class SequenceViewerModel:

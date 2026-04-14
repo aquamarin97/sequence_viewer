@@ -1,4 +1,5 @@
-﻿# features/header_viewer/header_spacer_widgets.py
+# sequence_viewer/features/header_viewer/header_spacer_widgets.py
+# features/header_viewer/header_spacer_widgets.py
 """
 MODIFIED:
 - ConsensusSpacerWidget: click = select all consensus, double-click = edit name
@@ -54,20 +55,20 @@ class AnnotationSpacerWidget(QWidget):
 
 class ConsensusSpacerWidget(QWidget):
     """
-    Consensus satÄ±rÄ± ile hizalÄ± sol panel spacer'Ä±.
+    Consensus satırı ile hizalı sol panel spacer'ı.
     
-    Tek tÄ±klama: consensus dizisini tÃ¼mÃ¼yle seÃ§er.
-    Ã‡ift tÄ±klama: consensus etiketini dÃ¼zenlemeye aÃ§ar.
+    Tek tıklama: consensus dizisini tümüyle seçer.
+    Çift tıklama: consensus etiketini düzenlemeye açar.
     """
-    clicked = pyqtSignal(bool)       # tek tÄ±klama â†’ consensus select all (bool=ctrl)
-    doubleClicked = pyqtSignal()     # Ã§ift tÄ±klama â†’ label dÃ¼zenleme
-    labelChanged = pyqtSignal(str)   # dÃ¼zenleme tamamlandÄ±
+    clicked = pyqtSignal(bool)       # tek tıklama â†’ consensus select all (bool=ctrl)
+    doubleClicked = pyqtSignal()     # çift tıklama â†’ label düzenleme
+    labelChanged = pyqtSignal(str)   # düzenleme tamamlandı
 
     def __init__(self, height=20, parent=None):
         super().__init__(parent)
         self.setFixedHeight(height)
         self._char_height = height
-        self._above_h = 0  # annotation lane yÃ¼ksekliÄŸi (Ã¼stte)
+        self._above_h = 0  # annotation lane yüksekliĞŸi (üstte)
         self._label = "Consensus"
         self._selected = False
         self._edit_widget: Optional[QLineEdit] = None
@@ -75,7 +76,7 @@ class ConsensusSpacerWidget(QWidget):
         theme_manager.themeChanged.connect(lambda _: self.update())
 
     def sync_seq_region(self, above_h: float, char_h: float):
-        """Sequence satÄ±rÄ±nÄ±n konumunu gÃ¼ncelle (annotation eklenince Ã§aÄŸrÄ±lÄ±r)."""
+        """Sequence satırının konumunu güncelle (annotation eklenince çaĞŸrılır)."""
         self._above_h = above_h
         self._char_height = char_h
         self.update()
@@ -109,7 +110,7 @@ class ConsensusSpacerWidget(QWidget):
         text_color = t.text_selected if self._selected else t.text_primary
         painter.setPen(QPen(text_color))
         text_left = 9 if self._selected else 6
-        # Metni _char_height alanÄ±nÄ±n altÄ±na hizala (sequence ile aynÄ± hiza)
+        # Metni _char_height alanının altına hizala (sequence ile aynı hiza)
         text_rect = QRectF(text_left, self._above_h, rect.width() - text_left, self._char_height)
         painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, self._label)
         painter.setPen(QPen(t.border_normal))
@@ -135,7 +136,7 @@ class ConsensusSpacerWidget(QWidget):
         else: super().keyPressEvent(event)
 
     def _get_consensus_row(self):
-        """Parent zincirinden ConsensusRowWidget'Ä± bul."""
+        """Parent zincirinden ConsensusRowWidget'ı bul."""
         p = self.parent()
         while p is not None:
             if hasattr(p, 'consensus_row'):
@@ -169,7 +170,7 @@ class ConsensusSpacerWidget(QWidget):
         editor.selectAll()
         margin = 2
         editor_h = max(self.height() - margin * 2, 22)
-        # Editor widget yÃ¼ksekten taÅŸÄ±yorsa yukarÄ± kaydÄ±r
+        # Editor widget yüksekten taşıyorsa yukarı kaydır
         y_pos = max(0, (self.height() - editor_h) // 2)
         editor.setGeometry(margin, y_pos, self.width() - margin * 2, editor_h)
         editor.setStyleSheet(

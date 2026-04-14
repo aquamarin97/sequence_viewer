@@ -1,4 +1,5 @@
-﻿# model/consensus_calculator.py
+# sequence_viewer/model/consensus_calculator.py
+# model/consensus_calculator.py
 from __future__ import annotations
 from enum import Enum, auto
 from typing import List, Sequence

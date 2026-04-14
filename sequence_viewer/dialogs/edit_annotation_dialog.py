@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/dialogs/edit_annotation_dialog.py
+from __future__ import annotations
 from typing import Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
@@ -33,7 +34,7 @@ class EditAnnotationDialog(QDialog):
         prop = QGroupBox("Properties"); form_p = QFormLayout(prop); form_p.setLabelAlignment(Qt.AlignRight)
         color_w = QWidget(); cl = QHBoxLayout(color_w); cl.setContentsMargins(0,0,0,0)
         self._color_preview = QLabel(); self._color_preview.setFrameStyle(QFrame.Box); self._color_preview.setFixedSize(28,22)
-        self._color_btn = QPushButton("Chooseâ€¦"); self._color_btn.setFixedSize(72,22)
+        self._color_btn = QPushButton("Choose…"); self._color_btn.setFixedSize(72,22)
         cl.addWidget(self._color_preview); cl.addWidget(self._color_btn); cl.addStretch()
         form_p.addRow("Color:", color_w)
         self._identity_spin = QDoubleSpinBox(); self._identity_spin.setRange(0.0,100.0); self._identity_spin.setSuffix(" %"); self._identity_spin.setDecimals(1)

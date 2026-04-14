@@ -1,4 +1,5 @@
-﻿from pathlib import Path
+# sequence_viewer/app/fasta_loader.py
+from pathlib import Path
 
 
 def load_fasta_files(fasta_paths):

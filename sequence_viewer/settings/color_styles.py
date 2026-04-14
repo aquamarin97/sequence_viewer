@@ -1,15 +1,16 @@
-﻿# settings/color_styles.py
+# sequence_viewer/settings/color_styles.py
+# settings/color_styles.py
 from __future__ import annotations
 from typing import Dict, Optional
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QColor
 from sequence_viewer.model.annotation import AnnotationType
 
-# Light theme iÃ§in geliÅŸtirilmiÅŸ nÃ¼kleotid renkleri
-# G rengi daha koyu turuncu yapÄ±ldÄ± (kontrast artÄ±rÄ±ldÄ±)
+# Light theme için geliştirilmiş nükleotid renkleri
+# G rengi daha koyu turuncu yapıldı (kontrast artırıldı)
 _NUCLEOTIDE_COLORS_LIGHT = {
     "A": QColor(21,128,61), "T": QColor(185,28,28), "U": QColor(185,28,28),
-    "C": QColor(29,78,216), "G": QColor(180,100,10),  # Kontrast artÄ±rÄ±ldÄ±
+    "C": QColor(29,78,216), "G": QColor(180,100,10),  # Kontrast artırıldı
     "-": QColor(100,116,139), "N": QColor(107,114,128),
 }
 _NUCLEOTIDE_COLORS_DARK = {
@@ -17,10 +18,10 @@ _NUCLEOTIDE_COLORS_DARK = {
     "C": QColor(88,152,235), "G": QColor(218,160,50),
     "-": QColor(140,148,162), "N": QColor(130,140,158),
 }
-# Consensus renkleri - U tutarlÄ± kÄ±rmÄ±zÄ± ailesinde tutuldu
+# Consensus renkleri - U tutarlı kırmızı ailesinde tutuldu
 _CONSENSUS_COLORS = {
     "light": {"A":QColor(0,170,80),"T":QColor(220,30,30),"U":QColor(220,30,30),"C":QColor(20,100,255),"G":QColor(255,140,0),"-":QColor(75,85,105),"N":QColor(100,110,130)},
-    "dark": {"A":QColor(40,255,110),"T":QColor(255,60,60),"U":QColor(255,80,80),"C":QColor(30,220,255),"G":QColor(255,190,30),"-":QColor(110,120,140),"N":QColor(140,150,170)},  # U tutarlÄ± kÄ±rmÄ±zÄ± tonunda
+    "dark": {"A":QColor(40,255,110),"T":QColor(255,60,60),"U":QColor(255,80,80),"C":QColor(30,220,255),"G":QColor(255,190,30),"-":QColor(110,120,140),"N":QColor(140,150,170)},  # U tutarlı kırmızı tonunda
 }
 _DEFAULT_NUCLEOTIDE_COLORS = _NUCLEOTIDE_COLORS_LIGHT
 _DEFAULT_ANNOTATION_COLORS = {
@@ -30,23 +31,23 @@ _DEFAULT_ANNOTATION_COLORS = {
     AnnotationType.MISMATCH_MARKER: QColor(255,220,0),
 }
 
-# Renk kÃ¶rÃ¼ (colorblind) modlarÄ± iÃ§in alternatif paletler
+# Renk körü (colorblind) modları için alternatif paletler
 _COLORBLIND_MODES = {
-    "deuteranopia": {  # KÄ±rmÄ±zÄ±-yeÅŸil renk kÃ¶rlÃ¼ÄŸÃ¼
+    "deuteranopia": {  # Kırmızı-yeşil renk körlüĞŸü
         "A": QColor(0,114,178),      # Mavi
         "T": QColor(230,159,0),      # Turuncu
         "U": QColor(230,159,0),      # Turuncu
-        "C": QColor(86,180,233),     # AÃ§Ä±k mavi
-        "G": QColor(240,228,66),     # SarÄ±
+        "C": QColor(86,180,233),     # Açık mavi
+        "G": QColor(240,228,66),     # Sarı
         "-": QColor(100,116,139),
         "N": QColor(107,114,128),
     },
-    "protanopia": {  # KÄ±rmÄ±zÄ± renk kÃ¶rlÃ¼ÄŸÃ¼
+    "protanopia": {  # Kırmızı renk körlüĞŸü
         "A": QColor(0,114,178),      # Mavi
         "T": QColor(213,94,0),       # Vermillion
         "U": QColor(213,94,0),       # Vermillion
-        "C": QColor(86,180,233),     # AÃ§Ä±k mavi
-        "G": QColor(240,228,66),     # SarÄ±
+        "C": QColor(86,180,233),     # Açık mavi
+        "G": QColor(240,228,66),     # Sarı
         "-": QColor(100,116,139),
         "N": QColor(107,114,128),
     },
@@ -122,14 +123,14 @@ class _ColorStyleManager(QObject):
 
     def set_colorblind_mode(self, mode: Optional[str]):
         """
-        Renk kÃ¶rÃ¼ modu ayarla.
-        mode: None (normal), "deuteranopia" (kÄ±rmÄ±zÄ±-yeÅŸil), veya "protanopia" (kÄ±rmÄ±zÄ±)
+        Renk körü modu ayarla.
+        mode: None (normal), "deuteranopia" (kırmızı-yeşil), veya "protanopia" (kırmızı)
         """
         if mode not in (None, "deuteranopia", "protanopia"):
             return
         if self._colorblind_mode != mode:
             self._colorblind_mode = mode
-            # Mevcut temayÄ± yeniden uygula
+            # Mevcut temayı yeniden uygula
             try:
                 from sequence_viewer.settings.theme import theme_manager
                 self.apply_theme(theme_manager.current.name)
@@ -249,7 +250,7 @@ class _ColorStyleManager(QObject):
                 ann_type = AnnotationType[type_name]
                 self._annotation[ann_type] = color; changed = True
             except KeyError: pass
-        # Colorblind mode'u yÃ¼kle
+        # Colorblind mode'u yükle
         colorblind_mode = data.get("colorblind_mode")
         if colorblind_mode in (None, "deuteranopia", "protanopia"):
             self._colorblind_mode = colorblind_mode

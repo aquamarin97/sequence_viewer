@@ -1,4 +1,5 @@
-﻿# model/sequence_record.py
+# sequence_viewer/model/sequence_record.py
+# model/sequence_record.py
 from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field

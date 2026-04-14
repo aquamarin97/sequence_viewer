@@ -1,8 +1,9 @@
-﻿# settings/theme.py
+# sequence_viewer/settings/theme.py
+# settings/theme.py
 """
 Uygulama tema sistemi.
 
-Token gruplarÄ± - YENÄ°: row_band_highlight eklendi.
+Token grupları - YENğ: row_band_highlight eklendi.
 """
 from __future__ import annotations
 from dataclasses import dataclass, fields
@@ -12,6 +13,7 @@ from PyQt5.QtGui import QColor
 @dataclass(frozen=True)
 class AppTheme:
     name: str
+    
     row_bg_even:          QColor
     row_bg_odd:           QColor
     row_bg_hover:         QColor
@@ -32,31 +34,31 @@ class AppTheme:
     seq_line_fg:          QColor
     editor_bg:            str
     editor_border:        str
-    # header/sequence satÄ±r seÃ§iminde bant vurgusu
+    # header/sequence satır seçiminde bant vurgusu
     row_band_highlight:   QColor = None
 
     i_beam: QColor = None
 
 
-    # â”€â”€ KÄ±lavuz Ã§izgileri (Guide Lines) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # Dikey ve yatay kÄ±lavuz Ã§izgilerinin rengi (yarÄ± saydam mavi).
-    # Hem SequenceViewerView hem ConsensusRowWidget tarafÄ±ndan kullanÄ±lÄ±r.
+    # â”€â”€ Kılavuz çizgileri (Guide Lines) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # Dikey ve yatay kılavuz çizgilerinin rengi (yarı saydam mavi).
+    # Hem SequenceViewerView hem ConsensusRowWidget tarafından kullanılır.
     guide_line_color:          QColor = None
 
-    # â”€â”€ SeÃ§im odak efekti: seÃ§im dÄ±ÅŸÄ± alan kararmasÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # Drag seÃ§imi sÄ±rasÄ±nda ve sonrasÄ±nda, seÃ§im aralÄ±ÄŸÄ±nÄ±n dÄ±ÅŸÄ±ndaki kolonlar
-    # Ã¼zerine yarÄ± saydam bir overlay Ã§izilerek arka plana itilir.
+    # â”€â”€ Seçim odak efekti: seçim dışı alan kararması â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # Drag seçimi sırasında ve sonrasında, seçim aralıĞŸının dışındaki kolonlar
+    # üzerine yarı saydam bir overlay çizilerek arka plana itilir.
     selection_dim_color:       QColor = None
 
-    # â”€â”€ Navigation Ruler: GÃ¶rÃ¼nÃ¼m Penceresi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # Ekranda gÃ¶rÃ¼nen bÃ¶lgeyi mini harita Ã¼zerinde gÃ¶steren dikdÃ¶rtgen.
-    nav_ruler_viewport_fill:   QColor = None   # iÃ§ dolgu (dÃ¼ÅŸÃ¼k alfa)
-    nav_ruler_viewport_border: QColor = None   # kenarlÄ±k
+    # â”€â”€ Navigation Ruler: Görünüm Penceresi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # Ekranda görünen bölgeyi mini harita üzerinde gösteren dikdörtgen.
+    nav_ruler_viewport_fill:   QColor = None   # iç dolgu (düşük alfa)
+    nav_ruler_viewport_border: QColor = None   # kenarlık
 
-    # â”€â”€ Navigation Ruler: SÃ¼rÃ¼kleme SeÃ§imi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # KullanÄ±cÄ± fare ile yeni bir gÃ¶rÃ¼ntÃ¼leme aralÄ±ÄŸÄ± sÃ¼rÃ¼klerken Ã§izilen geÃ§ici kutu.
-    nav_ruler_drag_fill:       QColor = None   # iÃ§ dolgu (dÃ¼ÅŸÃ¼k alfa)
-    nav_ruler_drag_border:     QColor = None   # kenarlÄ±k
+    # â”€â”€ Navigation Ruler: Sürükleme Seçimi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # Kullanıcı fare ile yeni bir görüntüleme aralıĞŸı sürüklerken çizilen geçici kutu.
+    nav_ruler_drag_fill:       QColor = None   # iç dolgu (düşük alfa)
+    nav_ruler_drag_border:     QColor = None   # kenarlık
 
     def __post_init__(self):
         if self.row_band_highlight is None:
@@ -64,7 +66,7 @@ class AppTheme:
             object.__setattr__(self, 'row_band_highlight',
                 QColor(60, 100, 180, 45) if self.name == "dark" else QColor(70, 130, 220, 40))
         if self.guide_line_color is None:
-            # Her iki temada da tutarlÄ± mavi tonu; alfa kanalÄ± saydamlÄ±ÄŸÄ± saÄŸlar
+            # Her iki temada da tutarlı mavi tonu; alfa kanalı saydamlıĞŸı saĞŸlar
             object.__setattr__(self, 'guide_line_color', QColor(100, 160, 255, 160))
         if self.selection_dim_color is None:
             object.__setattr__(self, 'selection_dim_color',
@@ -116,7 +118,7 @@ LIGHT_THEME = AppTheme(
     seq_line_fg=QColor(160,160,160),
     editor_bg="#EEF4FF", editor_border="#5B8DEF",
     row_band_highlight=QColor(70, 130, 220, 50),
-    # Guide lines - tutarlÄ± mavi ton
+    # Guide lines - tutarlı mavi ton
     guide_line_color=QColor(13, 22, 34, 160),
     # Selection dim overlay
     selection_dim_color=QColor(255, 255, 255, 155),
@@ -143,7 +145,7 @@ DARK_THEME = AppTheme(
     seq_line_fg=QColor(100,105,120),
     editor_bg="#1E2A4A", editor_border="#4A80E0",
     row_band_highlight=QColor(60, 100, 180, 45),
-    # Guide lines - tutarlÄ± mavi ton (magenta yerine)
+    # Guide lines - tutarlı mavi ton (magenta yerine)
     guide_line_color=QColor(100, 160, 255, 160),
     # Selection dim overlay
     selection_dim_color=QColor(0, 0, 0, 120),

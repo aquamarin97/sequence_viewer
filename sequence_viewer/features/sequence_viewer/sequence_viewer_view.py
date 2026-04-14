@@ -1,4 +1,5 @@
-﻿# features/sequence_viewer/sequence_viewer_view.py
+# sequence_viewer/features/sequence_viewer/sequence_viewer_view.py
+# features/sequence_viewer/sequence_viewer_view.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from PyQt5.QtCore import Qt

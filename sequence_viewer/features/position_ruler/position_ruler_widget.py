@@ -1,4 +1,5 @@
-﻿# features/position_ruler/position_ruler_widget.py
+# sequence_viewer/features/position_ruler/position_ruler_widget.py
+# features/position_ruler/position_ruler_widget.py
 import math
 from typing import Optional, List
 from PyQt5.QtCore import Qt, QRectF
@@ -17,25 +18,25 @@ class SequencePositionRulerWidget(QWidget):
         hbar = self.viewer.horizontalScrollBar()
         hbar.valueChanged.connect(self._on_view_changed); hbar.rangeChanged.connect(self._on_view_changed)
         self.viewer.selectionChanged.connect(self._on_view_changed)
-        # Guide kolonlarÄ± deÄŸiÅŸince ruler'Ä± gÃ¼ncelle
+        # Guide kolonları deĞŸişince ruler'ı güncelle
         self.viewer.add_v_guide_observer(self._on_guides_changed)
         theme_manager.themeChanged.connect(lambda _: self.update())
 
     def _on_view_changed(self, *_): self.update()
 
     def _on_guides_changed(self):
-        """Guide kolonlarÄ± deÄŸiÅŸince special pozisyonlarÄ± gÃ¼ncelle ve repaint."""
+        """Guide kolonları deĞŸişince special pozisyonları güncelle ve repaint."""
         ctrl = getattr(self.viewer, '_controller', None)
         if ctrl is not None:
-            # SeÃ§im sÄ±nÄ±rlarÄ±ndaki guide'lar iÃ§in model zaten selection_cols'dan
-            # doÄŸru pozisyonlarÄ± ekliyor; burada tekrar col+1 yapmak saÄŸ sÄ±nÄ±r iÃ§in
-            # col_end+2 Ã¼retir (bir sonraki seÃ§ili olmayan NA). Bu guide'larÄ± atla.
+            # Seçim sınırlarındaki guide'lar için model zaten selection_cols'dan
+            # doĞŸru pozisyonları ekliyor; burada tekrar col+1 yapmak saĞŸ sınır için
+            # col_end+2 üretir (bir sonraki seçili olmayan NA). Bu guide'ları atla.
             selection_cols = getattr(self.viewer, 'current_selection_cols', None)
             sel_boundaries: set = set()
             if selection_cols:
                 s, e = selection_cols
                 if s > e: s, e = e, s
-                sel_boundaries = {s, e + 1}  # sol ve saÄŸ guide sÃ¼tunlarÄ±
+                sel_boundaries = {s, e + 1}  # sol ve saĞŸ guide sütunları
             extra = []
             for col in ctrl._v_guide_cols:
                 if col in sel_boundaries:
@@ -58,7 +59,7 @@ class SequencePositionRulerWidget(QWidget):
         selection_cols = getattr(self.viewer, "current_selection_cols", None)
         self._model.set_state(max_len=max_len, view_left=view_left, view_width=view_width, char_width=char_width, selection_cols=selection_cols)
         layout = self._model.compute_layout()
-        # Guide pozisyonlarÄ±nÄ± special_positions'a ekle
+        # Guide pozisyonlarını special_positions'a ekle
         if layout is not None and self._extra_special_positions:
             for pos in self._extra_special_positions:
                 if pos not in layout.special_positions:

@@ -1,4 +1,4 @@
-﻿# widgets/workspace.py
+# sequence_viewer/workspace/workspace.py
 """
 MODIFIED:
 - ConsensusSpacerWidget click â†’ select all consensus
@@ -54,7 +54,7 @@ class SequenceWorkspaceWidget(QWidget):
                   self.consensus_spacer, self.header_viewer]:
             ll.addWidget(w)
 
-        # SaÄŸ panel
+        # SaĞŸ panel
         self.sequence_viewer = SequenceViewerWidget(parent=self, char_width=char_width, char_height=row_height)
         self.sequence_viewer.set_alignment_model(self._model)
         self.ruler = RulerWidget(self.sequence_viewer, parent=self)
@@ -98,7 +98,7 @@ class SequenceWorkspaceWidget(QWidget):
         self.annotation_layer.installEventFilter(self)
         self.annotation_spacer.sync_height(self.annotation_layer.height())
 
-        # Sinyaller â€” model satÄ±r
+        # Sinyaller â€” model satır
         self._model.rowAppended.connect(self._on_row_appended)
         self._model.rowRemoved.connect(self._on_row_removed)
         self._model.rowMoved.connect(self._on_row_moved)
@@ -122,9 +122,9 @@ class SequenceWorkspaceWidget(QWidget):
         self.sequence_viewer.selectionChanged.connect(
             lambda: self.consensus_spacer.set_selected(False))
         self.sequence_viewer.rowClicked.connect(self._on_seq_row_clicked)
-        # Consensus row guide Ã§izgilerini sequence_viewer guide state'i ile senkronize et
+        # Consensus row guide çizgilerini sequence_viewer guide state'i ile senkronize et
         self.sequence_viewer.add_v_guide_observer(self.consensus_row.update)
-        # Consensus tÄ±klamasÄ± position ruler'Ä± gÃ¼ncelle
+        # Consensus tıklaması position ruler'ı güncelle
         self.sequence_viewer.add_v_guide_observer(self.pos_ruler.update)
 
         anim = getattr(self.sequence_viewer, "_zoom_animation", None)
@@ -142,9 +142,9 @@ class SequenceWorkspaceWidget(QWidget):
         self._sync_consensus_visibility()
 
     def _sync_consensus_visibility(self):
-        """Consensus spacer gÃ¶rÃ¼nÃ¼rlÃ¼ÄŸÃ¼nÃ¼ consensus_row ile senkronize et."""
-        # consensus_row kendi visibility'sini _update_visibility ile yÃ¶netir.
-        # isHidden() widget'Ä±n kendi hide flag'ini kontrol eder (parent'tan baÄŸÄ±msÄ±z).
+        """Consensus spacer görünürlüĞŸünü consensus_row ile senkronize et."""
+        # consensus_row kendi visibility'sini _update_visibility ile yönetir.
+        # isHidden() widget'ın kendi hide flag'ini kontrol eder (parent'tan baĞŸımsız).
         cr_active = not self.consensus_row.isHidden() and self.consensus_row.height() > 0
         if not cr_active and self._model.is_aligned:
             self.consensus_row._update_visibility()
@@ -239,11 +239,11 @@ class SequenceWorkspaceWidget(QWidget):
         super().keyPressEvent(event)
 
     def _copy_sequences(self):
-        """Ctrl+C â€” seÃ§ili satÄ±rlarÄ±n sadece dizilerini kopyalar."""
+        """Ctrl+C â€” seçili satırların sadece dizilerini kopyalar."""
         from PyQt5.QtWidgets import QApplication
         lines = []
         selected = self.header_viewer._selection.selected_rows()
-        # Consensus seÃ§ili mi?
+        # Consensus seçili mi?
         if self.consensus_spacer._selected:
             from sequence_viewer.model.consensus_calculator import ConsensusCalculator
             seqs = [seq for _, seq in self._model.all_rows()]
@@ -251,12 +251,12 @@ class SequenceWorkspaceWidget(QWidget):
                 consensus = ConsensusCalculator.compute(seqs)
                 lines.append(consensus)
         elif selected:
-            # Header seÃ§imi varsa ona gÃ¶re, yoksa sequence viewer seÃ§imine gÃ¶re
+            # Header seçimi varsa ona göre, yoksa sequence viewer seçimine göre
             for i, (_, sequence) in enumerate(self._model.all_rows()):
                 if i in selected:
                     lines.append(sequence)
         else:
-                # Sequence viewer'da kÄ±smi seÃ§im
+                # Sequence viewer'da kısmi seçim
             for item in self.sequence_viewer.sequence_items:
                 if item.selection_range is not None:
                     s, e = item.selection_range
@@ -266,7 +266,7 @@ class SequenceWorkspaceWidget(QWidget):
             QApplication.clipboard().setText("\n".join(lines))
 
     def _copy_fasta(self):
-        """Ctrl+Shift+C â€” seÃ§ili satÄ±rlarÄ± FASTA formatÄ±nda kopyalar."""
+        """Ctrl+Shift+C â€” seçili satırları FASTA formatında kopyalar."""
         from PyQt5.QtWidgets import QApplication
         blocks = []
         has_sequence_fragment_selection = any(
@@ -282,7 +282,7 @@ class SequenceWorkspaceWidget(QWidget):
                         header = self._model.get_header(i)
                         blocks.append(f">{header}\n{fragment}")
         elif selected:
-            # Sequence viewer seÃ§imi varsa kÄ±smi fasta
+            # Sequence viewer seçimi varsa kısmi fasta
             for i, (header, sequence) in enumerate(self._model.all_rows()):
                 if i in selected:
                     blocks.append(f">{header}\n{sequence}")

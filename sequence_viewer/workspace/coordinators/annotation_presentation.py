@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/workspace/coordinators/annotation_presentation.py
+from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, List
 from sequence_viewer.features.annotation_layer.annotation_graphics_item import AnnotationGraphicsItem

@@ -1,4 +1,5 @@
-﻿# repositories/repository_factory.py
+# sequence_viewer/repositories/repository_factory.py
+# repositories/repository_factory.py
 from pathlib import Path
 from .base_repository import AbstractSequenceRepository
 from .database_repository import DatabaseRepository

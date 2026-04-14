@@ -1,4 +1,4 @@
-﻿# features/annotation_layer/annotation_graphics_item.py
+# sequence_viewer/features/annotation_layer/annotation_graphics_item.py
 from __future__ import annotations
 import weakref
 from typing import Callable, Optional
@@ -7,7 +7,7 @@ from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem, QToolTip
 
 # Tıklama animasyonu: büyüyüp küçülme kareleri (scale çarpanı)
-_ANIM_FRAMES = (1.00, 1.04, 1.07, 1.09, 1.07, 1.04, 1.00)
+_ANIM_FRAMES = (1.00, 1.02, 1.035, 1.045, 1.035, 1.02, 1.00)
 _ANIM_INTERVAL_MS = 22   # ~45fps, toplam ~150ms
 _ANIM_MARGIN = 6         # boundingRect taşma payı (px)
 from sequence_viewer.features.annotation_layer.annotation_painter import (

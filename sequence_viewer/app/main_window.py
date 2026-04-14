@@ -1,4 +1,5 @@
-﻿from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow
+# sequence_viewer/app/main_window.py
+from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow
 
 from sequence_viewer.app.fasta_loader import load_fasta_files
 

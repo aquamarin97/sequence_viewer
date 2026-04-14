@@ -1,4 +1,5 @@
-﻿# settings/config.py
+# sequence_viewer/settings/config.py
+# settings/config.py
 from __future__ import annotations
 import json
 from pathlib import Path

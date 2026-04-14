@@ -1,4 +1,5 @@
-﻿from __future__ import annotations
+# sequence_viewer/dialogs/find_motifs_dialog.py
+from __future__ import annotations
 from typing import Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont

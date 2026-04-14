@@ -1,4 +1,5 @@
-﻿# model/annotation.py
+# sequence_viewer/model/annotation.py
+# model/annotation.py
 from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
@@ -81,7 +82,7 @@ class Annotation:
         ]
         if self.type.uses_strand():
             direction = "Forward (+)" if self.strand == "+" else "Reverse (âˆ’)"
-            lines.append(f"YÃ¶n: {direction}")
+            lines.append(f"Yön: {direction}")
         if self.tm is not None:
             lines.append(f"Tm: {self.tm:.1f} Â°C")
         if self.gc_percent is not None:

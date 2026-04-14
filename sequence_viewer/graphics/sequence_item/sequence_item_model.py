@@ -1,4 +1,5 @@
-﻿# graphics/sequence_item/sequence_item_model.py
+# sequence_viewer/graphics/sequence_item/sequence_item_model.py
+# graphics/sequence_item/sequence_item_model.py
 from typing import Optional, Tuple, Dict
 from PyQt5.QtGui import QColor
 from sequence_viewer.graphics.sequence_item.sequence_glyph_cache import default_nucleotide_color_map
@@ -18,8 +19,8 @@ class SequenceItemModel:
         self.char_height = max(1, int(round(char_height)))
         self._custom_color_map = color_map is not None
         self.color_map = color_map or default_nucleotide_color_map()
-        # default_char_width / 1.8 ile LOD referans noktasÄ± kaydÄ±rÄ±lÄ±r:
-        # baÅŸlangÄ±Ã§ scale = char_width / (char_width/1.8) = 1.8 â†’ TEXT MODE garantisi.
+        # default_char_width / 1.8 ile LOD referans noktası kaydırılır:
+        # başlangıç scale = char_width / (char_width/1.8) = 1.8 â†’ TEXT MODE garantisi.
         self.default_char_width = self.char_width / 1.8
         self._selection_ranges: list = []   # [(start_incl, end_excl), ...]
         self.base_font_size = self.char_height * 0.6
@@ -68,7 +69,7 @@ class SequenceItemModel:
 
     @property
     def selection_range(self):
-        """Geriye dÃ¶nÃ¼k uyumluluk: ilk aralÄ±ÄŸÄ± dÃ¶ndÃ¼rÃ¼r (veya None)."""
+        """Geriye dönük uyumluluk: ilk aralıĞŸı döndürür (veya None)."""
         return self._selection_ranges[0] if self._selection_ranges else None
 
     def set_selection(self, start_col, end_col):
@@ -77,7 +78,7 @@ class SequenceItemModel:
         self._selection_ranges = [(start, end)] if start < end else []
 
     def set_multi_selection(self, ranges):
-        """[(start_col, end_col), ...] â€” her aralÄ±k baÄŸÄ±msÄ±z, aralarÄ±ndaki boÅŸluk seÃ§ilmez."""
+        """[(start_col, end_col), ...] â€” her aralık baĞŸımsız, aralarındaki boşluk seçilmez."""
         result = []
         for start_col, end_col in ranges:
             start = max(0, min(start_col, end_col))

@@ -1,4 +1,5 @@
-﻿# features/annotation_layer/annotation_painter.py
+# sequence_viewer/features/annotation_layer/annotation_painter.py
+# features/annotation_layer/annotation_painter.py
 from __future__ import annotations
 import math
 from PyQt5.QtCore import Qt, QRectF, QPointF
@@ -10,9 +11,9 @@ from sequence_viewer.model.annotation import AnnotationType
 from sequence_viewer.settings.annotation_styles import annotation_style_manager
 from sequence_viewer.settings.theme import theme_manager
 
-_LABEL_MARGIN = 6      # yatay iÃ§ boÅŸluk (px)
+_LABEL_MARGIN = 6      # yatay iç boşluk (px)
 _MIN_TIP_PX   = 5.0
-_CORNER_RADIUS   = 3.5    # kÃ¶ÅŸe yuvarlamasÄ± yarÄ±Ã§apÄ± (px)
+_CORNER_RADIUS   = 3.5    # köşe yuvarlaması yarıçapı (px)
 
 # â”€â”€ Label metin renkleri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Luminance < 140 â†’ koyu zemin â†’ beyaz metin; aksi halde koyu metin.
@@ -20,7 +21,7 @@ _LABEL_TEXT_ON_DARK  = QColor(255, 255, 255)
 _LABEL_TEXT_ON_LIGHT = QColor(20,  20,  20)
 
 
-# â”€â”€ Renk yardÄ±mcÄ±larÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Renk yardımcıları â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _clamp(v):
     return max(0, min(255, v))
@@ -28,10 +29,10 @@ def _clamp(v):
 
 def _make_gradient(x, y, h, base_color, fill_alpha, is_dark):
     """
-    Annotation renginden tÃ¼retilmiÅŸ dikey QLinearGradient.
+    Annotation renginden türetilmiş dikey QLinearGradient.
 
-    Ãœst highlight â†’ orta baz â†’ alt shadow tonlamasÄ±;
-    dark modda highlight daha belirgin, light modda daha yumuÅŸak.
+    Üst highlight â†’ orta baz â†’ alt shadow tonlaması;
+    dark modda highlight daha belirgin, light modda daha yumuşak.
     """
     d_hi  = 48 if is_dark else 28
     d_sha = 38 if is_dark else 22
@@ -58,7 +59,7 @@ def _make_gradient(x, y, h, base_color, fill_alpha, is_dark):
 
 
 def _make_border_color(base_color, border_alpha):
-    """KenarlÄ±k iÃ§in baz renginin koyu tonu."""
+    """Kenarlık için baz renginin koyu tonu."""
     d = 55
     return QColor(
         _clamp(base_color.red()   - d),
@@ -68,14 +69,14 @@ def _make_border_color(base_color, border_alpha):
     )
 
 
-# â”€â”€ KÃ¶ÅŸe yuvarlama â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Köşe yuvarlama â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _rounded_poly_path(points, radius):
     """
-    KÃ¶ÅŸeleri quadratic Bezier eÄŸrisiyle yuvarlatÄ±lmÄ±ÅŸ Ã§okgen QPainterPath'i.
+    Köşeleri quadratic Bezier eĞŸrisiyle yuvarlatılmış çokgen QPainterPath'i.
 
-    Her kÃ¶ÅŸede kontrol noktasÄ± orijinal vertex, eÄŸri komÅŸu kenarlar Ã¼zerinde
-    baÅŸlar/biter. KÄ±sa kenarlarda yarÄ±Ã§ap otomatik kÃ¼Ã§Ã¼lÃ¼r â€” tip ucun sivri
+    Her köşede kontrol noktası orijinal vertex, eĞŸri komşu kenarlar üzerinde
+    başlar/biter. Kısa kenarlarda yarıçap otomatik küçülür â€” tip ucun sivri
     formu korunur.
     """
     path = QPainterPath()
@@ -119,18 +120,18 @@ def _rounded_poly_path(points, radius):
     return path
 
 
-# â”€â”€ Ana Ã§izim fonksiyonlarÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Ana çizim fonksiyonları â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def draw_primer(painter, x, y, w, h, color, label, strand="+",
                 char_width=12.0, style_mode="default"):
     """
-    Primer annotation'Ä± Ã§izer.
+    Primer annotation'ı çizer.
 
     Parameters
     ----------
     style_mode : str
-        "default" â€” mevcut gÃ¶rsel stil.
-        Ä°leride "academic" eklenecektir (kapsam dÄ±ÅŸÄ±).
+        "default" â€” mevcut görsel stil.
+        ğleride "academic" eklenecektir (kapsam dışı).
     """
     if w <= 0:
         return
@@ -179,13 +180,13 @@ def draw_primer(painter, x, y, w, h, color, label, strand="+",
 def draw_probe(painter, x, y, w, h, color, label, strand="+",
                char_width=12.0, style_mode="default"):
     """
-    Probe annotation'Ä± Ã§izer.
+    Probe annotation'ı çizer.
 
     Parameters
     ----------
     style_mode : str
-        "default" â€” mevcut gÃ¶rsel stil.
-        Ä°leride "academic" eklenecektir (kapsam dÄ±ÅŸÄ±).
+        "default" â€” mevcut görsel stil.
+        ğleride "academic" eklenecektir (kapsam dışı).
     """
     if w <= 0:
         return
@@ -230,13 +231,13 @@ def draw_probe(painter, x, y, w, h, color, label, strand="+",
 
 def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"):
     """
-    Repeated region annotation'Ä± Ã§izer.
+    Repeated region annotation'ı çizer.
 
     Parameters
     ----------
     style_mode : str
-        "default" â€” mevcut gÃ¶rsel stil.
-        Ä°leride "academic" eklenecektir (kapsam dÄ±ÅŸÄ±).
+        "default" â€” mevcut görsel stil.
+        ğleride "academic" eklenecektir (kapsam dışı).
     """
     if w <= 0:
         return
@@ -261,30 +262,30 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
                     font_family=style.label_font_family)
 
 
-_MM_V_PAD = 1        # marker ile lane Ã¼st/alt kenarÄ± arasÄ±ndaki dikey boÅŸluk (px)
-_MM_TEXT_THRESHOLD   = 8.0   # bu char_width'in altÄ±nda â†’ box/line mod, metin gizlenir
-_MM_FULL_FONT_CW     = 12.0  # bu char_width'in Ã¼stÃ¼nde â†’ tam font boyutu
+_MM_V_PAD = 1        # marker ile lane üst/alt kenarı arasındaki dikey boşluk (px)
+_MM_TEXT_THRESHOLD   = 8.0   # bu char_width'in altında â†’ box/line mod, metin gizlenir
+_MM_FULL_FONT_CW     = 12.0  # bu char_width'in üstünde â†’ tam font boyutu
 
 
 def draw_mismatch_marker(painter, x, y, w, h, color, label,
                           char_width=12.0, font_family=None, font_size=None):
     """
-    Mismatch marker alt-annotation'Ä± Ã§izer.
+    Mismatch marker alt-annotation'ı çizer.
 
     Parameters
     ----------
-    label       : GÃ¶sterilecek tek karakter (beklenen NA / expected base).
-    char_width  : Mevcut karakter geniÅŸliÄŸi (px).
-    font_family : Metin iÃ§in font ailesi; None â†’ annotation style varsayÄ±lanÄ±.
-    font_size   : BaÄŸlam iÃ§in MAKSIMUM (base) font boyutu (pt).
-                  Scaling bu fonksiyon iÃ§inde char_width'e gÃ¶re hesaplanÄ±r;
-                  Ã§aÄŸÄ±ran her zaman base (zoom-independent) deÄŸeri geÃ§melidir.
+    label       : Gösterilecek tek karakter (beklenen NA / expected base).
+    char_width  : Mevcut karakter genişliĞŸi (px).
+    font_family : Metin için font ailesi; None â†’ annotation style varsayılanı.
+    font_size   : BaĞŸlam için MAKSIMUM (base) font boyutu (pt).
+                  Scaling bu fonksiyon içinde char_width'e göre hesaplanır;
+                  çaĞŸıran her zaman base (zoom-independent) deĞŸeri geçmelidir.
     """
     if w <= 0 or h <= 0:
         return
     style = annotation_style_manager.get(AnnotationType.MISMATCH_MARKER)
 
-    # Dikey padding â€” box lane kenarlarÄ±ndan gÃ¶rsel boÅŸluk
+    # Dikey padding â€” box lane kenarlarından görsel boşluk
     box_y = y + _MM_V_PAD
     box_h = max(1.0, h - 2 * _MM_V_PAD)
     box_left = int(round(x))
@@ -300,10 +301,10 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
     path.addRoundedRect(box_rect, _CORNER_RADIUS, _CORNER_RADIUS)
 
     painter.setBrush(QBrush(QColor(color)))
-    painter.setPen(Qt.NoPen)   # Border yok; seÃ§im durumunda draw_selection_outline kullanÄ±lÄ±r
+    painter.setPen(Qt.NoPen)   # Border yok; seçim durumunda draw_selection_outline kullanılır
     painter.drawPath(path)
 
-    # Metin: sadece text modunda (char_width yeterince bÃ¼yÃ¼kse) gÃ¶ster
+    # Metin: sadece text modunda (char_width yeterince büyükse) göster
     show_text = char_width >= _MM_TEXT_THRESHOLD
     if show_text and label:
         bg = QColor(color)
@@ -312,9 +313,9 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
         ff = font_family if font_family else style.label_font_family
         base_fs = float(font_size) if font_size else float(style.label_font_size)
 
-        # Sequence viewer ile aynÄ± LOD adÄ±mlarÄ±:
+        # Sequence viewer ile aynı LOD adımları:
         #   char_width >= 12 â†’ tam boyut  (SequenceItemModel scale >= 1.8)
-        #   char_width >=  8 â†’ 10/12 oranÄ± (scale >= 1.2, text mod alt sÄ±nÄ±rÄ±)
+        #   char_width >=  8 â†’ 10/12 oranı (scale >= 1.2, text mod alt sınırı)
         if char_width >= _MM_FULL_FONT_CW:
             effective_fs = base_fs
         else:
@@ -326,14 +327,14 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
         painter.setFont(font)
         painter.setPen(QPen(text_color))
         ch = label[0]
-        # Point/baseline tabanlÄ± Ã§izim max zoom-out'ta alt-piksel snap nedeniyle
-        # hafif sola kaymÄ±ÅŸ gÃ¶rÃ¼nebiliyor; rect iÃ§i merkezleme daha kararlÄ±.
+        # Point/baseline tabanlı çizim max zoom-out'ta alt-piksel snap nedeniyle
+        # hafif sola kaymış görünebiliyor; rect içi merkezleme daha kararlı.
         painter.drawText(box_rect, Qt.AlignCenter, ch)
 
     painter.restore()
 
 
-# â”€â”€ SeÃ§im ve hover outline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Seçim ve hover outline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _build_primer_probe_path(x, y, w, h, strand, char_width):
     tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
@@ -355,18 +356,18 @@ def _build_repeated_region_path(x, y, w, h):
 
 def _selection_colors(base_color):
     """
-    Annotation renginden seÃ§im halo ve iÃ§ kenar renklerini tÃ¼retir.
+    Annotation renginden seçim halo ve iç kenar renklerini türetir.
 
-    Halo: annotation renginin doygunluÄŸu artÄ±rÄ±lmÄ±ÅŸ, parlatÄ±lmÄ±ÅŸ versiyonu.
-    Kenar: annotation rengine gÃ¶re kontrast saÄŸlayan beyaz ya da koyu ton.
+    Halo: annotation renginin doygunluĞŸu artırılmış, parlatılmış versiyonu.
+    Kenar: annotation rengine göre kontrast saĞŸlayan beyaz ya da koyu ton.
     """
     h = base_color.hsvHueF()
     s = min(1.0, base_color.hsvSaturationF() * 1.15 + 0.25)
-    # ParlaklÄ±k: koyu renkler iÃ§in daha aydÄ±nlÄ±k, zaten aÃ§Ä±k renkler iÃ§in koru
+    # Parlaklık: koyu renkler için daha aydınlık, zaten açık renkler için koru
     v_base = base_color.valueF()
     v_halo = min(1.0, v_base * 0.6 + 0.55)
     halo = QColor.fromHsvF(h if h >= 0 else 0.0, s, v_halo, 0.72)
-    # Ä°Ã§ kenar: luminans yÃ¼ksekse koyu, dÃ¼ÅŸÃ¼kse beyaz
+    # ğç kenar: luminans yüksekse koyu, düşükse beyaz
     lum = 0.299 * base_color.red() + 0.587 * base_color.green() + 0.114 * base_color.blue()
     inner = QColor(20, 20, 20, 210) if lum > 160 else QColor(255, 255, 255, 220)
     return halo, inner
@@ -375,13 +376,13 @@ def _selection_colors(base_color):
 def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
                            strand="+", char_width=12.0):
     """
-    SeÃ§ili annotation iÃ§in annotation renginden tÃ¼retilmiÅŸ parlayan kenarlÄ±k Ã§izer.
-    base_color deÄŸiÅŸtiÄŸinde otomatik olarak uyum saÄŸlar.
+    Seçili annotation için annotation renginden türetilmiş parlayan kenarlık çizer.
+    base_color deĞŸiştiĞŸinde otomatik olarak uyum saĞŸlar.
     """
     if w <= 0:
         return
 
-    # Mismatch marker: kutu sÄ±nÄ±rlarÄ±na tam oturan, taÅŸmayan ince outline
+    # Mismatch marker: kutu sınırlarına tam oturan, taşmayan ince outline
     if ann_type == AnnotationType.MISMATCH_MARKER:
         box_y = y + _MM_V_PAD
         box_h = max(1.0, h - 2 * _MM_V_PAD)
@@ -411,12 +412,12 @@ def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
     painter.save()
     painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setBrush(Qt.NoBrush)
-    # DÄ±ÅŸ halo â€” annotation renginden tÃ¼retilmiÅŸ geniÅŸ parlama
+    # Dış halo â€” annotation renginden türetilmiş geniş parlama
     halo_pen = QPen(halo_color, 3.0)
     halo_pen.setJoinStyle(Qt.RoundJoin)
     painter.setPen(halo_pen)
     painter.drawPath(path)
-    # Ä°Ã§ keskin Ã§izgi â€” kontrast renk
+    # ğç keskin çizgi â€” kontrast renk
     inner_pen = QPen(inner_color, 1.0)
     inner_pen.setJoinStyle(Qt.RoundJoin)
     painter.setPen(inner_pen)
@@ -427,8 +428,8 @@ def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
 def draw_hover_overlay(painter, x, y, w, h, ann_type, base_color,
                        strand="+", char_width=12.0):
     """
-    Hover durumunda annotation renginden tÃ¼retilmiÅŸ ince parlaklÄ±k katmanÄ± Ã§izer.
-    SeÃ§im state'i aktifken Ã§aÄŸrÄ±lmaz.
+    Hover durumunda annotation renginden türetilmiş ince parlaklık katmanı çizer.
+    Seçim state'i aktifken çaĞŸrılmaz.
     """
     if w <= 0:
         return
@@ -437,7 +438,7 @@ def draw_hover_overlay(painter, x, y, w, h, ann_type, base_color,
     else:
         path = _build_repeated_region_path(x, y, w, h)
 
-    # Hafif renk aydÄ±nlatma: annotation rengiyle uyumlu hover tonu
+    # Hafif renk aydınlatma: annotation rengiyle uyumlu hover tonu
     h_f = base_color.hsvHueF()
     s_f = max(0.0, base_color.hsvSaturationF() - 0.1)
     v_f = min(1.0, base_color.valueF() * 0.35 + 0.65)
@@ -468,8 +469,8 @@ def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="
     painter.setFont(font)
     painter.setPen(QPen(text_color))
     metrics   = QFontMetrics(font)
-    # Dikey: tam yÃ¼kseklik â€” descender kÄ±rpÄ±lmasÄ±nÄ± Ã¶nler; hizalama AlignVCenter Ã¼stlenir
-    # Yatay: _LABEL_MARGIN ile iÃ§ boÅŸluk
+    # Dikey: tam yükseklik â€” descender kırpılmasını önler; hizalama AlignVCenter üstlenir
+    # Yatay: _LABEL_MARGIN ile iç boşluk
     text_rect = QRectF(x + _LABEL_MARGIN, y, w - _LABEL_MARGIN * 2, h)
     elided = metrics.elidedText(label, Qt.ElideRight, int(text_rect.width()))
     painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignHCenter, elided)

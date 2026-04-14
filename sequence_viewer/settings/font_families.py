@@ -1,18 +1,18 @@
-﻿# settings/font_families.py
+# sequence_viewer/settings/font_families.py
 """
-GÃ¶mÃ¼lÃ¼ ve sistem monospace font ailesi yÃ¶netimi.
+Gömülü ve sistem monospace font ailesi yönetimi.
 
-GÃ¶mÃ¼lÃ¼ fontlar assets/fonts/monospace/ klasÃ¶rÃ¼nde bulunur ve tÃ¼m platformlarda
-kullanÄ±labilir. Ek olarak, kullanÄ±cÄ±nÄ±n sisteminde yÃ¼klÃ¼ olan belirli monospace
+Gömülü fontlar assets/fonts/monospace/ klasöründe bulunur ve tüm platformlarda
+kullanılabilir. Ek olarak, kullanıcının sisteminde yüklü olan belirli monospace
 fontlar (Consolas, Lucida Console gibi) da listeye eklenir.
 
-KullanÄ±m:
+Kullanım:
     from sequence_viewer.settings.font_families import load_embedded_fonts, get_monospace_fonts
     
-    # Uygulama baÅŸlangÄ±cÄ±nda
+    # Uygulama başlangıcında
     load_embedded_fonts()
     
-    # Font dropdown'Ä± doldururken
+    # Font dropdown'ı doldururken
     combo.addItems(get_monospace_fonts())
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 # ---------------------------------------------------------------------------
-# GÃ¶mÃ¼lÃ¼ Fontlar (Uygulamayla birlikte daÄŸÄ±tÄ±lan)
+# Gömülü Fontlar (Uygulamayla birlikte daĞŸıtılan)
 # ---------------------------------------------------------------------------
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
@@ -35,22 +35,22 @@ EMBEDDED_MONOSPACE_FONTS: list[tuple[str, Path]] = [
 ]
 
 # ---------------------------------------------------------------------------
-# Sistem FontlarÄ± (KullanÄ±cÄ±nÄ±n sisteminde varsa dahil edilir)
+# Sistem Fontları (Kullanıcının sisteminde varsa dahil edilir)
 # ---------------------------------------------------------------------------
 
 SYSTEM_MONOSPACE_FONTS: list[str] = [
-    "Consolas",          # Windows Vista+ yerleÅŸik
-    "Lucida Console",    # Windows yerleÅŸik
-    "Menlo",             # macOS 10.6+ yerleÅŸik
+    "Consolas",          # Windows Vista+ yerleşik
+    "Lucida Console",    # Windows yerleşik
+    "Menlo",             # macOS 10.6+ yerleşik
     "Monaco",            # macOS klasik monospace
-    "DejaVu Sans Mono",  # Linux varsayÄ±lanÄ±
+    "DejaVu Sans Mono",  # Linux varsayılanı
     "Liberation Mono",   # Linux/LibreOffice
-    "Ubuntu Mono",       # Ubuntu varsayÄ±lanÄ±
+    "Ubuntu Mono",       # Ubuntu varsayılanı
 ]
 
 
 # ---------------------------------------------------------------------------
-# Font YÃ¼kleme ve Listeleme FonksiyonlarÄ±
+# Font Yükleme ve Listeleme Fonksiyonları
 # ---------------------------------------------------------------------------
 
 _fonts_loaded: bool = False
@@ -58,12 +58,12 @@ _fonts_loaded: bool = False
 
 def load_embedded_fonts() -> None:
     """
-    GÃ¶mÃ¼lÃ¼ fontlarÄ± QFontDatabase'e kaydeder.
+    Gömülü fontları QFontDatabase'e kaydeder.
     
-    Uygulama baÅŸlangÄ±cÄ±nda (QApplication oluÅŸturulduktan sonra) bir kez
-    Ã§aÄŸrÄ±lmalÄ±dÄ±r. Tekrar Ã§aÄŸrÄ±lÄ±rsa sessizce atlanÄ±r.
+    Uygulama başlangıcında (QApplication oluşturulduktan sonra) bir kez
+    çaĞŸrılmalıdır. Tekrar çaĞŸrılırsa sessizce atlanır.
     
-    Ã–rnek:
+    Örnek:
         from PyQt5.QtWidgets import QApplication
         from sequence_viewer.settings.font_families import load_embedded_fonts
         
@@ -92,7 +92,7 @@ def load_embedded_fonts() -> None:
                 print(f"Warning: Failed to load font: {font_path}")
             else:
                 loaded_count += 1
-                # Debug: Hangi font family isimleri yÃ¼klendi?
+                # Debug: Hangi font family isimleri yüklendi?
                 families = db.applicationFontFamilies(font_id)
                 if families:
                     print(f"Loaded font: {families[0]} from {font_path}")
@@ -106,18 +106,18 @@ def load_embedded_fonts() -> None:
 
 def get_embedded_monospace_fonts() -> list[str]:
     """
-    GÃ¶mÃ¼lÃ¼ monospace font isimlerini dÃ¶ndÃ¼rÃ¼r.
+    Gömülü monospace font isimlerini döndürür.
     
     Returns:
-        Font family isimleri listesi (Ã¶rn: ["JetBrains Mono", "Source Code Pro", ...])
+        Font family isimleri listesi (örn: ["JetBrains Mono", "Source Code Pro", ...])
     """
     return [name for name, _ in EMBEDDED_MONOSPACE_FONTS]
 
 
 def get_available_system_fonts() -> list[str]:
     """
-    SYSTEM_MONOSPACE_FONTS listesinden kullanÄ±cÄ±nÄ±n sisteminde yÃ¼klÃ¼
-    olanlarÄ± dÃ¶ndÃ¼rÃ¼r.
+    SYSTEM_MONOSPACE_FONTS listesinden kullanıcının sisteminde yüklü
+    olanları döndürür.
     
     Returns:
         Sistemde mevcut olan font isimleri listesi
@@ -128,7 +128,7 @@ def get_available_system_fonts() -> list[str]:
         db = QFontDatabase()
         installed = set(db.families())
         
-        # Sistem fontlarÄ±ndan mevcut olanlarÄ± filtrele
+        # Sistem fontlarından mevcut olanları filtrele
         available = [font for font in SYSTEM_MONOSPACE_FONTS if font in installed]
         
         return available
@@ -139,15 +139,15 @@ def get_available_system_fonts() -> list[str]:
 
 def get_monospace_fonts() -> list[str]:
     """
-    TÃ¼m kullanÄ±labilir monospace fontlarÄ± dÃ¶ndÃ¼rÃ¼r.
+    Tüm kullanılabilir monospace fontları döndürür.
     
-    Ã–nce gÃ¶mÃ¼lÃ¼ fontlar, sonra sistemde bulunan ek fontlar listelenir.
+    Önce gömülü fontlar, sonra sistemde bulunan ek fontlar listelenir.
     Tekrar eden fontlar filtrelenir.
     
     Returns:
-        KullanÄ±labilir tÃ¼m monospace font isimleri
+        Kullanılabilir tüm monospace font isimleri
         
-    Ã–rnek:
+    Örnek:
         from sequence_viewer.settings.font_families import get_monospace_fonts
         
         combo = QComboBox()
@@ -155,11 +155,11 @@ def get_monospace_fonts() -> list[str]:
     """
     fonts = []
     
-    # 1. GÃ¶mÃ¼lÃ¼ fontlarÄ± ekle
+    # 1. Gömülü fontları ekle
     embedded = get_embedded_monospace_fonts()
     fonts.extend(embedded)
     
-    # 2. Sistem fontlarÄ±nÄ± ekle (tekrar etmeyenleri)
+    # 2. Sistem fontlarını ekle (tekrar etmeyenleri)
     system = get_available_system_fonts()
     for font in system:
         if font not in fonts:
@@ -170,30 +170,30 @@ def get_monospace_fonts() -> list[str]:
 
 def is_font_available(font_name: str) -> bool:
     """
-    Belirtilen font'un kullanÄ±labilir olup olmadÄ±ÄŸÄ±nÄ± kontrol eder.
+    Belirtilen font'un kullanılabilir olup olmadıĞŸını kontrol eder.
     
     Args:
         font_name: Kontrol edilecek font family ismi
         
     Returns:
-        Font kullanÄ±labilir ise True, deÄŸilse False
+        Font kullanılabilir ise True, deĞŸilse False
     """
     return font_name in get_monospace_fonts()
 
 
 def get_default_monospace_font() -> str:
     """
-    VarsayÄ±lan monospace fontunu dÃ¶ndÃ¼rÃ¼r.
+    Varsayılan monospace fontunu döndürür.
     
     Returns:
-        Ä°lk kullanÄ±labilir gÃ¶mÃ¼lÃ¼ font, yoksa ilk sistem fontu,
-        hiÃ§biri yoksa "Courier New" fallback'i
+        ğlk kullanılabilir gömülü font, yoksa ilk sistem fontu,
+        hiçbiri yoksa "Courier New" fallback'i
     """
     fonts = get_monospace_fonts()
     
     if fonts:
         return fonts[0]
     
-    # Fallback (hiÃ§bir font yÃ¼klenemezse)
+    # Fallback (hiçbir font yüklenemezse)
     return "Courier New"
 

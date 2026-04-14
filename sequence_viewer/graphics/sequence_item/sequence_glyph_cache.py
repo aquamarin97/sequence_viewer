@@ -1,4 +1,5 @@
-﻿# graphics/sequence_item/sequence_glyph_cache.py
+# sequence_viewer/graphics/sequence_item/sequence_glyph_cache.py
+# graphics/sequence_item/sequence_glyph_cache.py
 from typing import Dict, Tuple
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QFont, QColor, QPen, QPixmap, QFontMetrics

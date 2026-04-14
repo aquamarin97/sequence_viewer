@@ -1,4 +1,4 @@
-﻿# settings/scrollbar_style.py
+# sequence_viewer/settings/scrollbar_style.py
 from __future__ import annotations
 from PyQt5.QtWidgets import QWidget
 from sequence_viewer.settings.theme import AppTheme, theme_manager

@@ -1,4 +1,5 @@
-﻿# dialogs/display_settings_dialog.py
+# sequence_viewer/dialogs/display_settings_dialog.py
+# dialogs/display_settings_dialog.py
 from __future__ import annotations
 from PyQt5.QtWidgets import (
     QDialog, QFormLayout, QComboBox, QDoubleSpinBox, QSpinBox,
@@ -92,7 +93,7 @@ class DisplaySettingsDialog(QDialog):
         # â”€â”€ Butonlar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         buttons = QDialogButtonBox()
         apply_btn = buttons.addButton("Uygula", QDialogButtonBox.AcceptRole)
-        buttons.addButton("Ä°ptal", QDialogButtonBox.RejectRole)
+        buttons.addButton("ğptal", QDialogButtonBox.RejectRole)
         apply_btn.clicked.connect(self._apply)
         buttons.rejected.connect(self.reject)
 

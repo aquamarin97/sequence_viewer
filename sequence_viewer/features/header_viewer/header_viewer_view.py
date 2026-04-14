@@ -1,4 +1,5 @@
-﻿# features/header_viewer/header_viewer_view.py
+# sequence_viewer/features/header_viewer/header_viewer_view.py
+# features/header_viewer/header_viewer_view.py
 from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, FrozenSet, List, Optional

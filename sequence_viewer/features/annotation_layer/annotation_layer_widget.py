@@ -1,4 +1,4 @@
-﻿# features/annotation_layer/annotation_layer_widget.py
+# sequence_viewer/features/annotation_layer/annotation_layer_widget.py
 from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 from PyQt5.QtCore import Qt, QRectF, QPoint, pyqtSignal
@@ -144,7 +144,7 @@ class AnnotationLayerWidget(QWidget):
                                        ann.type, ann.resolved_color(),
                                        strand=getattr(ann, 'strand', '+'), char_width=ann_char_w)
             painter.restore(); self._hit_rects.append((vp, ann))
-        # ---- SeÃ§im odak efekti ----
+        # ---- Seçim odak efekti ----
         dim_range = getattr(self._sequence_viewer, '_selection_dim_range', None)
         if dim_range is not None and cw > 0:
             left_col, right_col = dim_range

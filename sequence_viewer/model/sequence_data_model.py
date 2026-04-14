@@ -1,4 +1,5 @@
-﻿# model/sequence_data_model.py
+# sequence_viewer/model/sequence_data_model.py
+# model/sequence_data_model.py
 from typing import List, Tuple
 
 class SequenceDataModel:
