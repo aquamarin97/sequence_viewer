@@ -248,12 +248,10 @@ class OverlayMixin:
             return
         offset = self._viewport_horizontal_offset()
         vp_w = float(self.viewport().width())
-
-        draw_top = min(self._find_ruler_bottom_in_viewport(), 0.0)
-        draw_bottom = float(self.viewport().height())
-        consensus_bottom = self._find_consensus_bottom_in_viewport()
-        if consensus_bottom > draw_bottom:
-            draw_bottom = consensus_bottom
+        draw_top = 0.0
+        draw_bottom = self._sequence_content_bottom_in_viewport()
+        if draw_bottom <= draw_top:
+            return
 
         painter.save()
         painter.resetTransform()
@@ -406,3 +404,9 @@ class OverlayMixin:
             pass
         return default
 
+    def _sequence_content_bottom_in_viewport(self) -> float:
+        layout = self._row_layout
+        if layout is None or layout.row_count == 0:
+            return 0.0
+        content_bottom = float(layout.total_height) - self._viewport_vertical_offset()
+        return max(0.0, min(content_bottom, float(self.viewport().height())))
