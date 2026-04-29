@@ -77,9 +77,17 @@ class WorkspaceLayoutScrollSync:
         if cr_active:
             cs.setFixedHeight(cr.height())
             cs.setVisible(True)
+            above_h, ch, _below_h = cr._compute_heights()
+            cs.sync_seq_region(float(above_h), float(ch))
         else:
             cs.setFixedHeight(0)
             cs.setVisible(False)
+        cs.updateGeometry()
+        if self._ctx.left_panel.layout() is not None:
+            self._ctx.left_panel.layout().invalidate()
+            self._ctx.left_panel.layout().activate()
+        self._ctx.left_panel.updateGeometry()
+        self._ctx.left_panel.update()
 
     def update_header_max_width(self) -> None:
         big = 16_777_215

@@ -105,7 +105,9 @@ class FloatingPanel(QWidget):
         """İçerik satırlarını güncelle ve widget boyutunu ayarla."""
         self._rows = list(rows)
         self._layout_cache = self._compute_layout()
-        self.setFixedSize(self._layout_cache.size)
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(16777215, 16777215)  # QWIDGETSIZE_MAX — remove any prior constraints
+        self.resize(self._layout_cache.size)
         self.update()
 
     def show_at(self, anchor: QPoint) -> None:

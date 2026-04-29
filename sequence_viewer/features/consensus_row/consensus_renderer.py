@@ -77,8 +77,12 @@ class ConsensusRenderer:
             self._render_line_mode(
                 painter, theme, start_col, end_col, char_width, view_left, width, seq_top, seq_char_h, selection_ranges
             )
+            hit_rects = self._render_annotations(
+                painter, widget, annotations, char_width, view_left, float(width), seq_char_h
+            )
             self._paint_dim_overlay(painter, widget, char_width, float(width), float(height), theme)
-            return []
+            self._render_guides(painter, widget, char_width, seq_top, seq_char_h)
+            return hit_rects
 
         if selection_ranges:
             sel_color = QColor(theme.seq_selection_bg)
@@ -203,7 +207,7 @@ class ConsensusRenderer:
                 draw_repeated_region(painter, clipped_x, ann_y, clipped_w, lane_h, ann_color, ann.label)
 
             selected = ann.id in widget._selected_ann_ids
-            hovered = ann.id == widget._hovered_ann_id
+            hovered = ann.id == widget.hovered_annotation_id
             if hovered and not selected:
                 draw_hover_overlay(painter, clipped_x, ann_y, clipped_w, lane_h, ann.type, ann_color, strand=ann_strand, char_width=ann_char_w)
             if selected:

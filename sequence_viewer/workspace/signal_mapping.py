@@ -62,6 +62,9 @@ class WorkspaceSignalMapper:
         ctx.model.headerChanged.connect(ctx.action_dialogs.on_header_changed)
         ctx.model.modelReset.connect(self._on_model_reset)
         ctx.model.alignmentStateChanged.connect(self._on_alignment_state_changed)
+        ctx.model.consensusAnnotationAdded.connect(lambda _ann: ctx.layout_sync.sync_consensus_visibility())
+        ctx.model.consensusAnnotationRemoved.connect(lambda _ann_id: ctx.layout_sync.sync_consensus_visibility())
+        ctx.model.consensusAnnotationUpdated.connect(lambda _ann: ctx.layout_sync.sync_consensus_visibility())
 
     def _connect_header_signals(self) -> None:
         ctx = self._ctx
@@ -108,8 +111,14 @@ class WorkspaceSignalMapper:
         theme_manager.themeChanged.connect(ctx.style_applier.on_theme_changed)
         ctx.style_applier.on_theme_changed(theme_manager.current)
         display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
+        display_settings_manager.displaySettingsChanged.connect(
+            lambda: ctx.layout_sync.sync_consensus_visibility()
+        )
         annotation_style_manager.stylesChanged.connect(
             ctx.annotation_presentation.on_annotation_changed
+        )
+        annotation_style_manager.stylesChanged.connect(
+            lambda: ctx.layout_sync.sync_consensus_visibility()
         )
 
     def _connect_zoom_and_selection_signals(self) -> None:
@@ -144,3 +153,9 @@ class WorkspaceSignalMapper:
         ctx.consensus_spacer.setVisible(visible)
         if visible:
             ctx.consensus_spacer.sync_seq_region(above_h, char_h)
+        ctx.consensus_spacer.updateGeometry()
+        if ctx.left_panel.layout() is not None:
+            ctx.left_panel.layout().invalidate()
+            ctx.left_panel.layout().activate()
+        ctx.left_panel.updateGeometry()
+        ctx.left_panel.update()

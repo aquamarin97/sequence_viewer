@@ -286,5 +286,3 @@ class _ColorStyleManager(QObject):
                 self.stylesChanged.emit()
 
 color_style_manager = _ColorStyleManager()
-
-

@@ -41,6 +41,12 @@ class ConsensusMouseController:
         self._hovered_ann_id = None
         self._press_on_annotation: bool = False
 
+    # ── Durum sorguları ───────────────────────────────────────────────────
+
+    def get_hovered_annotation_id(self):
+        """Returns the currently hovered annotation ID, or None."""
+        return self._hovered_ann_id
+
     # ── Olay işleyicileri ──────────────────────────────────────────────────
 
     def handle_press(self, event) -> bool:

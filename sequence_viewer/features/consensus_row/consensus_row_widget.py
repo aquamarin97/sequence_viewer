@@ -67,7 +67,7 @@ class ConsensusRowWidget(QWidget):
         self._selection_ranges: list = []  # [(start_incl, end_excl), ...]
 
         # ── Alt controller'lar ───────────────────────────────────────────
-        _tooltip = DragTooltip()
+        _tooltip = DragTooltip(parent=self)
         self._ann_handler = ConsensusAnnotationHandler(alignment_model)
         self._drag_ctrl = ConsensusDragController(_tooltip)
         self._mouse_ctrl = ConsensusMouseController(
@@ -163,6 +163,13 @@ class ConsensusRowWidget(QWidget):
             return None
         return self._model.get_consensus(sequences)
 
+    # ── Hover public API ─────────────────────────────────────────────────
+
+    @property
+    def hovered_annotation_id(self) -> Optional[str]:
+        """Returns the currently hovered annotation ID, if any."""
+        return self._mouse_ctrl.get_hovered_annotation_id()
+
     # ── Seçim public API ─────────────────────────────────────────────────
 
     def has_selected_annotations(self) -> bool:
@@ -243,6 +250,7 @@ class ConsensusRowWidget(QWidget):
             self.setFixedHeight(0)
             self.setVisible(False)
             self._sync_spacer(0.0, float(int(round(self._sequence_viewer.char_height))))
+        self.updateGeometry()
         self.update()
 
     def _sync_spacer(self, above_h: float, char_h: float):
@@ -388,7 +396,12 @@ class ConsensusRowWidget(QWidget):
         bp = selection_bp(lo, hi)
         consensus = self._get_consensus()
         tm = calculate_tm(consensus[lo:hi + 1]) if consensus else None
-        self._drag_tooltip.show_bp_tm(self.mapToGlobal(event.pos()), bp, tm)
+        tooltip_parent = self.parentWidget() or self
+        if self._drag_tooltip.parentWidget() is not tooltip_parent:
+            self._drag_tooltip.setParent(tooltip_parent)
+            self._drag_tooltip.hide()
+        anchor = self.mapTo(tooltip_parent, event.pos())
+        self._drag_tooltip.show_bp_tm(anchor, bp, tm)
 
     # ── Qt olayları ───────────────────────────────────────────────────────
 
