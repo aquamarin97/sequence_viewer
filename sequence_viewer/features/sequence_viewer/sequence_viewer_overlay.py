@@ -213,7 +213,9 @@ class OverlayMixin:
             return
         offset = self._viewport_horizontal_offset()
         vp_w = float(self.viewport().width())
-        vp_h = float(self.viewport().height())
+        vp_h = self._sequence_content_bottom_in_viewport()
+        if vp_h <= 0:
+            return
         dim_color = QColor(t.selection_dim_color)
         sorted_ranges = sorted(self._selection_dim_ranges, key=lambda r: r[0])
 
