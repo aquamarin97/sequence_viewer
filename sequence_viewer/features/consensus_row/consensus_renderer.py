@@ -80,7 +80,7 @@ class ConsensusRenderer:
             hit_rects = self._render_annotations(
                 painter, widget, annotations, char_width, view_left, float(width), seq_char_h
             )
-            self._paint_dim_overlay(painter, widget, char_width, float(width), float(height), theme)
+            self._paint_dim_overlay(painter, widget._sequence_viewer, char_width, float(width), float(height), theme)
             self._render_guides(painter, widget, char_width, seq_top, seq_char_h)
             return hit_rects
 
@@ -117,7 +117,7 @@ class ConsensusRenderer:
         hit_rects = self._render_annotations(
             painter, widget, annotations, char_width, view_left, float(width), seq_char_h
         )
-        self._paint_dim_overlay(painter, widget, char_width, float(width), float(height), theme)
+        self._paint_dim_overlay(painter, widget._sequence_viewer, char_width, float(width), float(height), theme)
         self._render_guides(painter, widget, char_width, seq_top, seq_char_h)
         return hit_rects
 

@@ -126,6 +126,7 @@ class ConsensusMouseController:
             update = self._drag.compute_drag_update(scene_col, self._w._guide_cols())
             self._w._selection = update.selection
             self._w._set_guide_cols(update.guide_cols)
+            self._w.sync_focus_to_sequence_viewer()
             self._w._update_drag_tooltip(event)
             self._w.update()
             event.accept()
@@ -148,6 +149,7 @@ class ConsensusMouseController:
                 drag_action, self._w._selection, self._w._guide_cols()
             )
             self._w._set_guide_cols(update.guide_cols)
+            self._w.sync_focus_to_sequence_viewer()
         else:
             if self._press_on_annotation:
                 self._press_on_annotation = False
@@ -166,6 +168,7 @@ class ConsensusMouseController:
                 self._w._set_guide_cols(update.guide_cols)
                 if update.set_caret is not None:
                     self._sv.set_caret(update.set_caret, -1)
+            self._sv.clear_selection_dim_range()
 
         self._w.update()
         event.accept()
@@ -199,6 +202,10 @@ class ConsensusMouseController:
         if result.guide_cols:
             self._w._set_guide_cols(result.guide_cols)
             self._sv.set_selection_dim_range(result.dim_start, result.dim_end)
+        elif result.selection_ranges:
+            self._w.sync_focus_to_sequence_viewer()
+        else:
+            self._sv.clear_selection_dim_range()
         self._w.update()
         if result.refresh_coordinator:
             self._w.coordinatorRefreshRequested.emit()

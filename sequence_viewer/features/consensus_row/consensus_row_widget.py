@@ -197,6 +197,7 @@ class ConsensusRowWidget(QWidget):
         if consensus:
             self._selection_ranges = [(0, len(consensus))]
             self._is_selected = True
+            self.sync_focus_to_sequence_viewer()
             self.update()
 
     def delete_selected_annotations(self):
@@ -204,6 +205,16 @@ class ConsensusRowWidget(QWidget):
         if not ann_ids:
             return
         self.deleteAnnotationsRequested.emit(ann_ids)
+
+    def sync_focus_to_sequence_viewer(self) -> None:
+        if not self._selection_ranges:
+            self._sequence_viewer.clear_selection_dim_range()
+            return
+        if len(self._selection_ranges) == 1:
+            left_col, right_col = self._selection_ranges[0]
+            self._sequence_viewer.set_selection_dim_range(left_col, right_col)
+            return
+        self._sequence_viewer.set_selection_focus_ranges(self._selection_ranges)
 
     # ── Pano ─────────────────────────────────────────────────────────────
 
