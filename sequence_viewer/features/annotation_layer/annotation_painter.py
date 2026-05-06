@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from PyQt5.QtCore import Qt, QRectF, QPointF
 from PyQt5.QtGui import (
-    QPainter, QPen, QBrush, QColor, QFont, QFontMetrics, QFontMetricsF,
+    QPen, QBrush, QColor, QFont, QFontMetrics,
     QPainterPath, QLinearGradient,
 )
 from sequence_viewer.model.annotation import AnnotationType
@@ -121,29 +121,14 @@ def _rounded_poly_path(points, radius):
 
 
 # â”€â”€ Ana çizim fonksiyonları â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-def draw_primer(painter, x, y, w, h, color, label, strand="+",
-                char_width=12.0, style_mode="default"):
-    """
-    Primer annotation'ı çizer.
-
-    Parameters
-    ----------
-    style_mode : str
-        "default" â€” mevcut görsel stil.
-        ğleride "academic" eklenecektir (kapsam dışı).
-    """
-    if w <= 0:
-        return
-
+def _draw_arrow_annotation(painter, x, y, w, h, color, label,
+                           ann_type, strand, char_width):
     tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
     body_w = max(0.0, w - tip_w)
-    style  = annotation_style_manager.get(AnnotationType.PRIMER)
-    is_dark = theme_manager.current.name == "dark"
+    style  = annotation_style_manager.get(ann_type)
+    is_dark = theme_manager.current.name == "dark"          # Düzeltilmiş
 
-    painter.setRenderHint(QPainter.Antialiasing, True)
-
-    if strand == "+":
+    if strand == "+":                                       # Düzeltilmiş
         pts = [
             QPointF(x,          y),
             QPointF(x + body_w, y),
@@ -177,6 +162,23 @@ def draw_primer(painter, x, y, w, h, color, label, strand="+",
                     font_family=style.label_font_family)
 
 
+def draw_primer(painter, x, y, w, h, color, label, strand="+",
+                char_width=12.0, style_mode="default"):
+    """
+    Primer annotation'ı çizer.
+
+    Parameters
+    ----------
+    style_mode : str
+        "default" — mevcut görsel stil.
+        İleride "academic" eklenecektir (kapsam dışı).
+    """
+    if w <= 0:
+        return
+    _draw_arrow_annotation(painter, x, y, w, h, color, label,
+                           AnnotationType.PRIMER, strand, char_width)
+
+
 def draw_probe(painter, x, y, w, h, color, label, strand="+",
                char_width=12.0, style_mode="default"):
     """
@@ -185,48 +187,13 @@ def draw_probe(painter, x, y, w, h, color, label, strand="+",
     Parameters
     ----------
     style_mode : str
-        "default" â€” mevcut görsel stil.
-        ğleride "academic" eklenecektir (kapsam dışı).
+        "default" — mevcut görsel stil.
+        İleride "academic" eklenecektir (kapsam dışı).
     """
     if w <= 0:
         return
-
-    tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
-    body_w = max(0.0, w - tip_w)
-    style  = annotation_style_manager.get(AnnotationType.PROBE)
-    is_dark = theme_manager.current.name == "dark"
-
-    painter.setRenderHint(QPainter.Antialiasing, True)
-
-    if strand == "+":
-        pts = [
-            QPointF(x,          y),
-            QPointF(x + body_w, y),
-            QPointF(x + w,      y + h),
-            QPointF(x,          y + h),
-        ]
-        label_x, label_w = x, body_w
-    else:
-        pts = [
-            QPointF(x + tip_w,  y),
-            QPointF(x + w,      y),
-            QPointF(x + w,      y + h),
-            QPointF(x,          y + h),
-        ]
-        label_x, label_w = x + tip_w, body_w
-
-    path = _rounded_poly_path(pts, _CORNER_RADIUS)
-    grad = _make_gradient(x, y, h, color, style.fill_alpha, is_dark)
-
-    painter.setBrush(QBrush(grad))
-    painter.setPen(QPen(_make_border_color(color, style.border_alpha),
-                        style.border_width))
-    painter.drawPath(path)
-
-    if label_w >= style.label_min_width:
-        _draw_label(painter, label_x, y, label_w, h, label, color,
-                    font_size=style.label_font_size,
-                    font_family=style.label_font_family)
+    _draw_arrow_annotation(painter, x, y, w, h, color, label,
+                           AnnotationType.PROBE, strand, char_width)
 
 
 def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"):
@@ -244,8 +211,6 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
 
     style   = annotation_style_manager.get(AnnotationType.REPEATED_REGION)
     is_dark = theme_manager.current.name == "dark"
-
-    painter.setRenderHint(QPainter.Antialiasing, True)
 
     path = QPainterPath()
     path.addRoundedRect(QRectF(x, y, w, h), _CORNER_RADIUS, _CORNER_RADIUS)
@@ -295,7 +260,6 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
     box_rect = QRectF(box_left, box_top, box_right - box_left, box_bottom - box_top)
 
     painter.save()
-    painter.setRenderHint(QPainter.Antialiasing, True)
 
     path = QPainterPath()
     path.addRoundedRect(box_rect, _CORNER_RADIUS, _CORNER_RADIUS)
@@ -389,7 +353,6 @@ def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
         path = _build_repeated_region_path(x, box_y, w, box_h)
         halo_color, inner_color = _selection_colors(base_color)
         painter.save()
-        painter.setRenderHint(QPainter.Antialiasing, True)
         painter.setBrush(Qt.NoBrush)
         halo_pen = QPen(halo_color, 2.5)
         halo_pen.setJoinStyle(Qt.RoundJoin)
@@ -410,7 +373,6 @@ def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
     halo_color, inner_color = _selection_colors(base_color)
 
     painter.save()
-    painter.setRenderHint(QPainter.Antialiasing, True)
     painter.setBrush(Qt.NoBrush)
     # Dış halo â€” annotation renginden türetilmiş geniş parlama
     halo_pen = QPen(halo_color, 3.0)
@@ -448,7 +410,6 @@ def draw_hover_overlay(painter, x, y, w, h, ann_type, base_color,
                                min(1.0, base_color.valueF() + 0.15), 0.65)
 
     painter.save()
-    painter.setRenderHint(QPainter.Antialiasing, True)
     border_pen = QPen(border, 1.3)
     border_pen.setJoinStyle(Qt.RoundJoin)
     painter.setBrush(QBrush(overlay))
