@@ -11,6 +11,14 @@ from sequence_viewer.model.annotation import AnnotationType
 from sequence_viewer.settings.annotation_styles import annotation_style_manager
 from sequence_viewer.settings.theme import theme_manager
 
+_IS_DARK: bool = theme_manager.current.name == "dark"
+
+def _on_theme_changed(_=None) -> None:
+    global _IS_DARK
+    _IS_DARK = theme_manager.current.name == "dark"
+
+theme_manager.themeChanged.connect(_on_theme_changed)
+
 _LABEL_MARGIN = 6      # yatay iç boşluk (px)
 _MIN_TIP_PX   = 5.0
 _CORNER_RADIUS   = 3.5    # köşe yuvarlaması yarıçapı (px)
@@ -126,8 +134,6 @@ def _draw_arrow_annotation(painter, x, y, w, h, color, label,
     tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
     body_w = max(0.0, w - tip_w)
     style  = annotation_style_manager.get(ann_type)
-    is_dark = theme_manager.current.name == "dark"          # Düzeltilmiş
-
     if strand == "+":                                       # Düzeltilmiş
         pts = [
             QPointF(x,          y),
@@ -146,7 +152,7 @@ def _draw_arrow_annotation(painter, x, y, w, h, color, label,
         label_x, label_w = x + tip_w, body_w
 
     path = _rounded_poly_path(pts, _CORNER_RADIUS)
-    grad = _make_gradient(x, y, h, color, style.fill_alpha, is_dark)
+    grad = _make_gradient(x, y, h, color, style.fill_alpha, _IS_DARK)
 
     painter.setBrush(QBrush(grad))
     if style.border_width > 0 and style.border_alpha > 0:
@@ -210,11 +216,9 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
         return
 
     style   = annotation_style_manager.get(AnnotationType.REPEATED_REGION)
-    is_dark = theme_manager.current.name == "dark"
-
     path = QPainterPath()
     path.addRoundedRect(QRectF(x, y, w, h), _CORNER_RADIUS, _CORNER_RADIUS)
-    grad = _make_gradient(x, y, h, color, style.fill_alpha, is_dark)
+    grad = _make_gradient(x, y, h, color, style.fill_alpha, _IS_DARK)
 
     painter.setBrush(QBrush(grad))
     painter.setPen(QPen(_make_border_color(color, style.border_alpha),
