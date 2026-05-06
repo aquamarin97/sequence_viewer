@@ -16,12 +16,12 @@ class SequenceGraphicsItem(QGraphicsItem):
     BOX_MODE = SequenceItemModel.BOX_MODE
     LINE_MODE = SequenceItemModel.LINE_MODE
 
-    def __init__(self, sequence, char_width=12.0, char_height=18.0, row_index=0, color_map=None, parent=None):
+    def __init__(self, sequence, char_width=12.0, char_height=18.0, row_index=0, color_map=None, base_char_width=None, parent=None):
         super().__init__(parent)
         self.setFlag(QGraphicsItem.ItemUsesExtendedStyleOption, True)
         self.row_index = row_index
         self._row_highlighted = False
-        self._model = SequenceItemModel(sequence=sequence, char_width=char_width, char_height=char_height, color_map=color_map)
+        self._model = SequenceItemModel(sequence=sequence, char_width=char_width, char_height=char_height, color_map=color_map, base_char_width=base_char_width)
         self.font = QFont(display_settings_manager.sequence_font_family)
         self.font.setStyleHint(QFont.Monospace)
         self.font.setFixedPitch(True)
@@ -67,15 +67,13 @@ class SequenceGraphicsItem(QGraphicsItem):
         self._model.clear_selection(); self.update()
     def set_row_highlighted(self, highlighted):
         highlighted = bool(highlighted)
-        if self._row_highlighted == highlighted:
-            return
+        if self._row_highlighted == highlighted: return
         self._row_highlighted = highlighted
         self.update()
     def set_lod_max_mode(self, mode):
         self._model.set_lod_max_mode(mode); self.update()
 
     def refresh_display_settings(self):
-        """Font family, char_height ve size'ı display_settings_manager'dan yeniden uygula."""
         self.font.setFamily(display_settings_manager.sequence_font_family)
         new_ch = display_settings_manager.sequence_char_height
         if self._model.char_height != new_ch:
@@ -89,6 +87,7 @@ class SequenceGraphicsItem(QGraphicsItem):
 
     def _on_color_styles_changed(self):
         self._model.refresh_color_map(); self.update()
+
     def _sync_font_from_model(self):
         desired = float(self._model.current_font_size)
         if abs(desired - self._applied_font_size) < 0.001: return
@@ -100,62 +99,128 @@ class SequenceGraphicsItem(QGraphicsItem):
 
     def paint(self, painter, option, widget=None):
         if option is None or option.exposedRect.isNull(): return
-        painter.save()
-        painter.setFont(self.font)
-        t = theme_manager.current
+
         exposed = option.exposedRect
-        effective_mode = self._model.get_effective_mode()
-        cw, ch = self.char_width, self.char_height
-        length = self.length
-        seq, seq_upper, color_map = self.sequence, self.sequence_upper, self.color_map
+        model = self._model
+        cw = model.char_width
+        char_h = model.char_height
+        length = model.length
+        t = theme_manager.current
+
+        painter.save()
+
+        # Row background — one drawRect, no per-char work
+        painter.setPen(Qt.NoPen)
         if self._row_highlighted:
-            row_bg = QColor(t.row_band_highlight)
+            painter.setBrush(QBrush(QColor(t.row_band_highlight)))
         else:
-            row_bg = t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd
-        painter.setPen(Qt.NoPen); painter.setBrush(QBrush(row_bg)); painter.drawRect(exposed)
+            painter.setBrush(QBrush(t.row_bg_even if self.row_index % 2 == 0 else t.row_bg_odd))
+        painter.drawRect(exposed)
+
         total_width = length * cw
-        visible_left = max(exposed.left(), 0.0)
-        visible_right = min(exposed.right(), total_width)
-        if visible_right <= visible_left: painter.restore(); return
-        start_index = max(0, math.floor(visible_left / cw))
-        end_index = min(length, math.ceil(visible_right / cw))
-        sel_ranges = self._model._selection_ranges  # [(start_incl, end_excl), ...]
+        vis_left = max(exposed.left(), 0.0)
+        vis_right = min(exposed.right(), total_width)
+        if vis_right <= vis_left:
+            painter.restore()
+            return
+
+        start_idx = max(0, math.floor(vis_left / cw))
+        end_idx   = min(length, math.ceil(vis_right / cw))
+        vis_len   = end_idx - start_idx
+
+        sel_ranges     = model._selection_ranges
+        effective_mode = model.get_effective_mode()
+
         if effective_mode == SequenceItemModel.LINE_MODE:
-            vis_l, vis_r = max(exposed.left(), 0.0), min(exposed.right(), total_width)
-            if vis_r > vis_l:
-                line_h = self._model.line_height; y = (ch - line_h) / 2.0
-                painter.setBrush(QBrush(t.seq_line_fg)); painter.setPen(Qt.NoPen)
-                painter.drawRect(QRectF(vis_l, y, vis_r - vis_l, line_h))
+            line_h = model.line_height
+            y = (char_h - line_h) / 2.0
+            painter.setBrush(QBrush(t.seq_line_fg))
+            painter.drawRect(QRectF(vis_left, y, vis_right - vis_left, line_h))
             if sel_ranges:
-                sel_color = QColor(t.seq_selection_bg)
-                painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
+                painter.setBrush(QBrush(QColor(t.seq_selection_bg)))
                 for s, e in sel_ranges:
-                    sx = max(s * cw, vis_l); ex = min(e * cw, vis_r)
+                    sx = max(s * cw, vis_left); ex = min(e * cw, vis_right)
                     if ex > sx:
-                        painter.drawRect(QRectF(sx, 0, ex - sx, ch))
-            painter.restore(); return
+                        painter.drawRect(QRectF(sx, 0.0, ex - sx, char_h))
+            painter.restore()
+            return
+
+        # --- Selection: build O(vis_len) mask and draw one rect per range ---
+        # Replaces O(vis_len * n_ranges) any() check and per-character drawRect.
+        sel_mask = None
         if sel_ranges:
-            sel_color = QColor(t.seq_selection_bg)
-            painter.setBrush(QBrush(sel_color)); painter.setPen(Qt.NoPen)
+            sel_mask = bytearray(vis_len)  # 0 = normal, 1 = selected
+            painter.setBrush(QBrush(QColor(t.seq_selection_bg)))
             for s, e in sel_ranges:
-                sel_l = max(s, start_index); sel_r = min(e, end_index)
-                if sel_r > sel_l:
-                    for i in range(sel_l, sel_r): painter.drawRect(QRectF(i * cw, 0, cw, ch))
+                lo = max(s, start_idx)
+                hi = min(e, end_idx)
+                if hi > lo:
+                    sel_mask[lo - start_idx : hi - start_idx] = b'\x01' * (hi - lo)
+                    painter.drawRect(QRectF(lo * cw, 0.0, (hi - lo) * cw, char_h))
+
+        seq       = model.sequence
+        seq_upper = model.sequence_upper
+        color_map = model.color_map
+        _fallback = QColor(50, 50, 50)
+
         if effective_mode == SequenceItemModel.TEXT_MODE:
-            painter.setPen(Qt.NoPen); painter.setBrush(Qt.NoBrush)
-            for i in range(start_index, end_index):
-                base, base_u, x = seq[i], seq_upper[i], i * cw
-                is_selected = any(s <= i < e for s, e in sel_ranges)
-                color = QColor(255, 255, 255) if is_selected else color_map.get(base_u, QColor(50,50,50))
-                glyph = GLYPH_CACHE.get_glyph(base, self.font, color)
-                dx = x + (cw - glyph.width()) / 2.0; dy = (ch - glyph.height()) / 2.0
-                painter.drawPixmap(QPointF(dx, dy), glyph)
+            painter.setFont(self.font)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(Qt.NoBrush)
+            _white = QColor(255, 255, 255)
+
+            # Local glyph dicts use a single-char key instead of the 8-tuple
+            # GLYPH_CACHE key — O(1) hits after the first encounter per base.
+            # For ATGCN: ≤5 GLYPH_CACHE calls total per paint, rest are local hits.
+            _local_normal: dict = {}
+            _local_sel: dict = {}
+            dy = 0.0
+
+            for j in range(vis_len):
+                i = start_idx + j
+                base_char = seq[i]
+                base_u    = seq_upper[i]
+
+                if sel_mask is not None and sel_mask[j]:
+                    pm = _local_sel.get(base_char)
+                    if pm is None:
+                        pm = GLYPH_CACHE.get_glyph(base_char, self.font, _white)
+                        _local_sel[base_char] = pm
+                else:
+                    pm = _local_normal.get(base_char)
+                    if pm is None:
+                        col = color_map.get(base_u, _fallback)
+                        pm  = GLYPH_CACHE.get_glyph(base_char, self.font, col)
+                        _local_normal[base_char] = pm
+
+                # dy is identical for every glyph at a given font size; compute once
+                if not dy:
+                    dy = (char_h - pm.height()) / 2.0
+
+                x = i * cw
+                painter.drawPixmap(QPointF(x + (cw - pm.width()) / 2.0, dy), pm)
+
         elif effective_mode == SequenceItemModel.BOX_MODE:
-            painter.setPen(Qt.NoPen); box_h = self._model.box_height; y = (ch - box_h) / 2.0
-            for i in range(start_index, end_index):
-                base_u, x = seq_upper[i], i * cw
-                color = color_map.get(base_u, QColor(50,50,50))
-                painter.setBrush(QBrush(color)); painter.drawRect(QRectF(x, y, cw, box_h))
+            box_h = model.box_height
+            y = (char_h - box_h) / 2.0
+            painter.setPen(Qt.NoPen)
+
+            # Group x-positions by color → ≤5 setBrush calls for ATGCN instead of one per char
+            buckets: dict = {}  # (r,g,b) -> [QColor, [x, ...]]
+            for j in range(vis_len):
+                i      = start_idx + j
+                base_u = seq_upper[i]
+                color  = color_map.get(base_u, _fallback)
+                rgb    = (color.red(), color.green(), color.blue())
+                entry  = buckets.get(rgb)
+                if entry is None:
+                    buckets[rgb] = [color, [i * cw]]
+                else:
+                    entry[1].append(i * cw)
+
+            for _rgb, (color, xs) in buckets.items():
+                painter.setBrush(QBrush(color))
+                for x in xs:
+                    painter.drawRect(QRectF(x, y, cw, box_h))
+
         painter.restore()
-
-

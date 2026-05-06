@@ -11,7 +11,7 @@ class SequenceItemModel:
     _TEXT_BOX_THRESHOLD = 8.0
     _BOX_LINE_THRESHOLD = 5.0
 
-    def __init__(self, sequence, char_width=12.0, char_height=18.0, color_map=None):
+    def __init__(self, sequence, char_width=12.0, char_height=18.0, color_map=None, base_char_width=None):
         self.sequence = sequence
         self.sequence_upper = sequence.upper()
         self.length = len(sequence)
@@ -19,9 +19,10 @@ class SequenceItemModel:
         self.char_height = max(1, int(round(char_height)))
         self._custom_color_map = color_map is not None
         self.color_map = color_map or default_nucleotide_color_map()
-        # default_char_width / 1.8 ile LOD referans noktası kaydırılır:
-        # başlangıç scale = char_width / (char_width/1.8) = 1.8 â†’ TEXT MODE garantisi.
-        self.default_char_width = self.char_width / 1.8
+        # Use the view’s initial (unzoomed) char_width as the LOD reference so that
+        # items created at a zoomed-out level correctly inherit the current display mode.
+        ref_cw = float(base_char_width) if base_char_width is not None else self.char_width
+        self.default_char_width = ref_cw / 1.8
         self._selection_ranges: list = []   # [(start_incl, end_excl), ...]
         self.base_font_size = self.char_height * 0.6
         self.display_mode = self.TEXT_MODE

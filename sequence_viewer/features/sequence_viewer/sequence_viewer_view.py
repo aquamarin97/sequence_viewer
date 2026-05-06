@@ -1,5 +1,4 @@
 # sequence_viewer/features/sequence_viewer/sequence_viewer_view.py
-# features/sequence_viewer/sequence_viewer_view.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from PyQt5.QtCore import Qt
@@ -22,6 +21,7 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self.char_width = float(char_width)
+        self._base_char_width = float(char_width)  # unzoomed reference for LOD calculations
         self.char_height = int(round(char_height))
         self._per_row_annot_h = 0
         self._row_layout = None
@@ -127,6 +127,7 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
             char_width=self.char_width,
             char_height=self.char_height,
             row_index=row_index,
+            base_char_width=self._base_char_width,
         )
         layout = self._row_layout
         if layout is not None and row_index < layout.row_count:
