@@ -142,18 +142,22 @@ class AnnotationLayerWidget(QWidget):
 
     def _paint_annotations(self, painter, *, char_width: float, view_left: float) -> None:
         self._hit_rects.clear()
+        selected_visible = []
+
+        # Pass 1 — tüm annotation'lar, seçim outline'ı olmadan
         for annotation in self._annotations:
             lane = self._lane_assignment.get(annotation.id, 0)
             rect = self._annotation_viewport_rect(annotation, lane, char_width, view_left)
             if rect is None:
                 continue
-            self._renderer.render_annotation(
-                painter,
-                annotation,
-                rect,
-                selected=(annotation.id in self._selected_ann_ids),
-            )
+            self._renderer.render_annotation(painter, annotation, rect, selected=False)
             self._hit_rects.append((rect, annotation))
+            if annotation.id in self._selected_ann_ids:
+                selected_visible.append((annotation, rect))
+
+        # Pass 2 — seçili annotation outline'ları (her zaman üstte)
+        for annotation, rect in selected_visible:
+            self._renderer.render_selection_outline(painter, annotation, rect)
 
     def _paint_dim_overlay(self, painter, *, char_width: float) -> None:
         self._renderer.render_dim_effect(

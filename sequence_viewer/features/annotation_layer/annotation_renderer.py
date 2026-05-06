@@ -82,6 +82,22 @@ class AnnotationRenderer:
             )
         painter.restore()
 
+    def render_selection_outline(self, painter, annotation, rect: QRectF) -> None:
+        painter.save()
+        char_width = rect.width() / max(annotation.length(), 1)
+        draw_selection_outline(
+            painter,
+            rect.x(),
+            rect.y(),
+            rect.width(),
+            rect.height(),
+            annotation.type,
+            annotation.resolved_color(),
+            strand=getattr(annotation, "strand", "+"),
+            char_width=char_width,
+        )
+        painter.restore()
+
     def render_dim_effect(
         self,
         painter,
