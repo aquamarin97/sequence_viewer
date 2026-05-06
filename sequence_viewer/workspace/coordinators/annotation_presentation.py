@@ -22,6 +22,10 @@ class WorkspaceAnnotationPresentation:
         self._ctx = ctx
         self.ann_items: dict = {}
         self._selected_ann_ids: set = set()
+        # Cache: ann_id → (row_index, scene_y, is_marker, start, length)
+        # Rebuilt in rebuild_ann_items; allows on_zoom_changed to skip
+        # compute_row_layout() + lane assignment entirely during zoom.
+        self._ann_geo_cache: dict = {}
 
     # ── Seçim yönetimi ────────────────────────────────────────────────────
 
@@ -62,6 +66,7 @@ class WorkspaceAnnotationPresentation:
                 if item.scene() is not None:
                     scene.removeItem(item)
         self.ann_items.clear()
+        self._ann_geo_cache.clear()
 
     def per_row_lane_assignment(self, flat):
         above_by_row, below_by_row = defaultdict(list), defaultdict(list)
@@ -79,36 +84,42 @@ class WorkspaceAnnotationPresentation:
             result.update(build_side_geometry(anns).lane_assignment)
         return result
 
+    @staticmethod
+    def _build_side_geometry_maps(per_row: dict) -> tuple[dict, dict, dict]:
+        """O(N) helper: returns (row_sides, side_geometry, per_row_lookup)."""
+        row_sides = {row_index: partition_annotations_by_side(anns)
+                     for row_index, anns in per_row.items()}
+        side_geometry: dict = {}
+        for row_index, (above_anns, below_anns) in row_sides.items():
+            side_geometry[("above", row_index)] = build_side_geometry(above_anns)
+            side_geometry[("below", row_index)] = build_side_geometry(below_anns)
+        per_row_lookup = {row_index: {ann.id: ann for ann in anns}
+                          for row_index, anns in per_row.items()}
+        return row_sides, side_geometry, per_row_lookup
+
     def rebuild_ann_items(self, layout: RowLayout) -> None:
         self.remove_all_ann_items()
         flat = self._ctx.model.all_annotations_flat()
         if not flat or layout.row_count == 0:
             return
+
+        # O(N) grouping — avoids O(N²) nested list comprehension
+        per_row: dict = defaultdict(list)
+        for row_index, ann in flat:
+            per_row[row_index].append(ann)
+
         assignment = self.per_row_lane_assignment(flat)
-        row_sides = {}
-        for row_index, _ in flat:
-            row_anns = [ann for r, ann in flat if r == row_index]
-            row_sides[row_index] = partition_annotations_by_side(row_anns)
-        side_geometry = {
-            ("above", row_index): build_side_geometry(above_anns)
-            for row_index, (above_anns, _) in row_sides.items()
-        }
-        side_geometry.update(
-            {
-                ("below", row_index): build_side_geometry(below_anns)
-                for row_index, (_, below_anns) in row_sides.items()
-            }
-        )
+        _row_sides, side_geometry, per_row_lookup = self._build_side_geometry_maps(per_row)
+
         cw = float(self._ctx.sequence_viewer.current_char_width())
         ann_h = float(annotation_style_manager.get_lane_height())
         scene = self._ctx.sequence_viewer.scene
+
         for row_index, ann in flat:
             if row_index >= layout.row_count:
                 continue
-            scene_x = ann.start * cw
-            parent_lookup = {
-                candidate.id: candidate for r_idx, candidate in flat if r_idx == row_index
-            }
+
+            parent_lookup = per_row_lookup[row_index]
             parent = parent_lookup.get(ann.parent_id)
             is_above = (
                 parent.type.is_above_sequence()
@@ -118,20 +129,28 @@ class WorkspaceAnnotationPresentation:
             side_key = ("above", row_index) if is_above else ("below", row_index)
             geometry = side_geometry[side_key]
             lane = assignment.get(ann.id, 0)
+
             if ann.type == AnnotationType.MISMATCH_MARKER:
                 parent_lane = assignment.get(ann.parent_id, 0)
                 side_y = geometry.marker_y(parent_lane, above=is_above, lane_height=ann_h)
             else:
                 side_y = geometry.parent_y(lane, above=is_above, lane_height=ann_h)
+
             scene_y = float(
                 layout.y_offsets[row_index] if is_above else layout.below_y_offsets[row_index]
             ) + side_y
+
+            is_marker = ann.type == AnnotationType.MISMATCH_MARKER
+            scene_x = ann.start * cw
+            ann_width = cw if is_marker else ann.length() * cw
+
+            # Persist Y offsets so on_zoom_changed can skip recomputation
+            self._ann_geo_cache[ann.id] = (row_index, scene_y, is_marker, ann.start, ann.length())
+
             item = AnnotationGraphicsItem(
                 annotation=ann,
                 row_index=row_index,
-                ann_width=(
-                    cw if ann.type == AnnotationType.MISMATCH_MARKER else ann.length() * cw
-                ),
+                ann_width=ann_width,
                 ann_height=ann_h,
                 on_click=self._ctx.action_dialogs.on_ann_item_clicked,
                 on_double_click=self._ctx.action_dialogs.on_ann_item_double_clicked,
@@ -145,34 +164,27 @@ class WorkspaceAnnotationPresentation:
     def update_ann_items_geometry(self, layout: RowLayout) -> None:
         if not self.ann_items or layout.row_count == 0:
             return
+        cw = float(self._ctx.sequence_viewer.current_char_width())
+        ann_h = float(annotation_style_manager.get_lane_height())
+        if self._ann_geo_cache:
+            self._apply_positions_from_cache(cw, ann_h)
+            return
+
+        # Fallback (cache not populated): O(N) full recompute
         flat = self._ctx.model.all_annotations_flat()
         if not flat:
             return
+        per_row: dict = defaultdict(list)
+        for row_index, ann in flat:
+            per_row[row_index].append(ann)
         assignment = self.per_row_lane_assignment(flat)
-        row_sides = {}
-        for row_index, _ in flat:
-            row_anns = [ann for r, ann in flat if r == row_index]
-            row_sides[row_index] = partition_annotations_by_side(row_anns)
-        side_geometry = {
-            ("above", row_index): build_side_geometry(above_anns)
-            for row_index, (above_anns, _) in row_sides.items()
-        }
-        side_geometry.update(
-            {
-                ("below", row_index): build_side_geometry(below_anns)
-                for row_index, (_, below_anns) in row_sides.items()
-            }
-        )
-        cw = float(self._ctx.sequence_viewer.current_char_width())
-        ann_h = float(annotation_style_manager.get_lane_height())
+        _row_sides, side_geometry, per_row_lookup = self._build_side_geometry_maps(per_row)
+
         for row_index, ann in flat:
             items = self.ann_items.get(ann.id, [])
             if not items or row_index >= layout.row_count:
                 continue
-            scene_x = ann.start * cw
-            parent_lookup = {
-                candidate.id: candidate for r_idx, candidate in flat if r_idx == row_index
-            }
+            parent_lookup = per_row_lookup[row_index]
             parent = parent_lookup.get(ann.parent_id)
             is_above = (
                 parent.type.is_above_sequence()
@@ -190,6 +202,7 @@ class WorkspaceAnnotationPresentation:
             scene_y = float(
                 layout.y_offsets[row_index] if is_above else layout.below_y_offsets[row_index]
             ) + side_y
+            scene_x = ann.start * cw
             for item in items:
                 if item.row_index == row_index:
                     item.setPos(scene_x, scene_y)
@@ -197,6 +210,19 @@ class WorkspaceAnnotationPresentation:
                         cw if ann.type == AnnotationType.MISMATCH_MARKER else ann.length() * cw,
                         ann_h,
                     )
+
+    def _apply_positions_from_cache(self, cw: float, ann_h: float) -> None:
+        """O(N) fast path: uses cached Y offsets, only recomputes scene_x."""
+        for ann_id, (row_index, scene_y, is_marker, start, length) in self._ann_geo_cache.items():
+            items = self.ann_items.get(ann_id, [])
+            if not items:
+                continue
+            scene_x = start * cw
+            width = cw if is_marker else length * cw
+            for item in items:
+                if item.row_index == row_index:
+                    item.setPos(scene_x, scene_y)
+                    item.update_size(width, ann_h)
 
     # ── Signal handler'ları ───────────────────────────────────────────────
 
@@ -206,5 +232,11 @@ class WorkspaceAnnotationPresentation:
         self.rebuild_ann_items(layout)
 
     def on_zoom_changed(self, *_) -> None:
-        layout = self._ctx.layout_sync.compute_row_layout()
-        self.update_ann_items_geometry(layout)
+        if self._ann_geo_cache:
+            # Fast path: Y positions cached, compute_row_layout() not needed
+            cw = float(self._ctx.sequence_viewer.current_char_width())
+            ann_h = float(annotation_style_manager.get_lane_height())
+            self._apply_positions_from_cache(cw, ann_h)
+        else:
+            layout = self._ctx.layout_sync.compute_row_layout()
+            self.update_ann_items_geometry(layout)

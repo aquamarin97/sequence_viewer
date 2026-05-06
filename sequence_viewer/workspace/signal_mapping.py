@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
 
+from PyQt5.QtCore import QVariantAnimation
+
 if TYPE_CHECKING:
     from sequence_viewer.workspace.context import WorkspaceContext
 
@@ -126,9 +128,16 @@ class WorkspaceSignalMapper:
         anim = getattr(ctx.sequence_viewer, "_zoom_animation", None)
         if anim is not None:
             anim.valueChanged.connect(ctx.annotation_presentation.on_zoom_changed)
-        ctx.sequence_viewer.horizontalScrollBar().rangeChanged.connect(
-            ctx.annotation_presentation.on_zoom_changed
-        )
+
+        # hbar.rangeChanged fires as a side-effect of _update_scene_rect during animation.
+        # anim.valueChanged already covers that frame — skip to avoid double work.
+        def _on_hbar_range_zoom(*_):
+            a = getattr(ctx.sequence_viewer, "_zoom_animation", None)
+            if a is not None and a.state() == QVariantAnimation.Running:
+                return
+            ctx.annotation_presentation.on_zoom_changed()
+
+        ctx.sequence_viewer.horizontalScrollBar().rangeChanged.connect(_on_hbar_range_zoom)
 
     def _clear_workspace_annotation_selection(self) -> None:
         ctx = self._ctx

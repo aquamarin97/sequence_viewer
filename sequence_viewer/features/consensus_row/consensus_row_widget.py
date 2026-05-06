@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from typing import Optional, Tuple
 
-from PyQt5.QtCore import Qt, pyqtSignal, QRectF
+from PyQt5.QtCore import Qt, QVariantAnimation, pyqtSignal, QRectF
 from PyQt5.QtGui import QFont, QPainter
 from PyQt5.QtWidgets import QWidget
 
@@ -101,8 +101,8 @@ class ConsensusRowWidget(QWidget):
 
         # ── Viewer sinyal bağlantıları ───────────────────────────────────
         hbar = self._sequence_viewer.horizontalScrollBar()
-        hbar.valueChanged.connect(self.update)
-        hbar.rangeChanged.connect(self.update)
+        hbar.valueChanged.connect(self._on_hbar_scroll)
+        hbar.rangeChanged.connect(self._on_hbar_scroll)
         anim = getattr(self._sequence_viewer, "_zoom_animation", None)
         if anim:
             anim.valueChanged.connect(self.update)
@@ -124,6 +124,12 @@ class ConsensusRowWidget(QWidget):
             pass
 
         self._update_visibility()
+
+    def _on_hbar_scroll(self, *_) -> None:
+        anim = getattr(self._sequence_viewer, "_zoom_animation", None)
+        if anim is not None and anim.state() == QVariantAnimation.Running:
+            return
+        self.update()
 
     # ── _selection property (drag + annotation seçimi için backing store) ─
 

@@ -2,7 +2,7 @@
 # features/position_ruler/position_ruler_widget.py
 import math
 from typing import Optional, List
-from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtCore import Qt, QRectF, QVariantAnimation
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont, QFontMetrics
 from PyQt5.QtWidgets import QWidget, QScrollBar
 from sequence_viewer.features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
@@ -16,13 +16,20 @@ class SequencePositionRulerWidget(QWidget):
         self.font = QFont("Arial", 8); self._model = PositionRulerModel()
         self._extra_special_positions: List[int] = []
         hbar = self.viewer.horizontalScrollBar()
-        hbar.valueChanged.connect(self._on_view_changed); hbar.rangeChanged.connect(self._on_view_changed)
+        hbar.valueChanged.connect(self._on_view_changed)
+        hbar.rangeChanged.connect(self._on_hbar_range_changed)
         self.viewer.selectionChanged.connect(self._on_view_changed)
         # Guide kolonları deĞŸişince ruler'ı güncelle
         self.viewer.add_v_guide_observer(self._on_guides_changed)
         theme_manager.themeChanged.connect(lambda _: self.update())
 
     def _on_view_changed(self, *_): self.update()
+
+    def _on_hbar_range_changed(self, *_):
+        anim = getattr(self.viewer, "_zoom_animation", None)
+        if anim is not None and anim.state() == QVariantAnimation.Running:
+            return
+        self.update()
 
     def _on_guides_changed(self):
         """Guide kolonları deĞŸişince special pozisyonları güncelle ve repaint."""
