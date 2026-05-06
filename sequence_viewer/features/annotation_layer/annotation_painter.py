@@ -42,30 +42,21 @@ def _clamp(v):
     return max(0, min(255, v))
 
 
-def _make_gradient(x, y, h, base_color, fill_alpha, is_dark):
-    """
-    Annotation renginden türetilmiş dikey QLinearGradient.
-
-    Üst highlight â†’ orta baz â†’ alt shadow tonlaması;
-    dark modda highlight daha belirgin, light modda daha yumuşak.
-    """
+@lru_cache(maxsize=64)
+def _compute_gradient_colors(r, g, b, fill_alpha, is_dark):
     d_hi  = 48 if is_dark else 28
     d_sha = 38 if is_dark else 22
+    top = QColor(_clamp(r + d_hi),  _clamp(g + d_hi),  _clamp(b + d_hi),  fill_alpha)
+    mid = QColor(r, g, b, fill_alpha)
+    bot = QColor(_clamp(r - d_sha), _clamp(g - d_sha), _clamp(b - d_sha), fill_alpha)
+    return top, mid, bot
 
-    top = QColor(
-        _clamp(base_color.red()   + d_hi),
-        _clamp(base_color.green() + d_hi),
-        _clamp(base_color.blue()  + d_hi),
-        fill_alpha,
-    )
-    mid = QColor(base_color.red(), base_color.green(), base_color.blue(), fill_alpha)
-    bot = QColor(
-        _clamp(base_color.red()   - d_sha),
-        _clamp(base_color.green() - d_sha),
-        _clamp(base_color.blue()  - d_sha),
-        fill_alpha,
-    )
 
+def _make_gradient(x, y, h, base_color, fill_alpha, is_dark):
+    top, mid, bot = _compute_gradient_colors(
+        base_color.red(), base_color.green(), base_color.blue(),
+        fill_alpha, is_dark,
+    )
     grad = QLinearGradient(x, y, x, y + h)
     grad.setColorAt(0.00, top)
     grad.setColorAt(0.42, mid)
