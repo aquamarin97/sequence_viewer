@@ -11,6 +11,7 @@ from sequence_viewer.features.annotation_layer.annotation_painter import (
     draw_selection_outline,
 )
 from sequence_viewer.model.annotation import AnnotationType
+from sequence_viewer.settings.display_settings_manager import display_settings_manager
 
 
 class AnnotationRenderer:
@@ -44,10 +45,6 @@ class AnnotationRenderer:
                 char_width=char_width,
             )
         elif annotation.type == AnnotationType.MISMATCH_MARKER:
-            from sequence_viewer.settings.display_settings_manager import (
-                display_settings_manager,
-            )
-
             draw_mismatch_marker(
                 painter,
                 rect.x(),

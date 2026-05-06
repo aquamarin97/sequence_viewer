@@ -24,10 +24,12 @@ class AnnotationViewportCalculator:
         lane_height: int,
         lane_padding: int,
     ) -> Optional[QRectF]:
-        x = annotation.start * char_width - view_left
-        width = annotation.length() * char_width
-        y = self._annotation_y(annotation, lane, lane_height, lane_padding)
-        rect = QRectF(x, y, width, lane_height)
+        start_px = annotation.start * char_width - view_left
+        end_px   = start_px + annotation.length() * char_width
+        if end_px < 0 or start_px > widget_width:
+            return None
+        y    = self._annotation_y(annotation, lane, lane_height, lane_padding)
+        rect = QRectF(start_px, y, end_px - start_px, lane_height)
         return self._clip_rect(rect, widget_width)
 
     def _annotation_y(
