@@ -3,6 +3,7 @@
 from typing import Optional, Tuple, Dict
 from PyQt5.QtGui import QColor
 from sequence_viewer.graphics.sequence_item.sequence_glyph_cache import default_nucleotide_color_map
+from sequence_viewer.settings.display_settings_manager import display_settings_manager
 
 class SequenceItemModel:
     TEXT_MODE = "text"
@@ -48,7 +49,6 @@ class SequenceItemModel:
         self._update_display_state()
 
     def _update_display_state(self):
-        from sequence_viewer.settings.display_settings_manager import display_settings_manager
         if self.default_char_width <= 0: self.default_char_width = 12.0
         cw = max(self.char_width, 0.001)
         base_cw = max(self.default_char_width, 0.001)

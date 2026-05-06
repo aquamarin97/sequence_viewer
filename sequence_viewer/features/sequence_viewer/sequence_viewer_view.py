@@ -169,7 +169,7 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
     # Scene rect
     # ------------------------------------------------------------------
 
-    def _update_scene_rect(self):
+    def _update_scene_rect(self, *, invalidate: bool = True):
         if not self.sequence_items:
             self.scene.setSceneRect(0, 0, 0, 0)
             self.max_sequence_length = 0
@@ -185,7 +185,8 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
             stride = self._per_row_annot_h + self.char_height
             height = float(len(self.sequence_items) * stride)
         self.scene.setSceneRect(0, 0, width, height)
-        self.scene.invalidate()
+        if invalidate:
+            self.scene.invalidate()
 
     # ------------------------------------------------------------------
     # Coordinate conversion

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt5.QtCore import QPoint, QRectF, Qt, pyqtSignal
+from PyQt5.QtCore import QPoint, QRectF, Qt, QVariantAnimation, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QPainter, QPen
 from PyQt5.QtWidgets import QToolTip, QWidget
 
@@ -51,8 +51,8 @@ class AnnotationLayerWidget(QWidget):
         self._model.modelReset.connect(self._on_global_changed)
 
         hbar = self._sequence_viewer.horizontalScrollBar()
-        hbar.valueChanged.connect(self.update)
-        hbar.rangeChanged.connect(self.update)
+        hbar.valueChanged.connect(self._on_hbar_scroll)
+        hbar.rangeChanged.connect(self._on_hbar_scroll)
         anim = getattr(self._sequence_viewer, "_zoom_animation", None)
         if anim:
             anim.valueChanged.connect(self.update)
@@ -105,6 +105,12 @@ class AnnotationLayerWidget(QWidget):
         if not self._selected_ann_ids:
             return
         self._selected_ann_ids.clear()
+        self.update()
+
+    def _on_hbar_scroll(self, *_):
+        anim = getattr(self._sequence_viewer, "_zoom_animation", None)
+        if anim is not None and anim.state() == QVariantAnimation.Running:
+            return
         self.update()
 
     def _on_global_changed(self, *_):

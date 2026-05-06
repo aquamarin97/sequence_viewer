@@ -59,6 +59,14 @@ class SequenceGraphicsItem(QGraphicsItem):
         self._sync_font_from_model()
         self.update()
 
+    def _set_char_width_fast(self, new_width):
+        """Animasyon frame'leri için: model günceller, prepareGeometryChange/update atlar.
+        Caller viewport().update() ile tek seferde repaint yapar."""
+        if new_width <= 0: new_width = 0.001
+        if abs(new_width - self.char_width) < 0.0001: return
+        self._model.set_char_width(new_width)
+        self._sync_font_from_model()
+
     def set_selection(self, start_col, end_col):
         self._model.set_selection(start_col, end_col); self.update()
     def set_multi_selection(self, ranges):

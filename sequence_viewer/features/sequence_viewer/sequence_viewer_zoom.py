@@ -2,6 +2,7 @@
 # features/sequence_viewer/sequence_viewer_zoom.py
 from __future__ import annotations
 from PyQt5.QtCore import QEasingCurve, QVariantAnimation
+from sequence_viewer.graphics.sequence_item.sequence_item import SequenceGraphicsItem
 
 
 class ZoomMixin:
@@ -25,6 +26,7 @@ class ZoomMixin:
         self._zoom_animation = QVariantAnimation(self)
         self._zoom_animation.setEasingCurve(QEasingCurve.OutCubic)
         self._zoom_animation.valueChanged.connect(self._on_zoom_value_changed)
+        self._zoom_animation.finished.connect(self._on_zoom_finished)
         self._zoom_center_nt = None
         self._zoom_view_width_px = None
 
@@ -56,15 +58,19 @@ class ZoomMixin:
         if abs(new_char_width - self.char_width) < 0.0001 and center_nt is None:
             return
         applied = float(new_char_width)
-        for item in self.sequence_items:
-            item.set_char_width(applied)
+        is_animating = self._zoom_animation.state() == QVariantAnimation.Running
+        if is_animating:
+            for item in self.sequence_items:
+                item._set_char_width_fast(applied)
+        else:
+            for item in self.sequence_items:
+                item.set_char_width(applied)
         if self.sequence_items:
             applied = float(self.sequence_items[0].char_width)
         self.char_width = applied
-        self._update_scene_rect()
+        self._update_scene_rect(invalidate=not is_animating)
         if center_nt is not None:
             self._recenter_horizontally(center_nt, view_width_px)
-        self.scene.invalidate()
         self.viewport().update()
 
     def start_zoom_animation(self, target_char_width, center_nt, view_width_px=None):
@@ -80,7 +86,7 @@ class ZoomMixin:
             return
         self._zoom_center_nt = center_nt
         self._zoom_view_width_px = view_width_px
-        self._zoom_animation.setDuration(180)
+        self._zoom_animation.setDuration(120)
         self._zoom_animation.setStartValue(current)
         self._zoom_animation.setEndValue(target_char_width)
         self._zoom_animation.start()
@@ -149,8 +155,15 @@ class ZoomMixin:
         except Exception:
             pass
 
+    def _on_zoom_finished(self):
+        """Animasyon bitişinde ertelenen geometry değişikliklerini uygula."""
+        for item in self.sequence_items:
+            item.prepareGeometryChange()
+            item.update()
+        self._update_scene_rect()
+        self.viewport().update()
+
     def _current_trailing_padding(self):
-        from sequence_viewer.graphics.sequence_item.sequence_item import SequenceGraphicsItem
         if not self.sequence_items:
             return self.trailing_padding_text_px
         for item in self.sequence_items:
