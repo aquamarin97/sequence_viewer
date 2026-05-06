@@ -132,26 +132,14 @@ def _draw_arrow_annotation(painter, x, y, w, h, color, label,
     tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
     body_w = max(0.0, w - tip_w)
     style  = annotation_style_manager.get(ann_type)
-    if strand == "+":                                       # Düzeltilmiş
-        pts = [
-            QPointF(x,          y),
-            QPointF(x + body_w, y),
-            QPointF(x + w,      y + h),
-            QPointF(x,          y + h),
-        ]
-        label_x, label_w = x, body_w
-    else:
-        pts = [
-            QPointF(x + tip_w,  y),
-            QPointF(x + w,      y),
-            QPointF(x + w,      y + h),
-            QPointF(x,          y + h),
-        ]
-        label_x, label_w = x + tip_w, body_w
+    label_x = x if strand == "+" else x + tip_w
+    label_w = body_w
 
-    path = _rounded_poly_path(pts, _CORNER_RADIUS)
-    grad = _make_gradient(x, y, h, color, style.fill_alpha, _IS_DARK)
+    path = _cached_arrow_path(int(round(w)), int(round(h)), int(round(tip_w)), strand)
+    grad = _make_gradient(0, 0, h, color, style.fill_alpha, _IS_DARK)
 
+    painter.save()
+    painter.translate(x, y)
     painter.setBrush(QBrush(grad))
     if style.border_width > 0 and style.border_alpha > 0:
         painter.setPen(QPen(_make_border_color(color, style.border_alpha),
@@ -159,6 +147,7 @@ def _draw_arrow_annotation(painter, x, y, w, h, color, label,
     else:
         painter.setPen(Qt.NoPen)
     painter.drawPath(path)
+    painter.restore()
 
     if label_w >= style.label_min_width:
         _draw_label(painter, label_x, y, label_w, h, label, color,
@@ -213,15 +202,17 @@ def draw_repeated_region(painter, x, y, w, h, color, label, style_mode="default"
     if w <= 0:
         return
 
-    style   = annotation_style_manager.get(AnnotationType.REPEATED_REGION)
-    path = QPainterPath()
-    path.addRoundedRect(QRectF(x, y, w, h), _CORNER_RADIUS, _CORNER_RADIUS)
-    grad = _make_gradient(x, y, h, color, style.fill_alpha, _IS_DARK)
+    style = annotation_style_manager.get(AnnotationType.REPEATED_REGION)
+    path  = _cached_rect_path(int(round(w)), int(round(h)))
+    grad  = _make_gradient(0, 0, h, color, style.fill_alpha, _IS_DARK)
 
+    painter.save()
+    painter.translate(x, y)
     painter.setBrush(QBrush(grad))
     painter.setPen(QPen(_make_border_color(color, style.border_alpha),
                         style.border_width))
     painter.drawPath(path)
+    painter.restore()
 
     if w >= style.label_min_width:
         _draw_label(painter, x, y, w, h, label, color,
@@ -253,19 +244,18 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
     style = annotation_style_manager.get(AnnotationType.MISMATCH_MARKER)
 
     # Dikey padding â€” box lane kenarlarından görsel boşluk
-    box_y = y + _MM_V_PAD
-    box_h = max(1.0, h - 2 * _MM_V_PAD)
-    box_left = int(round(x))
-    box_top = int(round(box_y))
-    box_right = max(box_left + 1, int(round(x + w)))
-    box_bottom = max(box_top + 1, int(round(box_y + box_h)))
-    box_rect = QRectF(box_left, box_top, box_right - box_left, box_bottom - box_top)
+    box_y  = y + _MM_V_PAD
+    box_h  = max(1.0, h - 2 * _MM_V_PAD)
+    box_left   = int(round(x))
+    box_top    = int(round(box_y))
+    box_w_px   = max(1, int(round(x + w))       - box_left)
+    box_h_px   = max(1, int(round(box_y + box_h)) - box_top)
+    local_rect = QRectF(0.0, 0.0, box_w_px, box_h_px)
+
+    path = _cached_rect_path(box_w_px, box_h_px)
 
     painter.save()
-
-    path = QPainterPath()
-    path.addRoundedRect(box_rect, _CORNER_RADIUS, _CORNER_RADIUS)
-
+    painter.translate(box_left, box_top)
     painter.setBrush(QBrush(QColor(color)))
     painter.setPen(Qt.NoPen)   # Border yok; seçim durumunda draw_selection_outline kullanılır
     painter.drawPath(path)
@@ -290,31 +280,33 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
         font = _get_font(ff, int(round(effective_fs)), True)
         painter.setFont(font)
         painter.setPen(QPen(text_color))
-        ch = label[0]
-        # Point/baseline tabanlı çizim max zoom-out'ta alt-piksel snap nedeniyle
+        # Point/baseline tabanlı çizim max zoom-out’ta alt-piksel snap nedeniyle
         # hafif sola kaymış görünebiliyor; rect içi merkezleme daha kararlı.
-        painter.drawText(box_rect, Qt.AlignCenter, ch)
+        painter.drawText(local_rect, Qt.AlignCenter, label[0])
 
     painter.restore()
 
 
 # â”€â”€ Seçim ve hover outline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-def _build_primer_probe_path(x, y, w, h, strand, char_width):
-    tip_w  = min(max(2.0 * char_width, _MIN_TIP_PX), w)
-    body_w = max(0.0, w - tip_w)
+@lru_cache(maxsize=256)
+def _cached_arrow_path(w_px: int, h_px: int, tip_w_px: int, strand: str) -> QPainterPath:
+    body_w = float(w_px - tip_w_px)
+    w, h, tip = float(w_px), float(h_px), float(tip_w_px)
     if strand == "+":
-        pts = [QPointF(x, y), QPointF(x + body_w, y),
-               QPointF(x + w, y + h), QPointF(x, y + h)]
+        pts = [QPointF(0.0, 0.0), QPointF(body_w, 0.0),
+               QPointF(w, h), QPointF(0.0, h)]
     else:
-        pts = [QPointF(x + tip_w, y), QPointF(x + w, y),
-               QPointF(x + w, y + h), QPointF(x, y + h)]
+        pts = [QPointF(tip, 0.0), QPointF(w, 0.0),
+               QPointF(w, h), QPointF(0.0, h)]
     return _rounded_poly_path(pts, _CORNER_RADIUS)
 
 
-def _build_repeated_region_path(x, y, w, h):
+@lru_cache(maxsize=128)
+def _cached_rect_path(w_px: int, h_px: int) -> QPainterPath:
     path = QPainterPath()
-    path.addRoundedRect(QRectF(x, y, w, h), _CORNER_RADIUS, _CORNER_RADIUS)
+    path.addRoundedRect(QRectF(0.0, 0.0, float(w_px), float(h_px)),
+                        _CORNER_RADIUS, _CORNER_RADIUS)
     return path
 
 
@@ -348,38 +340,28 @@ def draw_selection_outline(painter, x, y, w, h, ann_type, base_color,
 
     # Mismatch marker: kutu sınırlarına tam oturan, taşmayan ince outline
     if ann_type == AnnotationType.MISMATCH_MARKER:
-        box_y = y + _MM_V_PAD
-        box_h = max(1.0, h - 2 * _MM_V_PAD)
-        path = _build_repeated_region_path(x, box_y, w, box_h)
-        halo_color, inner_color = _selection_colors(base_color)
-        painter.save()
-        painter.setBrush(Qt.NoBrush)
-        halo_pen = QPen(halo_color, 2.5)
-        halo_pen.setJoinStyle(Qt.RoundJoin)
-        painter.setPen(halo_pen)
-        painter.drawPath(path)
-        inner_pen = QPen(inner_color, 1.0)
-        inner_pen.setJoinStyle(Qt.RoundJoin)
-        painter.setPen(inner_pen)
-        painter.drawPath(path)
-        painter.restore()
-        return
-
-    if ann_type in (AnnotationType.PRIMER, AnnotationType.PROBE):
-        path = _build_primer_probe_path(x, y, w, h, strand, char_width)
+        box_y    = y + _MM_V_PAD
+        box_h    = max(1.0, h - 2 * _MM_V_PAD)
+        path     = _cached_rect_path(int(round(w)), int(round(box_h)))
+        tx, ty   = x, box_y
+    elif ann_type in (AnnotationType.PRIMER, AnnotationType.PROBE):
+        tip_w = min(max(2.0 * char_width, _MIN_TIP_PX), w)
+        path  = _cached_arrow_path(int(round(w)), int(round(h)), int(round(tip_w)), strand)
+        tx, ty = x, y
     else:
-        path = _build_repeated_region_path(x, y, w, h)
+        path   = _cached_rect_path(int(round(w)), int(round(h)))
+        tx, ty = x, y
 
     halo_color, inner_color = _selection_colors(base_color)
+    halo_w = 2.5 if ann_type == AnnotationType.MISMATCH_MARKER else 3.0
 
     painter.save()
+    painter.translate(tx, ty)
     painter.setBrush(Qt.NoBrush)
-    # Dış halo â€” annotation renginden türetilmiş geniş parlama
-    halo_pen = QPen(halo_color, 3.0)
+    halo_pen = QPen(halo_color, halo_w)
     halo_pen.setJoinStyle(Qt.RoundJoin)
     painter.setPen(halo_pen)
     painter.drawPath(path)
-    # ğç keskin çizgi â€” kontrast renk
     inner_pen = QPen(inner_color, 1.0)
     inner_pen.setJoinStyle(Qt.RoundJoin)
     painter.setPen(inner_pen)
@@ -396,9 +378,10 @@ def draw_hover_overlay(painter, x, y, w, h, ann_type, base_color,
     if w <= 0:
         return
     if ann_type in (AnnotationType.PRIMER, AnnotationType.PROBE):
-        path = _build_primer_probe_path(x, y, w, h, strand, char_width)
+        tip_w = min(max(2.0 * char_width, _MIN_TIP_PX), w)
+        path  = _cached_arrow_path(int(round(w)), int(round(h)), int(round(tip_w)), strand)
     else:
-        path = _build_repeated_region_path(x, y, w, h)
+        path = _cached_rect_path(int(round(w)), int(round(h)))
 
     # Hafif renk aydınlatma: annotation rengiyle uyumlu hover tonu
     h_f = base_color.hsvHueF()
@@ -410,6 +393,7 @@ def draw_hover_overlay(painter, x, y, w, h, ann_type, base_color,
                                min(1.0, base_color.valueF() + 0.15), 0.65)
 
     painter.save()
+    painter.translate(x, y)
     border_pen = QPen(border, 1.3)
     border_pen.setJoinStyle(Qt.RoundJoin)
     painter.setBrush(QBrush(overlay))
@@ -420,7 +404,14 @@ def draw_hover_overlay(painter, x, y, w, h, ann_type, base_color,
 
 # â”€â”€ Label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="Arial"):
+@lru_cache(maxsize=256)
+def _elided(label: str, font_family: str, font_size: int,
+            available_width_px: int) -> str:
+    font = _get_font(font_family, font_size, True)
+    return QFontMetrics(font).elidedText(label, Qt.ElideRight, available_width_px)
+
+
+def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family='Arial'):
     if not label or w < 4:
         return
     lum        = 0.299 * bg_color.red() + 0.587 * bg_color.green() + 0.114 * bg_color.blue()
@@ -428,11 +419,10 @@ def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="
     font       = _get_font(font_family, font_size, True)
     painter.setFont(font)
     painter.setPen(QPen(text_color))
-    metrics   = QFontMetrics(font)
     # Dikey: tam yükseklik â€” descender kırpılmasını önler; hizalama AlignVCenter üstlenir
     # Yatay: _LABEL_MARGIN ile iç boşluk
-    text_rect = QRectF(x + _LABEL_MARGIN, y, w - _LABEL_MARGIN * 2, h)
-    elided = metrics.elidedText(label, Qt.ElideRight, int(text_rect.width()))
+    text_rect  = QRectF(x + _LABEL_MARGIN, y, w - _LABEL_MARGIN * 2, h)
+    elided     = _elided(label, font_family, font_size, int(text_rect.width()))
     painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignHCenter, elided)
 
 
