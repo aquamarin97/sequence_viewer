@@ -2,6 +2,7 @@
 # features/annotation_layer/annotation_painter.py
 from __future__ import annotations
 import math
+from functools import lru_cache
 from PyQt5.QtCore import Qt, QRectF, QPointF
 from PyQt5.QtGui import (
     QPen, QBrush, QColor, QFont, QFontMetrics,
@@ -18,6 +19,12 @@ def _on_theme_changed(_=None) -> None:
     _IS_DARK = theme_manager.current.name == "dark"
 
 theme_manager.themeChanged.connect(_on_theme_changed)
+
+@lru_cache(maxsize=32)
+def _get_font(family: str, size: int, bold: bool) -> QFont:
+    font = QFont(family, max(6, size))
+    font.setBold(bold)
+    return font
 
 _LABEL_MARGIN = 6      # yatay iç boşluk (px)
 _MIN_TIP_PX   = 5.0
@@ -289,9 +296,7 @@ def draw_mismatch_marker(painter, x, y, w, h, color, label,
         else:
             effective_fs = max(6.0, base_fs * (10.0 / 12.0))
 
-        font = QFont(ff)
-        font.setPointSizeF(max(6.0, effective_fs))
-        font.setBold(True)
+        font = _get_font(ff, int(round(effective_fs)), True)
         painter.setFont(font)
         painter.setPen(QPen(text_color))
         ch = label[0]
@@ -429,8 +434,7 @@ def _draw_label(painter, x, y, w, h, label, bg_color, font_size=7, font_family="
         return
     lum        = 0.299 * bg_color.red() + 0.587 * bg_color.green() + 0.114 * bg_color.blue()
     text_color = _LABEL_TEXT_ON_DARK if lum < 140 else _LABEL_TEXT_ON_LIGHT
-    font       = QFont(font_family, max(6, font_size))
-    font.setBold(True)
+    font       = _get_font(font_family, font_size, True)
     painter.setFont(font)
     painter.setPen(QPen(text_color))
     metrics   = QFontMetrics(font)
