@@ -1,5 +1,6 @@
-# sequence_viewer/workspace/coordinators/annotation_presentation.py
 from __future__ import annotations
+
+# sequence_viewer/workspace/coordinators/annotation_presentation.py
 
 from collections import defaultdict
 from typing import TYPE_CHECKING
@@ -284,18 +285,13 @@ class WorkspaceAnnotationPresentation:
                 return True
         return False
 
-    def on_annotation_updated(self, *args) -> None:
-        annotation = args[-1] if args else None
-        if annotation is None:
-            self.on_annotation_changed()
-            return
+    def on_annotation_updated(self, row_index: int, annotation) -> None:
         items = self.ann_items.get(annotation.id, [])
         cached = self._ann_geo_cache.get(annotation.id)
         if not items or cached is None:
             self.on_annotation_changed()
             return
 
-        row_index = args[0] if args and isinstance(args[0], int) else cached[0]
         layout = self._ctx.layout_sync.compute_row_layout()
         if self._row_geometry_changed(row_index, layout):
             self.on_annotation_changed()

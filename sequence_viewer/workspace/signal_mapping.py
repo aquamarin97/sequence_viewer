@@ -1,5 +1,6 @@
-# sequence_viewer/workspace/signal_mapping.py
 from __future__ import annotations
+
+# sequence_viewer/workspace/signal_mapping.py
 
 from typing import TYPE_CHECKING, Callable
 
@@ -82,9 +83,7 @@ class WorkspaceSignalMapper:
         ctx.consensus_spacer.copyFastaRequested.connect(ctx.clipboard_controller.copy_consensus_fasta)
         ctx.sequence_viewer.rowClicked.connect(ctx.row_selection.on_seq_row_clicked)
         ctx.sequence_viewer.selectionChanged.connect(ctx.consensus_row.clear_selection)
-        ctx.sequence_viewer.selectionChanged.connect(
-            lambda: ctx.consensus_spacer.set_selected(False)
-        )
+        ctx.sequence_viewer.selectionChanged.connect(ctx.consensus_spacer.deselect)
         ctx.sequence_viewer.add_v_guide_observer(ctx.consensus_row.update)
         ctx.sequence_viewer.add_v_guide_observer(ctx.pos_ruler.update)
         ctx.consensus_row.annotationEditRequested.connect(

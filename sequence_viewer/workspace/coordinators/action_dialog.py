@@ -1,10 +1,14 @@
-# sequence_viewer/workspace/coordinators/action_dialog.py
 from __future__ import annotations
 
+# sequence_viewer/workspace/coordinators/action_dialog.py
+
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sequence_viewer.workspace.context import WorkspaceContext
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceActionDialogCoordinator:
@@ -23,8 +27,8 @@ class WorkspaceActionDialogCoordinator:
                 return
             try:
                 self._ctx.model.update_consensus_annotation(updated)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Consensus annotation update failed: %s", e)
 
     # Dialog acma
 
@@ -53,8 +57,8 @@ class WorkspaceActionDialogCoordinator:
                     self._ctx.model.update_annotation(row_index, updated)
                 else:
                     self._ctx.model.update_global_annotation(updated)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Annotation update failed: %s", e)
 
     # Header & model event handler'lari
 

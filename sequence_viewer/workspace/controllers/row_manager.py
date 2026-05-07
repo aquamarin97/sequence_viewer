@@ -1,5 +1,6 @@
-# sequence_viewer/workspace/controllers/row_manager.py
 from __future__ import annotations
+
+# sequence_viewer/workspace/controllers/row_manager.py
 
 from typing import TYPE_CHECKING
 

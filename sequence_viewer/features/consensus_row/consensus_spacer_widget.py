@@ -59,6 +59,9 @@ class ConsensusSpacerWidget(QWidget):
         self._selected = selected
         self.update()
 
+    def deselect(self) -> None:
+        self.set_selected(False)
+
     def paintEvent(self, event):
         if not self.isVisible() or self.height() == 0:
             return

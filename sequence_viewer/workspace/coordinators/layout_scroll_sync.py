@@ -1,9 +1,10 @@
-# sequence_viewer/workspace/coordinators/layout_scroll_sync.py
 from __future__ import annotations
+
+# sequence_viewer/workspace/coordinators/layout_scroll_sync.py
 
 from typing import TYPE_CHECKING
 
-from PyQt5.QtWidgets import QScrollBar
+from PyQt5.QtWidgets import QScrollBar, QWIDGETSIZE_MAX
 
 from sequence_viewer.features.annotation_layer.annotation_layout_engine import (
     partition_annotations_by_side,
@@ -108,14 +109,13 @@ class WorkspaceLayoutScrollSync:
         self._ctx.left_panel.update()
 
     def update_header_max_width(self) -> None:
-        big = 16_777_215
         if self._ctx.header_viewer.header_items:
             req = self._ctx.header_viewer.compute_required_width()
             self._ctx.header_viewer.setMaximumWidth(req)
             self._ctx.left_panel.setMaximumWidth(req)
         else:
-            self._ctx.header_viewer.setMaximumWidth(big)
-            self._ctx.left_panel.setMaximumWidth(big)
+            self._ctx.header_viewer.setMaximumWidth(QWIDGETSIZE_MAX)
+            self._ctx.left_panel.setMaximumWidth(QWIDGETSIZE_MAX)
             total = sum(self._ctx.splitter.sizes())
             if total > 0:
                 half = total // 2
