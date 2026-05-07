@@ -1,7 +1,7 @@
 # sequence_viewer/app/main_window.py
-from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow
+from pathlib import Path
 
-from sequence_viewer.app.fasta_loader import load_fasta_files
+from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow
 
 
 class MainWindow(QMainWindow):
@@ -11,6 +11,9 @@ class MainWindow(QMainWindow):
         self._theme_dev_dialog = None
         self._nucleotide_dev_dialog = None
         self._annotation_dev_dialog = None
+        # SQXReaders must stay open while their LazySequences are live.
+        self._sqx_readers: list = []
+        self._workers: list = []
         self.setWindowTitle("MSA Viewer")
         self.setCentralWidget(workspace)
         self._build_menu()
@@ -71,24 +74,67 @@ class MainWindow(QMainWindow):
     def _import_fasta_dialog(self):
         file_filter = "FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn *.aln);;All Files (*)"
         file_paths, _ = QFileDialog.getOpenFileNames(self, "FASTA Dosyasi Sec", "", file_filter)
-        if file_paths:
-            sequences = load_fasta_files(file_paths)
-            for header, sequence in sequences:
-                self.workspace.add_sequence(header, sequence)
+        for path in file_paths:
+            self._load_fasta_as_sqx(path, aligned=False)
 
     def _import_aligned_fasta_dialog(self):
         file_filter = "FASTA Files (*.fasta *.fa *.fna *.faa *.ffn *.frn *.aln);;All Files (*)"
         file_paths, _ = QFileDialog.getOpenFileNames(self, "Aligned FASTA Dosyasi Sec", "", file_filter)
-        if file_paths:
-            sequences = load_fasta_files(file_paths)
-            for header, sequence in sequences:
-                self.workspace.add_sequence(header, sequence)
-            if sequences:
-                from sequence_viewer.model.alignment_metadata import AlignmentMetadata
+        for path in file_paths:
+            self._load_fasta_as_sqx(path, aligned=True)
 
-                self.workspace.model.set_aligned(
-                    AlignmentMetadata(algorithm="imported", source="aligned FASTA file")
-                )
+    def _load_fasta_as_sqx(self, path_str: str, aligned: bool = False) -> None:
+        """Start SQX conversion if needed, then load in background."""
+        fasta_path = Path(path_str)
+        sqx_path = fasta_path.with_suffix('.sqx')
+
+        if sqx_path.exists():
+            self._start_load_worker(sqx_path, aligned)
+            return
+
+        from sequence_viewer.app.sqx_conversion_worker import SQXConversionWorker
+        worker = SQXConversionWorker(fasta_path, sqx_path)
+        worker.finished.connect(lambda p: self._start_load_worker(Path(p), aligned))
+        worker.failed.connect(lambda msg: print(f"SQX donusum hatasi: {msg}"))
+        self._register_worker(worker)
+        worker.start()
+
+    def _start_load_worker(self, sqx_path: Path, aligned: bool) -> None:
+        """Open and read .sqx in a background thread."""
+        from sequence_viewer.app.sqx_conversion_worker import SQXLoadWorker
+        worker = SQXLoadWorker(sqx_path)
+        worker.records_ready.connect(
+            lambda reader, records: self._on_records_loaded(reader, records, aligned)
+        )
+        worker.failed.connect(lambda msg: print(f"SQX yukleme hatasi: {msg}"))
+        self._register_worker(worker)
+        worker.start()
+
+    def _on_records_loaded(self, reader, records: list, aligned: bool) -> None:
+        """Called on main thread after SQXLoadWorker finishes."""
+        self._sqx_readers.append(reader)
+        self.workspace.model.append_records_bulk(records)
+        if aligned and records:
+            from sequence_viewer.model.alignment_metadata import AlignmentMetadata
+            self.workspace.model.set_aligned(
+                AlignmentMetadata(algorithm="imported", source="aligned FASTA file")
+            )
+
+    def _register_worker(self, worker) -> None:
+        self._workers.append(worker)
+        worker.finished.connect(
+            lambda: self._workers.remove(worker) if worker in self._workers else None
+        )
+
+    def closeEvent(self, event):
+        for worker in self._workers:
+            worker.quit()
+            worker.wait()
+        self._workers.clear()
+        for reader in self._sqx_readers:
+            reader.close()
+        self._sqx_readers.clear()
+        super().closeEvent(event)
 
     def _toggle_dark_mode(self):
         from sequence_viewer.settings.theme import theme_manager

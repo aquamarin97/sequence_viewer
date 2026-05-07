@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from sequence_viewer.features.sequence_viewer.sequence_viewer_zoom_controller import SequenceViewerZoomController; print\\('OK'\\)\")"
+    ]
+  }
+}

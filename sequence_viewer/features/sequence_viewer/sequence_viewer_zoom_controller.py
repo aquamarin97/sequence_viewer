@@ -64,9 +64,13 @@ class SequenceViewerZoomController:
 
         center_nt = self._model.get_selection_center_nt()
         if center_nt is None:
-            old_left_px = float(self._view.horizontalScrollBar().value())
-            cursor_x = float(event.pos().x())
-            center_nt = (old_left_px + cursor_x) / current_cw
+            caret = getattr(self._view, '_caret', None)
+            if caret is not None:
+                center_nt = float(caret[0])
+            else:
+                old_left_px = float(self._view.horizontalScrollBar().value())
+                cursor_x = float(event.pos().x())
+                center_nt = (old_left_px + cursor_x) / current_cw
 
         target_cw = self._compute_target_char_width(current_cw, steps, direction)
         if abs(target_cw - current_cw) < 0.0001:

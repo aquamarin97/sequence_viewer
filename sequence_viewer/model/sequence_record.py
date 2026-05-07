@@ -3,13 +3,16 @@
 from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional, Union
 from sequence_viewer.model.annotation import Annotation
+
+if TYPE_CHECKING:
+    from sequence_viewer.model.lazy_sequence import LazySequence
 
 @dataclass
 class SequenceRecord:
     header:      str
-    sequence:    str
+    sequence:    Union[str, 'LazySequence']
     id:          str                = field(default_factory=lambda: str(uuid.uuid4()))
     annotations: List[Annotation]  = field(default_factory=list)
 

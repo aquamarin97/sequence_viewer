@@ -1,6 +1,11 @@
 # sequence_viewer/model/alignment_data_model.py
 from __future__ import annotations
 from copy import deepcopy
+
+
+def _to_str(seq) -> str:
+    """Return seq as a plain str regardless of whether it is a str or LazySequence."""
+    return seq.to_str() if hasattr(seq, 'to_str') else seq
 from dataclasses import dataclass
 from typing import List, Optional
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -62,10 +67,11 @@ class AlignmentDataModel(QObject):
 
     def row_count(self): return len(self._rows)
     def get_row(self, index):
-        r = self._rows[index]; return r.header, r.sequence
+        r = self._rows[index]
+        return r.header, _to_str(r.sequence)
     def get_header(self, index): return self._rows[index].header
-    def get_sequence(self, index): return self._rows[index].sequence
-    def all_rows(self): return [(r.header, r.sequence) for r in self._rows]
+    def get_sequence(self, index): return _to_str(self._rows[index].sequence)
+    def all_rows(self): return [(r.header, _to_str(r.sequence)) for r in self._rows]
     @property
     def max_sequence_length(self):
         if not self._rows: return 0
@@ -77,8 +83,13 @@ class AlignmentDataModel(QObject):
         record = SequenceRecord(header=header, sequence=sequence)
         index = len(self._rows)
         self._rows.append(record)
-        self.rowAppended.emit(index, header, sequence)
+        self.rowAppended.emit(index, header, _to_str(sequence))
         return index
+
+    def append_records_bulk(self, records: list) -> None:
+        """Append multiple SequenceRecords at once; emit modelReset once instead of per-row signals."""
+        self._rows.extend(records)
+        self.modelReset.emit()
 
     def remove_row(self, index):
         if index < 0 or index >= len(self._rows):
