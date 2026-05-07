@@ -48,11 +48,11 @@ class WorkspaceSignalMapper:
         ctx = self._ctx
         ctx.model.annotationAdded.connect(ctx.annotation_presentation.on_annotation_changed)
         ctx.model.annotationRemoved.connect(ctx.annotation_presentation.on_annotation_changed)
-        ctx.model.annotationUpdated.connect(ctx.annotation_presentation.on_annotation_changed)
+        ctx.model.annotationUpdated.connect(ctx.annotation_presentation.on_annotation_updated)
         ctx.model.annotationsReset.connect(ctx.annotation_presentation.on_annotation_changed)
-        ctx.annotation_layer.annotationClicked.connect(ctx.action_dialogs.on_annotation_layer_clicked)
+        ctx.annotation_layer.annotationClicked.connect(ctx.annotation_selection.on_annotation_layer_clicked)
         ctx.annotation_layer.annotationDoubleClicked.connect(
-            ctx.action_dialogs.on_annotation_layer_double_clicked
+            ctx.annotation_selection.on_annotation_layer_double_clicked
         )
         ctx.annotation_spacer.sync_height(ctx.annotation_layer.height())
 
@@ -64,23 +64,23 @@ class WorkspaceSignalMapper:
         ctx.model.headerChanged.connect(ctx.action_dialogs.on_header_changed)
         ctx.model.modelReset.connect(self._on_model_reset)
         ctx.model.alignmentStateChanged.connect(self._on_alignment_state_changed)
-        ctx.model.consensusAnnotationAdded.connect(lambda _ann: ctx.layout_sync.sync_consensus_visibility())
-        ctx.model.consensusAnnotationRemoved.connect(lambda _ann_id: ctx.layout_sync.sync_consensus_visibility())
-        ctx.model.consensusAnnotationUpdated.connect(lambda _ann: ctx.layout_sync.sync_consensus_visibility())
+        ctx.model.consensusAnnotationAdded.connect(ctx.layout_sync.on_consensus_annotation_changed)
+        ctx.model.consensusAnnotationRemoved.connect(ctx.layout_sync.on_consensus_annotation_changed)
+        ctx.model.consensusAnnotationUpdated.connect(ctx.layout_sync.on_consensus_annotation_changed)
 
     def _connect_header_signals(self) -> None:
         ctx = self._ctx
         ctx.header_viewer.headerEdited.connect(ctx.action_dialogs.on_header_edited)
         ctx.header_viewer.rowMoveRequested.connect(ctx.action_dialogs.on_row_move_requested)
         ctx.header_viewer.rowsDeleteRequested.connect(ctx.action_dialogs.on_rows_delete_requested)
-        ctx.header_viewer.selectionChanged.connect(ctx.action_dialogs.on_selection_changed)
+        ctx.header_viewer.selectionChanged.connect(ctx.row_selection.on_selection_changed)
 
     def _connect_consensus_signals(self) -> None:
         ctx = self._ctx
-        ctx.consensus_spacer.clicked.connect(ctx.action_dialogs.on_consensus_spacer_clicked)
+        ctx.consensus_spacer.clicked.connect(ctx.row_selection.on_consensus_spacer_clicked)
         ctx.consensus_spacer.copySequenceRequested.connect(ctx.clipboard_controller.copy_consensus_sequence)
         ctx.consensus_spacer.copyFastaRequested.connect(ctx.clipboard_controller.copy_consensus_fasta)
-        ctx.sequence_viewer.rowClicked.connect(ctx.action_dialogs.on_seq_row_clicked)
+        ctx.sequence_viewer.rowClicked.connect(ctx.row_selection.on_seq_row_clicked)
         ctx.sequence_viewer.selectionChanged.connect(ctx.consensus_row.clear_selection)
         ctx.sequence_viewer.selectionChanged.connect(
             lambda: ctx.consensus_spacer.set_selected(False)
@@ -94,14 +94,14 @@ class WorkspaceSignalMapper:
             self._clear_workspace_annotation_selection
         )
         ctx.consensus_row.spacerSelectionChanged.connect(ctx.consensus_spacer.set_selected)
-        ctx.consensus_row.coordinatorRefreshRequested.connect(ctx.action_dialogs._apply_union_selection)
+        ctx.consensus_row.coordinatorRefreshRequested.connect(ctx.annotation_selection.apply_union_selection)
         ctx.consensus_row.copySequenceRequested.connect(ctx.clipboard_controller.copy_consensus_sequence)
         ctx.consensus_row.copyFastaRequested.connect(ctx.clipboard_controller.copy_consensus_fasta)
         ctx.consensus_row.deleteAnnotationsRequested.connect(
             ctx.command_controller.delete_consensus_annotations_with_undo
         )
         ctx.consensus_row.headerClearRequested.connect(self._clear_header_selection_for_consensus)
-        ctx.consensus_row.spacerSyncRequested.connect(self._sync_consensus_spacer)
+        ctx.consensus_row.spacerSyncRequested.connect(ctx.layout_sync.sync_consensus_spacer)
         ctx.consensus_row.positionRulerRefreshRequested.connect(ctx.pos_ruler.update)
 
     def _connect_theme_and_settings_signals(self) -> None:
@@ -113,15 +113,11 @@ class WorkspaceSignalMapper:
         theme_manager.themeChanged.connect(ctx.style_applier.on_theme_changed)
         ctx.style_applier.on_theme_changed(theme_manager.current)
         display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
-        display_settings_manager.displaySettingsChanged.connect(
-            lambda: ctx.layout_sync.sync_consensus_visibility()
-        )
+        display_settings_manager.displaySettingsChanged.connect(ctx.layout_sync.sync_consensus_visibility)
         annotation_style_manager.stylesChanged.connect(
             ctx.annotation_presentation.on_annotation_changed
         )
-        annotation_style_manager.stylesChanged.connect(
-            lambda: ctx.layout_sync.sync_consensus_visibility()
-        )
+        annotation_style_manager.stylesChanged.connect(ctx.layout_sync.sync_consensus_visibility)
 
     def _connect_zoom_and_selection_signals(self) -> None:
         ctx = self._ctx
@@ -141,30 +137,17 @@ class WorkspaceSignalMapper:
 
     def _clear_workspace_annotation_selection(self) -> None:
         ctx = self._ctx
-        if ctx.action_dialogs._selected_annotations:
-            ctx.action_dialogs._selected_annotations.clear()
-            ctx.action_dialogs._clear_all_annotation_visuals()
+        if ctx.annotation_selection.has_selected_annotations():
+            ctx.annotation_selection.clear_selected_annotations()
+            ctx.annotation_selection.clear_all_annotation_visuals()
 
     def _clear_header_selection_for_consensus(self) -> None:
         ctx = self._ctx
         ctx.consensus_spacer.set_selected(True)
-        changed = ctx.header_viewer.selection.clear()
+        changed = ctx.header_viewer.clear_selection()
         ctx.header_viewer.apply_selection_to_items(changed)
         ctx.sequence_viewer.clear_h_guides()
         for item in ctx.sequence_viewer.sequence_items:
             item.clear_selection()
         ctx.sequence_viewer.scene.invalidate()
         ctx.sequence_viewer.viewport().update()
-
-    def _sync_consensus_spacer(self, height: int, visible: bool, above_h: float, char_h: float) -> None:
-        ctx = self._ctx
-        ctx.consensus_spacer.setFixedHeight(height if visible else 0)
-        ctx.consensus_spacer.setVisible(visible)
-        if visible:
-            ctx.consensus_spacer.sync_seq_region(above_h, char_h)
-        ctx.consensus_spacer.updateGeometry()
-        if ctx.left_panel.layout() is not None:
-            ctx.left_panel.layout().invalidate()
-            ctx.left_panel.layout().activate()
-        ctx.left_panel.updateGeometry()
-        ctx.left_panel.update()

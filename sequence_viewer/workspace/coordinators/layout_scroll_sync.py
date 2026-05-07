@@ -72,16 +72,34 @@ class WorkspaceLayoutScrollSync:
         cs = self._ctx.consensus_spacer
         cr_active = not cr.isHidden() and cr.height() > 0
         if not cr_active and self._ctx.model.is_aligned:
-            cr._update_visibility()
+            cr.update_visibility()
             cr_active = not cr.isHidden() and cr.height() > 0
         if cr_active:
             cs.setFixedHeight(cr.height())
             cs.setVisible(True)
-            above_h, ch, _below_h = cr._compute_heights()
+            above_h, ch, _below_h = cr.compute_heights()
             cs.sync_seq_region(float(above_h), float(ch))
         else:
             cs.setFixedHeight(0)
             cs.setVisible(False)
+        cs.updateGeometry()
+        if self._ctx.left_panel.layout() is not None:
+            self._ctx.left_panel.layout().invalidate()
+            self._ctx.left_panel.layout().activate()
+        self._ctx.left_panel.updateGeometry()
+        self._ctx.left_panel.update()
+
+    def on_consensus_annotation_changed(self, *_) -> None:
+        self.sync_consensus_visibility()
+
+    def sync_consensus_spacer(
+        self, height: int, visible: bool, above_h: float, char_h: float
+    ) -> None:
+        cs = self._ctx.consensus_spacer
+        cs.setFixedHeight(height if visible else 0)
+        cs.setVisible(visible)
+        if visible:
+            cs.sync_seq_region(above_h, char_h)
         cs.updateGeometry()
         if self._ctx.left_panel.layout() is not None:
             self._ctx.left_panel.layout().invalidate()

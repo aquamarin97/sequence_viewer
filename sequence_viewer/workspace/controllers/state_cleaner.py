@@ -23,7 +23,7 @@ class WorkspaceStateCleaner:
     def clear_all_interaction_state(self) -> None:
         """Undo geri yükleme sonrasında tüm etkileşim state'ini sıfırlar."""
         ctx = self._ctx
-        ctx.action_dialogs.clear_selected_annotations()
+        ctx.annotation_selection.clear_selected_annotations()
         ctx.annotation_presentation.clear_annotation_selection()
         ctx.annotation_layer.clear_annotation_selection()
         ctx.sequence_viewer.clear_interaction_state()
@@ -34,7 +34,7 @@ class WorkspaceStateCleaner:
     def clear_annotation_delete_state(self) -> None:
         """Annotation silme mutation'ı sırasında ilgili state'i temizler."""
         ctx = self._ctx
-        ctx.action_dialogs.clear_selected_annotations()
+        ctx.annotation_selection.clear_selected_annotations()
         ctx.annotation_presentation.clear_annotation_selection()
         ctx.annotation_layer.clear_annotation_selection()
         ctx.sequence_viewer.clear_interaction_state()

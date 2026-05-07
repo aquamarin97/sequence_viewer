@@ -96,7 +96,7 @@ class ConsensusRowWidget(QWidget):
             self._alignment_model.consensusAnnotationRemoved,
             self._alignment_model.consensusAnnotationUpdated,
         ):
-            sig.connect(lambda _: self._update_visibility())
+            sig.connect(self.update_visibility)
         self._alignment_model.alignmentStateChanged.connect(self._on_alignment_changed)
 
         # ── Viewer sinyal bağlantıları ───────────────────────────────────
@@ -119,7 +119,7 @@ class ConsensusRowWidget(QWidget):
             pass
         try:
             from sequence_viewer.settings.annotation_styles import annotation_style_manager as _asm2
-            _asm2.stylesChanged.connect(self._update_visibility)
+            _asm2.stylesChanged.connect(self.update_visibility)
         except Exception:
             pass
 
@@ -256,6 +256,9 @@ class ConsensusRowWidget(QWidget):
         above_anns, below_anns = partition_annotations_by_side(annotations)
         return side_strip_height(above_anns), ch, side_strip_height(below_anns)
 
+    def compute_heights(self) -> tuple[float, float, float]:
+        return self._compute_heights()
+
     def _update_visibility(self):
         if self._alignment_model.is_aligned:
             above_h, ch, below_h = self._compute_heights()
@@ -269,6 +272,9 @@ class ConsensusRowWidget(QWidget):
             self._sync_spacer(0.0, float(int(round(self._sequence_viewer.char_height))))
         self.updateGeometry()
         self.update()
+
+    def update_visibility(self, *_) -> None:
+        self._update_visibility()
 
     def _sync_spacer(self, above_h: float, char_h: float):
         self.spacerSyncRequested.emit(self.height(), self.height() > 0, float(above_h), float(char_h))

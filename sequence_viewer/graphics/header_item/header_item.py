@@ -54,6 +54,9 @@ class HeaderRowItem(QGraphicsItem):
     def set_row_index(self, index):
         if self.row_index == index: return
         self.row_index = index; self.update()
+    def set_full_text(self, text):
+        if self._model.full_text == text: return
+        self._model.full_text = text; self.update()
     def set_width(self, width):
         if abs(width - self.width) < 0.5: return
         self.prepareGeometryChange(); self.width = float(width); self.update()
@@ -142,5 +145,4 @@ class HeaderRowItem(QGraphicsItem):
             painter.drawLine(int(0), int(below_top + below_h) - 1, int(total_w), int(below_top + below_h) - 1)
 
         painter.restore()
-
 

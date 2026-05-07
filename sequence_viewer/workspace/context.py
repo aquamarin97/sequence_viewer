@@ -13,7 +13,7 @@ olarak kalır.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QSplitter, QWidget
@@ -50,6 +50,15 @@ if TYPE_CHECKING:
         WorkspaceAnnotationPresentation,
     )
     from sequence_viewer.workspace.coordinators.layout_scroll_sync import WorkspaceLayoutScrollSync
+    from sequence_viewer.workspace.coordinators.selection.annotation_selection_coordinator import (
+        WorkspaceAnnotationSelectionCoordinator,
+    )
+    from sequence_viewer.workspace.coordinators.selection.row_selection_coordinator import (
+        WorkspaceRowSelectionCoordinator,
+    )
+    from sequence_viewer.workspace.coordinators.selection.selection_state import (
+        WorkspaceSelectionState,
+    )
     from sequence_viewer.workspace.styling.style_applier import WorkspaceStyleApplier
 
 
@@ -70,26 +79,29 @@ class WorkspaceContext:
         self.root_widget: QWidget = root_widget
 
         # ── Model katmanı ────────────────────────────────────────────────
-        self.model: AlignmentDataModel = None  # type: ignore[assignment]
-        self.undo_stack: UndoStack = None  # type: ignore[assignment]
+        self.model: Optional[AlignmentDataModel] = None
+        self.undo_stack: Optional[UndoStack] = None
 
         # ── UI widget'ları (WorkspaceLayoutManager.setup_ui tarafından doldurulur) ──
-        self.sequence_viewer: SequenceViewerWidget = None  # type: ignore[assignment]
-        self.header_viewer: HeaderViewerWidget = None  # type: ignore[assignment]
-        self.annotation_layer: AnnotationLayerWidget = None  # type: ignore[assignment]
-        self.consensus_row: ConsensusRowWidget = None  # type: ignore[assignment]
-        self.consensus_spacer: ConsensusSpacerWidget = None  # type: ignore[assignment]
-        self.annotation_spacer: AnnotationSpacerWidget = None  # type: ignore[assignment]
-        self.splitter: QSplitter = None  # type: ignore[assignment]
-        self.left_panel: QWidget = None  # type: ignore[assignment]
-        self.ruler: RulerWidget = None  # type: ignore[assignment]
-        self.pos_ruler: SequencePositionRulerWidget = None  # type: ignore[assignment]
+        self.sequence_viewer: Optional[SequenceViewerWidget] = None
+        self.header_viewer: Optional[HeaderViewerWidget] = None
+        self.annotation_layer: Optional[AnnotationLayerWidget] = None
+        self.consensus_row: Optional[ConsensusRowWidget] = None
+        self.consensus_spacer: Optional[ConsensusSpacerWidget] = None
+        self.annotation_spacer: Optional[AnnotationSpacerWidget] = None
+        self.splitter: Optional[QSplitter] = None
+        self.left_panel: Optional[QWidget] = None
+        self.ruler: Optional[RulerWidget] = None
+        self.pos_ruler: Optional[SequencePositionRulerWidget] = None
 
         # ── Coordinator'lar & controller'lar (workspace.__init__ tarafından doldurulur) ──
-        self.layout_sync: WorkspaceLayoutScrollSync = None  # type: ignore[assignment]
-        self.annotation_presentation: WorkspaceAnnotationPresentation = None  # type: ignore[assignment]
-        self.action_dialogs: WorkspaceActionDialogCoordinator = None  # type: ignore[assignment]
-        self.clipboard_controller: WorkspaceClipboardController = None  # type: ignore[assignment]
-        self.command_controller: WorkspaceCommandController = None  # type: ignore[assignment]
-        self.keyboard_controller: WorkspaceKeyboardController = None  # type: ignore[assignment]
-        self.style_applier: WorkspaceStyleApplier = None  # type: ignore[assignment]
+        self.layout_sync: Optional[WorkspaceLayoutScrollSync] = None
+        self.annotation_presentation: Optional[WorkspaceAnnotationPresentation] = None
+        self.action_dialogs: Optional[WorkspaceActionDialogCoordinator] = None
+        self.selection_state: Optional[WorkspaceSelectionState] = None
+        self.annotation_selection: Optional[WorkspaceAnnotationSelectionCoordinator] = None
+        self.row_selection: Optional[WorkspaceRowSelectionCoordinator] = None
+        self.clipboard_controller: Optional[WorkspaceClipboardController] = None
+        self.command_controller: Optional[WorkspaceCommandController] = None
+        self.keyboard_controller: Optional[WorkspaceKeyboardController] = None
+        self.style_applier: Optional[WorkspaceStyleApplier] = None

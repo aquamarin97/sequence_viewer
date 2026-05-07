@@ -16,6 +16,23 @@ class SequenceViewerModel:
             self.max_sequence_length = len(sequence)
         return len(self._sequences) - 1
 
+    def remove_sequence(self, index):
+        if index < 0 or index >= len(self._sequences):
+            raise IndexError(f"Sequence index {index} out of range")
+        del self._sequences[index]
+        self.recalc_max_sequence_length()
+        self.clear_selection()
+
+    def move_sequence(self, from_index, to_index):
+        n = len(self._sequences)
+        if not (0 <= from_index < n and 0 <= to_index < n):
+            raise IndexError("move_sequence out of range")
+        if from_index == to_index:
+            return
+        sequence = self._sequences.pop(from_index)
+        self._sequences.insert(to_index, sequence)
+        self.clear_selection()
+
     def clear_sequences(self):
         self._sequences.clear(); self.max_sequence_length = 0; self.clear_selection()
 
@@ -62,5 +79,4 @@ class SequenceViewerModel:
     def _clamp_column_index(self, col):
         if self.max_sequence_length <= 0: return None
         return max(0, min(col, self.max_sequence_length - 1))
-
 

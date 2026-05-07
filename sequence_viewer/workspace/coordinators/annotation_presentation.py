@@ -152,8 +152,8 @@ class WorkspaceAnnotationPresentation:
                 row_index=row_index,
                 ann_width=ann_width,
                 ann_height=ann_h,
-                on_click=self._ctx.action_dialogs.on_ann_item_clicked,
-                on_double_click=self._ctx.action_dialogs.on_ann_item_double_clicked,
+                on_click=self._ctx.annotation_selection.on_ann_item_clicked,
+                on_double_click=self._ctx.annotation_selection.on_ann_item_double_clicked,
             )
             item.setPos(scene_x, scene_y)
             scene.addItem(item)
@@ -225,6 +225,102 @@ class WorkspaceAnnotationPresentation:
                     item.update_size(width, ann_h)
 
     # ── Signal handler'ları ───────────────────────────────────────────────
+
+    def _compute_row_annotation_geometry(self, row_index: int, layout: RowLayout) -> dict:
+        if row_index < 0 or row_index >= layout.row_count:
+            return {}
+        anns = list(self._ctx.model.get_record(row_index).annotations)
+        if not anns:
+            return {}
+
+        above_anns, below_anns = partition_annotations_by_side(anns)
+        above_geometry = build_side_geometry(above_anns)
+        below_geometry = build_side_geometry(below_anns)
+        assignment = {}
+        assignment.update(above_geometry.lane_assignment)
+        assignment.update(below_geometry.lane_assignment)
+        parent_lookup = {ann.id: ann for ann in anns}
+        ann_h = float(annotation_style_manager.get_lane_height())
+
+        result = {}
+        for ann in anns:
+            parent = parent_lookup.get(ann.parent_id)
+            is_above = (
+                parent.type.is_above_sequence()
+                if ann.type == AnnotationType.MISMATCH_MARKER and parent is not None
+                else ann.type.is_above_sequence()
+            )
+            geometry = above_geometry if is_above else below_geometry
+            lane = assignment.get(ann.id, 0)
+            if ann.type == AnnotationType.MISMATCH_MARKER:
+                parent_lane = assignment.get(ann.parent_id, 0)
+                side_y = geometry.marker_y(parent_lane, above=is_above, lane_height=ann_h)
+            else:
+                side_y = geometry.parent_y(lane, above=is_above, lane_height=ann_h)
+            scene_y = float(
+                layout.y_offsets[row_index] if is_above else layout.below_y_offsets[row_index]
+            ) + side_y
+            result[ann.id] = (
+                row_index,
+                scene_y,
+                ann.type == AnnotationType.MISMATCH_MARKER,
+                ann.start,
+                ann.length(),
+            )
+        return result
+
+    def _row_geometry_changed(self, row_index: int, layout: RowLayout) -> bool:
+        row_geometry = self._compute_row_annotation_geometry(row_index, layout)
+        if not row_geometry:
+            return True
+        for ann_id, (row, scene_y, is_marker, _start, _length) in row_geometry.items():
+            cached = self._ann_geo_cache.get(ann_id)
+            if cached is None:
+                return True
+            cached_row, cached_y, cached_is_marker, _cached_start, _cached_length = cached
+            if row != cached_row or is_marker != cached_is_marker:
+                return True
+            if abs(float(scene_y) - float(cached_y)) > 0.01:
+                return True
+        return False
+
+    def on_annotation_updated(self, *args) -> None:
+        annotation = args[-1] if args else None
+        if annotation is None:
+            self.on_annotation_changed()
+            return
+        items = self.ann_items.get(annotation.id, [])
+        cached = self._ann_geo_cache.get(annotation.id)
+        if not items or cached is None:
+            self.on_annotation_changed()
+            return
+
+        row_index = args[0] if args and isinstance(args[0], int) else cached[0]
+        layout = self._ctx.layout_sync.compute_row_layout()
+        if self._row_geometry_changed(row_index, layout):
+            self.on_annotation_changed()
+            return
+
+        cw = float(self._ctx.sequence_viewer.current_char_width())
+        ann_h = float(annotation_style_manager.get_lane_height())
+        row_geometry = self._compute_row_annotation_geometry(row_index, layout)
+        if annotation.id not in row_geometry:
+            self.on_annotation_changed()
+            return
+        row_index, scene_y, is_marker, start, length = row_geometry[annotation.id]
+        scene_x = start * cw
+        ann_width = cw if is_marker else length * cw
+        for item in items:
+            item.update_annotation(annotation)
+            item.setPos(scene_x, scene_y)
+            item.update_size(ann_width, ann_h)
+        self._ann_geo_cache[annotation.id] = (
+            row_index,
+            scene_y,
+            is_marker,
+            start,
+            length,
+        )
 
     def on_annotation_changed(self, *_) -> None:
         layout = self._ctx.layout_sync.compute_row_layout()

@@ -40,7 +40,6 @@ class WorkspaceCommandController:
     def _mutate_delete_rows(self, rows) -> None:
         for row in rows:
             try:
-                self._ctx.header_viewer.deselect_row(row)
                 self._ctx.model.remove_row(row)
             except IndexError:
                 pass
@@ -82,6 +81,5 @@ class WorkspaceCommandController:
         for ann_id in ann_ids:
             try:
                 self._ctx.model.remove_consensus_annotation(ann_id)
-            except (KeyError, Exception):
+            except (KeyError, ValueError):
                 pass
-

@@ -50,6 +50,10 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self._h = float(ann_height)
         self.update()
 
+    def update_annotation(self, annotation):
+        self.annotation = annotation
+        self.update()
+
     def set_selected_visual(self, selected):
         if self._selected == selected:
             return

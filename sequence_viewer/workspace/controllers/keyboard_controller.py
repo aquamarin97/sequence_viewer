@@ -45,14 +45,14 @@ class WorkspaceKeyboardController:
 
     def _handle_delete(self, event) -> bool:
         ctx = self._ctx
-        has_coord = ctx.action_dialogs.has_selected_annotations()
+        has_coord = ctx.annotation_selection.has_selected_annotations()
         has_cons = ctx.consensus_row.has_selected_annotations()
 
         if not (has_coord or has_cons):
             return False
 
         if has_coord:
-            selected = ctx.action_dialogs.get_selected_annotations()
+            selected = ctx.annotation_selection.get_selected_annotations()
             ctx.command_controller.delete_annotations_with_undo(selected)
 
         if has_cons:

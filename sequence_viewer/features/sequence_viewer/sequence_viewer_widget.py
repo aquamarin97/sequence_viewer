@@ -41,6 +41,33 @@ class SequenceViewerWidget(SequenceViewerView):
     def add_sequence(self, sequence_string):
         self._controller.add_sequence(sequence_string)
 
+    def remove_sequence(self, index: int) -> None:
+        self._model.remove_sequence(index)
+        item = self.sequence_items.pop(index)
+        if item.scene() is not None:
+            self.scene.removeItem(item)
+        self._renumber_sequence_items(start=index)
+        self._update_scene_rect()
+        self.viewport().update()
+
+    def move_sequence(self, from_index: int, to_index: int) -> None:
+        self._model.move_sequence(from_index, to_index)
+        if from_index == to_index:
+            return
+        item = self.sequence_items.pop(from_index)
+        self.sequence_items.insert(to_index, item)
+        self._renumber_sequence_items(start=min(from_index, to_index))
+        self._reposition_items()
+        self._update_scene_rect()
+        self.viewport().update()
+
+    def _renumber_sequence_items(self, *, start: int = 0) -> None:
+        for row_index in range(max(0, start), len(self.sequence_items)):
+            item = self.sequence_items[row_index]
+            item.row_index = row_index
+            item.set_row_highlighted(row_index in self._h_guide_rows)
+            item.update()
+
     def clear(self):
         self._controller.clear()
 
@@ -49,6 +76,15 @@ class SequenceViewerWidget(SequenceViewerView):
 
     def get_selection_column_range(self):
         return self._model.get_selection_column_range()
+
+    def start_selection(self, row: int, col: int) -> bool:
+        return self._model.start_selection(row, col)
+
+    def update_selection(self, row: int, col: int):
+        return self._model.update_selection(row, col)
+
+    def clear_selection_model(self) -> None:
+        self._model.clear_selection()
 
     def get_sequences(self):
         return self._model.get_sequences()

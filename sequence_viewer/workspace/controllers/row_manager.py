@@ -1,11 +1,16 @@
 # sequence_viewer/workspace/controllers/row_manager.py
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sequence_viewer.model.alignment_data_model import AlignmentDataModel
+
 
 class WorkspaceRowManager:
     """Owns row-level model mutations."""
 
-    def __init__(self, model):
+    def __init__(self, model: "AlignmentDataModel") -> None:
         self._model = model
 
     def add_sequence(self, header, sequence) -> None:
@@ -19,4 +24,3 @@ class WorkspaceRowManager:
 
     def set_header(self, index, new_header) -> None:
         self._model.set_header(index, new_header)
-

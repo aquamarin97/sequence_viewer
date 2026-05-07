@@ -1,12 +1,13 @@
 # sequence_viewer/workspace/workspace.py
 from __future__ import annotations
 
+from typing import Optional
+
 from PyQt5.QtCore import QEvent
 from PyQt5.QtWidgets import QWidget
 
 from sequence_viewer.model.alignment_data_model import AlignmentDataModel
 from sequence_viewer.model.undo_stack import UndoStack
-from sequence_viewer.settings.display_settings_manager import display_settings_manager
 from sequence_viewer.workspace.context import WorkspaceContext
 from sequence_viewer.workspace.controllers import (
     WorkspaceAnnotationManager,
@@ -18,18 +19,25 @@ from sequence_viewer.workspace.controllers import (
 from sequence_viewer.workspace.coordinators import (
     WorkspaceActionDialogCoordinator,
     WorkspaceAnnotationPresentation,
+    WorkspaceAnnotationSelectionCoordinator,
     WorkspaceLayoutScrollSync,
+    WorkspaceRowSelectionCoordinator,
+    WorkspaceSelectionState,
 )
 from sequence_viewer.workspace.signal_mapping import WorkspaceSignalMapper
 from sequence_viewer.workspace.styling import WorkspaceStyleApplier
 from sequence_viewer.workspace.ui import WorkspaceLayoutManager
 
+_DEFAULT_CHAR_HEIGHT = 20
+
 
 class SequenceWorkspaceWidget(QWidget):
-    def __init__(self, parent=None, char_width=12.0, char_height=None):
+    def __init__(
+        self, parent=None, char_width=12.0, char_height: Optional[float] = None
+    ):
         super().__init__(parent)
         if char_height is None:
-            char_height = display_settings_manager.sequence_char_height
+            char_height = _DEFAULT_CHAR_HEIGHT
         row_height = int(round(char_height))
 
         # ── Bağımlılık konteyneri ────────────────────────────────────────
@@ -42,9 +50,12 @@ class SequenceWorkspaceWidget(QWidget):
         WorkspaceLayoutManager(self, char_width=char_width, row_height=row_height).setup_ui(ctx)
 
         # ── Coordinator'lar ──────────────────────────────────────────────
+        ctx.selection_state = WorkspaceSelectionState()
         ctx.layout_sync = WorkspaceLayoutScrollSync(ctx)
         ctx.annotation_presentation = WorkspaceAnnotationPresentation(ctx)
         ctx.action_dialogs = WorkspaceActionDialogCoordinator(ctx)
+        ctx.annotation_selection = WorkspaceAnnotationSelectionCoordinator(ctx, ctx.selection_state)
+        ctx.row_selection = WorkspaceRowSelectionCoordinator(ctx, ctx.selection_state)
 
         # ── Controller'lar ───────────────────────────────────────────────
         self._annotation_manager = WorkspaceAnnotationManager(ctx.model)
