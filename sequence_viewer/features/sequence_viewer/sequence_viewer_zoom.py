@@ -60,8 +60,16 @@ class ZoomMixin:
         applied = float(new_char_width)
         is_animating = self._zoom_animation.state() == QVariantAnimation.Running
         if is_animating:
+            # During animation only update rows actually on screen.
+            # Off-screen items are synced once in _on_zoom_finished.
+            vis_top, vis_bottom = self._visible_row_range()
             for item in self.sequence_items:
-                item._set_char_width_fast(applied)
+                y = item.y()
+                if y <= vis_bottom and y + item.char_height >= vis_top:
+                    item._set_char_width_fast(applied)
+            # item[0] may be off-screen; keep it synced so the read-back below is valid.
+            if self.sequence_items:
+                self.sequence_items[0]._set_char_width_fast(applied)
         else:
             for item in self.sequence_items:
                 item.set_char_width(applied)
@@ -157,11 +165,27 @@ class ZoomMixin:
 
     def _on_zoom_finished(self):
         """Animasyon bitişinde ertelenen geometry değişikliklerini uygula."""
+        final_cw = self.char_width
+        vis_top, vis_bottom = self._visible_row_range()
         for item in self.sequence_items:
+            y = item.y()
+            if not (y <= vis_bottom and y + item.char_height >= vis_top):
+                # Off-screen items were skipped during animation; sync their model now.
+                item._set_char_width_fast(final_cw)
+            # prepareGeometryChange() is always required so the scene's spatial
+            # index reflects the new bounding rect (especially important on zoom-in
+            # where the rect widens and new screen regions become reachable).
             item.prepareGeometryChange()
-            item.update()
         self._update_scene_rect()
         self.viewport().update()
+
+    def _visible_row_range(self) -> tuple:
+        """Return (scene_top, scene_bottom) of the currently visible viewport area."""
+        vp = self.viewport().rect()
+        return (
+            self.mapToScene(0, vp.top()).y(),
+            self.mapToScene(0, vp.bottom()).y(),
+        )
 
     def _current_trailing_padding(self):
         if not self.sequence_items:
