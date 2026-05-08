@@ -83,7 +83,7 @@ class ZoomMixin:
             for item in self.sequence_items:
                 item._set_char_width_fast(applied)
             self.char_width = applied
-            self._update_scene_rect()
+            self._update_scene_rect(invalidate=False)
             if center_nt is not None:
                 self._recenter_horizontally(center_nt, view_width_px)
             self.viewport().update()

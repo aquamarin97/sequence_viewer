@@ -341,6 +341,8 @@ class WorkspaceAnnotationPresentation:
           - signal_mapping.py'deki hbar.rangeChanged → on_zoom_changed bağlantısını
             animasyon sırasında açmak: aynı frame'de çift çağrıya yol açar.
         """
+        if not self.ann_items:
+            return
         if self._ann_geo_cache:
             cw = float(self._ctx.sequence_viewer.current_char_width())
             ann_h = float(annotation_style_manager.get_lane_height())

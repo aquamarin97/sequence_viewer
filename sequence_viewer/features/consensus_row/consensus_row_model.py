@@ -26,6 +26,9 @@ class ConsensusRowModel:
 
     def invalidate(self): self._cache_valid = False; self._cached_consensus = None
 
+    def cached_consensus(self) -> Optional[str]:
+        return self._cached_consensus if self._cache_valid else None
+
     def get_consensus(self, sequences):
         if self._cache_valid and self._cached_consensus is not None: return self._cached_consensus
         self._cached_consensus = self._calculator.compute(sequences)

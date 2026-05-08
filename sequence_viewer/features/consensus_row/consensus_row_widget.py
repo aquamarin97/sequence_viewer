@@ -164,6 +164,9 @@ class ConsensusRowWidget(QWidget):
         return self._model.threshold
 
     def _get_consensus(self):
+        consensus = self._model.cached_consensus()
+        if consensus is not None:
+            return consensus
         sequences = [seq for _, seq in self._alignment_model.all_rows()]
         if not sequences:
             return None

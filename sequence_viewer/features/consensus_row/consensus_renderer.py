@@ -41,9 +41,8 @@ class ConsensusRenderer:
             painter.setPen(h_pen)
             painter.drawLine(0, height - 1, width, height - 1)
 
-        sequences = [seq for _, seq in widget._alignment_model.all_rows()]
         char_h = float(int(round(widget._sequence_viewer.char_height)))
-        if not sequences:
+        if widget._alignment_model.row_count() == 0:
             label_font = QFont("Arial")
             label_font.setPointSizeF(max(1.0, char_h * 0.5))
             painter.setPen(QPen(theme.text_primary))
@@ -51,7 +50,10 @@ class ConsensusRenderer:
             painter.drawText(rect.adjusted(6, 0, 0, 0), Qt.AlignVCenter | Qt.AlignLeft, "—")
             return []
 
-        consensus = widget._model.get_consensus(sequences)
+        consensus = widget._model.cached_consensus()
+        if consensus is None:
+            sequences = [seq for _, seq in widget._alignment_model.all_rows()]
+            consensus = widget._model.get_consensus(sequences)
         if not consensus:
             return []
 
