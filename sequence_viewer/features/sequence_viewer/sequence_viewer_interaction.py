@@ -2,6 +2,7 @@
 # features/sequence_viewer/sequence_viewer_interaction.py
 from __future__ import annotations
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication
 
 
 class InteractionMixin:
@@ -30,6 +31,13 @@ class InteractionMixin:
             handled = getattr(self._controller, "handle_wheel_event", None)
             if callable(handled) and handled(event):
                 return
+        delta = event.angleDelta().y()
+        if delta != 0:
+            step = max(20, self.verticalScrollBar().singleStep()) * max(1, QApplication.wheelScrollLines())
+            add_impulse = getattr(self, "_add_scroll_impulse", None)
+            if callable(add_impulse):
+                add_impulse(0.0, -(delta / 120.0) * step)
+                return
         super().wheelEvent(event)
 
     # ------------------------------------------------------------------
@@ -37,6 +45,9 @@ class InteractionMixin:
     # ------------------------------------------------------------------
 
     def mousePressEvent(self, event):
+        stop_fn = getattr(self, "stop_scroll_inertia", None)
+        if callable(stop_fn):
+            stop_fn()
         if event.button() == Qt.LeftButton:
             scene_pos = self.mapToScene(event.pos())
 

@@ -25,7 +25,7 @@ class ZoomMixin:
 
     def _init_zoom(self):
         self._zoom_animation = QVariantAnimation(self)
-        self._zoom_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._zoom_animation.setEasingCurve(QEasingCurve.OutExpo)
         self._zoom_animation.valueChanged.connect(self._on_zoom_value_changed)
         self._zoom_animation.finished.connect(self._on_zoom_finished)
         self._zoom_center_nt = None

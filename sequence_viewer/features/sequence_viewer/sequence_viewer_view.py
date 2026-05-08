@@ -10,6 +10,7 @@ from sequence_viewer.settings.display_settings_manager import display_settings_m
 from .sequence_viewer_zoom import ZoomMixin
 from .sequence_viewer_overlay import OverlayMixin
 from .sequence_viewer_interaction import InteractionMixin
+from .sequence_viewer_scroll_inertia import ScrollInertiaMixin
 
 if TYPE_CHECKING:
     from sequence_viewer.workspace.row_layout import RowLayout
@@ -26,7 +27,7 @@ def _remap_row(row: int, from_idx: int, to_idx: int) -> int:
     return row
 
 
-class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsView):
+class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, ScrollInertiaMixin, QGraphicsView):
     _POOL_BUFFER: int = 8
 
     def __init__(self, parent=None, *, char_width=12.0, char_height=18.0):
@@ -49,6 +50,7 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
 
         self._init_zoom()
         self._init_overlay()
+        self._init_scroll_inertia()
 
         self.setRenderHint(QPainter.Antialiasing, False)
         self.setRenderHint(QPainter.TextAntialiasing, True)

@@ -39,9 +39,14 @@ class SequenceViewerZoomController:
             delta = event.angleDelta().x()
         if delta != 0:
             self._tooltip_controller.clear_panel()
-            scrollbar = self._view.horizontalScrollBar()
             step = max(1, int(self._view._effective_char_width() * 3))
-            scrollbar.setValue(scrollbar.value() - int(delta / 120.0 * step))
+            dx = -(delta / 120.0) * step
+            add_impulse = getattr(self._view, "_add_scroll_impulse", None)
+            if callable(add_impulse):
+                add_impulse(dx, 0.0)
+            else:
+                hbar = self._view.horizontalScrollBar()
+                hbar.setValue(hbar.value() + int(dx))
         return True
 
     def _handle_zoom(self, event) -> bool:
@@ -50,6 +55,9 @@ class SequenceViewerZoomController:
             return True
 
         self._tooltip_controller.clear_panel()
+        stop_fn = getattr(self._view, "stop_scroll_inertia", None)
+        if callable(stop_fn):
+            stop_fn()
         steps = delta / 120.0
         direction = 1 if steps > 0 else -1
         self._update_zoom_streak(direction)
