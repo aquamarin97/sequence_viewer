@@ -30,6 +30,7 @@ class SequenceViewerController:
             on_row_clicked=on_row_clicked,
         )
         self._zoom = SequenceViewerZoomController(model, view, self._tooltip)
+        self._view._on_zoom_step_cb = self._hover.refresh_hover_from_cursor
 
     @property
     def _is_selecting(self) -> bool:

@@ -83,16 +83,28 @@ class SequenceViewerHoverController:
         self._view = view
         self._tooltip_controller = tooltip_controller
 
-    def handle_hover(self, event) -> None:
-        scene_pos = self._view.mapToScene(event.pos())
-        hover_row, hover_col = self._view.scene_pos_to_row_col(scene_pos)
+    def _update_hover_caret(self, scene_pos, hover_row) -> None:
         row_count = self._model.get_row_count()
-
         if row_count > 0 and 0 <= hover_row < row_count:
             boundary_col = self._boundary_col_at(float(scene_pos.x()))
             self._view.set_hover_caret(boundary_col, hover_row)
         else:
             self._view.clear_hover_caret()
+
+    def refresh_hover_from_cursor(self) -> None:
+        from PyQt5.QtGui import QCursor
+        vp = self._view.viewport()
+        viewport_pos = vp.mapFromGlobal(QCursor.pos())
+        if not vp.rect().contains(viewport_pos):
+            return
+        scene_pos = self._view.mapToScene(viewport_pos)
+        hover_row, _ = self._view.scene_pos_to_row_col(scene_pos)
+        self._update_hover_caret(scene_pos, hover_row)
+
+    def handle_hover(self, event) -> None:
+        scene_pos = self._view.mapToScene(event.pos())
+        hover_row, hover_col = self._view.scene_pos_to_row_col(scene_pos)
+        self._update_hover_caret(scene_pos, hover_row)
 
         sel = self._model.get_selection_column_range()
         last_sel_range = self._tooltip_controller.last_sel_range

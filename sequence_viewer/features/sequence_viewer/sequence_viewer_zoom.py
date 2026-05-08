@@ -30,8 +30,8 @@ class ZoomMixin:
         self._zoom_animation.finished.connect(self._on_zoom_finished)
         self._zoom_center_nt = None
         self._zoom_view_width_px = None
-        # Scene-space char_width at animation start — the transform baseline.
         self._zoom_base_cw: float | None = None
+        self._on_zoom_step_cb = None
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -183,6 +183,8 @@ class ZoomMixin:
             self.apply_char_width(float(value), self._zoom_center_nt, float(self._zoom_view_width_px))
         except Exception:
             pass
+        if self._on_zoom_step_cb is not None:
+            self._on_zoom_step_cb()
 
     def _on_zoom_finished(self):
         """Animasyon bitişinde BSP ağacını senkronize et.
