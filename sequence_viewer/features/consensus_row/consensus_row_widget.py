@@ -16,6 +16,7 @@ from PyQt5.QtGui import QFont, QPainter
 from PyQt5.QtWidgets import QWidget
 
 from sequence_viewer.features.annotation_layer.annotation_layout_engine import (
+    build_side_geometry,
     partition_annotations_by_side,
     side_strip_height,
 )
@@ -60,6 +61,7 @@ class ConsensusRowWidget(QWidget):
         self._color_map = _csm.consensus_nucleotide_color_map()
         self._renderer = ConsensusRenderer()
         self._hit_rects: list = []
+        self._ann_geometry: tuple = (build_side_geometry([]), build_side_geometry([]))
 
         # ── Seçim state ──────────────────────────────────────────────────
         self._is_selected: bool = False
@@ -92,11 +94,14 @@ class ConsensusRowWidget(QWidget):
             self._alignment_model.globalAnnotationAdded,
             self._alignment_model.globalAnnotationRemoved,
             self._alignment_model.globalAnnotationUpdated,
+        ):
+            sig.connect(self.update_visibility)
+        for sig in (
             self._alignment_model.consensusAnnotationAdded,
             self._alignment_model.consensusAnnotationRemoved,
             self._alignment_model.consensusAnnotationUpdated,
         ):
-            sig.connect(self.update_visibility)
+            sig.connect(self._on_consensus_ann_changed)
         self._alignment_model.alignmentStateChanged.connect(self._on_alignment_changed)
 
         # Background consensus hesabı bitince repaint tetikle
@@ -126,6 +131,7 @@ class ConsensusRowWidget(QWidget):
         except Exception:
             pass
 
+        self._sync_ann_geometry()
         self._update_visibility()
 
     def _on_hbar_scroll(self, *_) -> None:
@@ -133,6 +139,20 @@ class ConsensusRowWidget(QWidget):
         if anim is not None and anim.state() == QVariantAnimation.Running:
             return
         self.update()
+
+    def _sync_ann_geometry(self, *_) -> None:
+        """Rebuild cached annotation side geometry when consensus annotations change."""
+        annotations = (
+            list(self._alignment_model.consensus_annotations)
+            if self._alignment_model.is_aligned
+            else []
+        )
+        above_anns, below_anns = partition_annotations_by_side(annotations)
+        self._ann_geometry = build_side_geometry(above_anns), build_side_geometry(below_anns)
+
+    def _on_consensus_ann_changed(self, *_) -> None:
+        self._sync_ann_geometry()
+        self.update_visibility()
 
     # ── _selection property (drag + annotation seçimi için backing store) ─
 
@@ -286,6 +306,7 @@ class ConsensusRowWidget(QWidget):
         self.spacerSyncRequested.emit(self.height(), self.height() > 0, float(above_h), float(char_h))
 
     def _on_alignment_changed(self, is_aligned):
+        self._sync_ann_geometry()
         self._update_visibility()
         if is_aligned:
             self._model.invalidate()

@@ -149,9 +149,15 @@ class AnnotationLayerWidget(QWidget):
     def _paint_annotations(self, painter, *, char_width: float, view_left: float) -> None:
         self._hit_rects.clear()
         selected_visible = []
+        widget_w = float(self.width())
 
         # Pass 1 — tüm annotation'lar, seçim outline'ı olmadan
         for annotation in self._annotations:
+            # Cheap column-range reject before the more expensive calc_rect call
+            if annotation.end * char_width - view_left <= 0:
+                continue
+            if annotation.start * char_width - view_left >= widget_w:
+                continue
             lane = self._lane_assignment.get(annotation.id, 0)
             rect = self._annotation_viewport_rect(annotation, lane, char_width, view_left)
             if rect is None:

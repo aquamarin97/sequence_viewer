@@ -5,11 +5,7 @@ import math
 from PyQt5.QtCore import QPointF, QRectF, Qt
 from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPen
 
-from sequence_viewer.features.annotation_layer.annotation_layout_engine import (
-    build_side_geometry,
-    partition_annotations_by_side,
-    side_strip_height,
-)
+from sequence_viewer.workspace.row_layout import strip_height
 from sequence_viewer.features.annotation_layer.annotation_painter import (
     draw_hover_overlay,
     draw_mismatch_marker,
@@ -59,8 +55,8 @@ class ConsensusRenderer:
         painter.setFont(widget._font)
         mode = widget._effective_mode()
         annotations = list(widget._alignment_model.consensus_annotations) if widget._alignment_model.is_aligned else []
-        above_annotations, _ = partition_annotations_by_side(annotations)
-        above_h = float(side_strip_height(above_annotations))
+        above_geometry, _ = widget._ann_geometry
+        above_h = float(strip_height(above_geometry.total_lanes))
         seq_char_h = float(int(round(widget._sequence_viewer.char_height)))
         seq_top = above_h
         max_len = widget._alignment_model.max_sequence_length
@@ -151,13 +147,10 @@ class ConsensusRenderer:
         from sequence_viewer.settings.annotation_styles import annotation_style_manager
 
         lane_h = annotation_style_manager.get_lane_height()
-        above_annotations, below_annotations = partition_annotations_by_side(annotations)
-        above_geometry = build_side_geometry(above_annotations)
-        below_geometry = build_side_geometry(below_annotations)
+        above_geometry, below_geometry = widget._ann_geometry
         above_assignment = above_geometry.lane_assignment
         below_assignment = below_geometry.lane_assignment
-        above_h = side_strip_height(above_annotations)
-        seq_top = float(above_h)
+        seq_top = float(strip_height(above_geometry.total_lanes))
         painter.setRenderHint(QPainter.Antialiasing, True)
         parent_by_id = {ann.id: ann for ann in annotations}
         for ann in annotations:
