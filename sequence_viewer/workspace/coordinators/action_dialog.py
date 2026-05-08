@@ -105,6 +105,10 @@ class WorkspaceActionDialogCoordinator:
 
     def on_row_moved(self, from_index: int, to_index: int) -> None:
         ctx = self._ctx
+        # Remap selection state BEFORE move_sequence triggers _full_pool_remount,
+        # otherwise the stale row indices highlight the wrong row after remounting.
+        ctx.annotation_selection.remap_row_indices(from_index, to_index)
+        ctx.sequence_viewer.remap_visual_selection(from_index, to_index)
         ctx.header_viewer.move_header_item(from_index, to_index)
         ctx.sequence_viewer.move_sequence(from_index, to_index)
         ctx.header_viewer.renumber_from(min(from_index, to_index))

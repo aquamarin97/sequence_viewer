@@ -15,6 +15,17 @@ if TYPE_CHECKING:
     from sequence_viewer.workspace.row_layout import RowLayout
 
 
+def _remap_row(row: int, from_idx: int, to_idx: int) -> int:
+    if row == from_idx:
+        return to_idx
+    if from_idx < to_idx:
+        if from_idx < row <= to_idx:
+            return row - 1
+    elif to_idx <= row < from_idx:
+        return row + 1
+    return row
+
+
 class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsView):
     _POOL_BUFFER: int = 8
 
@@ -248,6 +259,18 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
             item.update()
         self.scene.invalidate()
         self.viewport().update()
+
+    def remap_visual_selection(self, from_index: int, to_index: int) -> None:
+        """Remap _selection_range row indices after a row move, before pool remount."""
+        sel = self._selection_range
+        if sel is None:
+            return
+        rs, re, cs, ce = sel
+        self._selection_range = (
+            _remap_row(rs, from_index, to_index),
+            _remap_row(re, from_index, to_index),
+            cs, ce,
+        )
 
     def set_visual_selection(self, row_start, row_end, col_start, col_end):
         self._selection_range = (row_start, row_end, col_start, col_end)

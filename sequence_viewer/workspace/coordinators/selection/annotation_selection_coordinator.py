@@ -141,6 +141,25 @@ class WorkspaceAnnotationSelectionCoordinator:
             changed = changed | ctx.header_viewer.toggle_row(row_index, n)
         ctx.header_viewer.apply_selection_to_items(changed)
 
+    def remap_row_indices(self, from_index: int, to_index: int) -> None:
+        """Update stored row indices in selected_annotations after a row move."""
+        if not self._state.selected_annotations:
+            return
+        def _remap(idx):
+            if idx is None:
+                return None
+            if idx == from_index:
+                return to_index
+            if from_index < to_index:
+                if from_index < idx <= to_index:
+                    return idx - 1
+            elif to_index <= idx < from_index:
+                return idx + 1
+            return idx
+        self._state.selected_annotations = [
+            (ann, _remap(row_idx)) for ann, row_idx in self._state.selected_annotations
+        ]
+
     # Annotation layer click handler'lari
 
     def on_annotation_layer_clicked(self, annotation) -> None:

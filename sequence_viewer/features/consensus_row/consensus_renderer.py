@@ -230,14 +230,17 @@ class ConsensusRenderer:
         return hit_rects
 
     def _render_guides(self, painter, widget, char_width, seq_top, seq_char_h):
-        ctrl = widget._get_controller()
-        if ctrl is not None and ctrl._v_guide_cols:
+        # View-level _v_guide_cols: annotation ve sequence tıklamalarında eşit
+        # şekilde güncellenir; controller seviyesindeki _v_guide_cols'dan farklı olarak
+        # annotation seçimlerini de içerir.
+        guide_cols = list(getattr(widget._sequence_viewer, '_v_guide_cols', []))
+        if guide_cols:
             offset = float(widget._sequence_viewer.horizontalScrollBar().value())
             vp_w = float(widget.width())
             pen = QPen(theme_manager.current.guide_line_color, 1, Qt.DashLine)
             pen.setDashPattern([4, 3])
             painter.setPen(pen)
-            for gcol in ctrl._v_guide_cols:
+            for gcol in guide_cols:
                 vp_x = gcol * char_width - offset
                 if -10 <= vp_x <= vp_w + 10:
                     painter.drawLine(QPointF(vp_x, 0), QPointF(vp_x, float(widget.height())))
