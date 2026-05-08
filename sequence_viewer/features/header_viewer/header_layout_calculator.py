@@ -28,7 +28,7 @@ class HeaderLayoutCalculator:
         if stride <= 0:
             return 0
         insert = int(round(scene_y / stride))
-        return max(0, min(insert, len(self._view.header_items)))
+        return max(0, min(insert, self._view._total_header_count))
 
     def item_viewport_rect(self, row_index):
         layout = self._view._row_layout

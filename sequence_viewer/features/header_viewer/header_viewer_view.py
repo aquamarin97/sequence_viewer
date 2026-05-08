@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 
 class HeaderViewerView(QGraphicsView):
+    _POOL_BUFFER: int = 8
+
     def __init__(self, parent=None, *, row_height=18.0, initial_width=160.0):
         super().__init__(parent)
         self.scene = QGraphicsScene(self)
@@ -32,12 +34,13 @@ class HeaderViewerView(QGraphicsView):
         self._row_layout = None
         self.row_height = self._char_height
         self.header_width = float(initial_width)
-        self.header_items = []
+        self.header_items: list[HeaderRowItem] = []  # item pool
+        self._total_header_count: int = 0
+        self._pool_first_row: int = 0
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         from PyQt5.QtWidgets import QFrame
-
         self.setFrameShape(QFrame.NoFrame)
         self.setMinimumWidth(60)
         self.setMouseTracking(True)
@@ -51,7 +54,6 @@ class HeaderViewerView(QGraphicsView):
 
         theme_manager.themeChanged.connect(self._on_theme_changed)
         from sequence_viewer.settings.display_settings_manager import display_settings_manager
-
         display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
         self._apply_scene_background()
 
@@ -63,14 +65,119 @@ class HeaderViewerView(QGraphicsView):
     def _row_stride_uniform(self):
         return self._annot_height + self._char_height
 
+    # ── Pool internals ─────────────────────────────────────────────────────
+
+    def _desired_pool_window(self) -> tuple[int, int]:
+        if self._total_header_count == 0:
+            return 0, -1
+        scroll_y = float(self.verticalScrollBar().value())
+        vp_h = float(max(1, self.viewport().height()))
+        layout = self._row_layout
+        if layout is not None and layout.row_count > 0:
+            vis_first = layout.row_at_y(scroll_y)
+            vis_last = layout.row_at_y(scroll_y + vp_h)
+        else:
+            stride = max(1, self._row_stride_uniform)
+            vis_first = int(scroll_y / stride)
+            vis_last = int((scroll_y + vp_h) / stride)
+        first = max(0, vis_first - self._POOL_BUFFER)
+        last = min(self._total_header_count - 1, vis_last + self._POOL_BUFFER)
+        return first, last
+
+    def _y_for_header_row(self, row_idx: int) -> float:
+        layout = self._row_layout
+        if layout is not None and row_idx < layout.row_count:
+            return float(layout.y_offsets[row_idx])
+        return float(row_idx * self._row_stride_uniform)
+
+    def _get_header_text_for_row(self, row_idx: int) -> str:
+        return ''
+
+    def _ensure_header_pool_size(self, needed: int) -> None:
+        while len(self.header_items) < needed:
+            item_width = self.viewport().width() or self.header_width
+            item = HeaderRowItem(
+                text='',
+                width=item_width,
+                row_height=self._char_height,
+                annot_height=0,
+                row_index=0,
+            )
+            item.setVisible(False)
+            self.scene.addItem(item)
+            self.header_items.append(item)
+
+    def _mount_header_item(self, item: HeaderRowItem, row_idx: int) -> None:
+        if row_idx < 0 or row_idx >= self._total_header_count:
+            item.setVisible(False)
+            return
+        text = self._get_header_text_for_row(row_idx)
+        item.set_full_text(text)
+        item.set_row_index(row_idx)
+        item.set_width(self.viewport().width() or self.header_width)
+        layout = self._row_layout
+        if layout is not None and row_idx < layout.row_count:
+            item.set_annot_height(layout.per_row_above_heights[row_idx])
+            item.set_below_ann_height(layout.per_row_below_heights[row_idx])
+            item.setPos(0, float(layout.y_offsets[row_idx]))
+        else:
+            item.set_annot_height(self._annot_height)
+            item.set_below_ann_height(0)
+            item.setPos(0, float(row_idx * self._row_stride_uniform))
+        item.set_selected(self._selection.is_selected(row_idx))
+        item.setVisible(True)
+
+    def _sync_header_pool(self) -> None:
+        if self._total_header_count == 0:
+            return
+        first, last = self._desired_pool_window()
+        if last < first:
+            return
+        needed = last - first + 1
+        self._ensure_header_pool_size(needed)
+        desired: set[int] = set(range(first, last + 1))
+        mounted: dict[int, HeaderRowItem] = {}
+        free: list[HeaderRowItem] = []
+        for item in self.header_items:
+            r = item.row_index
+            if item.isVisible() and 0 <= r < self._total_header_count and r in desired:
+                mounted[r] = item
+            else:
+                free.append(item)
+        for row in sorted(desired - set(mounted.keys())):
+            if not free:
+                break
+            self._mount_header_item(free.pop(), row)
+        self._pool_first_row = first
+
+    def _full_header_pool_remount(self) -> None:
+        if self._total_header_count == 0:
+            for item in self.header_items:
+                item.setVisible(False)
+            return
+        first, last = self._desired_pool_window()
+        needed = max(last - first + 1, 0)
+        self._ensure_header_pool_size(needed)
+        for i, item in enumerate(self.header_items):
+            row_idx = first + i
+            if row_idx <= last:
+                self._mount_header_item(item, row_idx)
+            else:
+                item.setVisible(False)
+        self._pool_first_row = first
+
+    def _find_pool_item(self, row_idx: int) -> HeaderRowItem | None:
+        for item in self.header_items:
+            if item.isVisible() and item.row_index == row_idx:
+                return item
+        return None
+
+    # ── Row layout ─────────────────────────────────────────────────────────
+
     def apply_row_layout(self, layout):
         self._row_layout = layout
         self._annot_height = 0
-        for index, item in enumerate(self.header_items):
-            if index < layout.row_count:
-                item.set_annot_height(layout.per_row_above_heights[index])
-                item.set_below_ann_height(layout.per_row_below_heights[index])
-                item.setPos(0, float(layout.y_offsets[index]))
+        self._full_header_pool_remount()
         self._update_scene_rect()
 
     def set_annot_height(self, height):
@@ -80,10 +187,7 @@ class HeaderViewerView(QGraphicsView):
             return
         self._annot_height = height
         self.row_height = height + self._char_height
-        stride = height + self._char_height
-        for index, item in enumerate(self.header_items):
-            item.set_annot_height(height)
-            item.setPos(0, float(index * stride))
+        self._full_header_pool_remount()
         self._update_scene_rect()
 
     def _row_at_viewport_y(self, y):
@@ -95,51 +199,41 @@ class HeaderViewerView(QGraphicsView):
     def _item_viewport_rect(self, row_index):
         return self._layout_calc.item_viewport_rect(row_index)
 
-    def add_header_item(self, display_text):
-        row_index = len(self.header_items)
-        item_width = self.viewport().width() or self.header_width
-        layout = self._row_layout
-        if layout is not None and row_index < layout.row_count:
-            annot_height = layout.per_row_annot_heights[row_index]
-            y_start = float(layout.y_offsets[row_index])
-            below_height = layout.per_row_below_heights[row_index]
-        else:
-            annot_height = self._annot_height
-            y_start = float(row_index * self._row_stride_uniform)
-            below_height = 0
-        item = HeaderRowItem(
-            text=display_text,
-            width=item_width,
-            row_height=self._char_height,
-            annot_height=annot_height,
-            row_index=row_index,
-        )
-        item.set_below_ann_height(below_height)
-        item.setPos(0, y_start)
-        self.scene.addItem(item)
-        self.header_items.append(item)
+    # ── Header items (public API) ──────────────────────────────────────────
+
+    def add_header_item(self, display_text: str) -> None:
+        self._total_header_count += 1
+        row_idx = self._total_header_count - 1
+        _, last = self._desired_pool_window()
+        if row_idx <= last:
+            self._ensure_header_pool_size(len(self.header_items) + 1)
+            self._mount_header_item(self.header_items[-1], row_idx)
         self._update_scene_rect()
-        return item
 
     def clear_items(self):
         self._editor.cancel_edit()
         self._drag.reset()
         self.header_items.clear()
         self.scene.clear()
+        self._total_header_count = 0
+        self._pool_first_row = 0
         self._row_layout = None
         self._update_scene_rect()
 
     def apply_selection_to_items(self, changed_rows):
-        for row in changed_rows:
-            if 0 <= row < len(self.header_items):
-                self.header_items[row].set_selected(self._selection.is_selected(row))
+        changed_set = set(changed_rows)
+        for item in self.header_items:
+            if item.isVisible() and item.row_index in changed_set:
+                item.set_selected(self._selection.is_selected(item.row_index))
+
+    # ── Scene rect ─────────────────────────────────────────────────────────
 
     def _update_scene_rect(self):
         layout = self._row_layout
         if layout is not None and layout.row_count > 0:
             height = float(layout.total_height)
         else:
-            height = float(len(self.header_items) * self._row_stride_uniform)
+            height = float(self._total_header_count * self._row_stride_uniform)
         width = self.viewport().width() or self.header_width
         self.scene.setSceneRect(0, 0, float(width), height)
 
@@ -149,6 +243,8 @@ class HeaderViewerView(QGraphicsView):
         metrics = QFontMetrics(self.header_items[0].font)
         max_px = max(metrics.horizontalAdvance(item.full_text) for item in self.header_items)
         return max_px + 6 + 4 + 4
+
+    # ── Resize / scroll ────────────────────────────────────────────────────
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -161,6 +257,13 @@ class HeaderViewerView(QGraphicsView):
             self.setMaximumWidth(required if width >= required else 16_777_215)
         else:
             self.setMaximumWidth(16_777_215)
+
+    def scrollContentsBy(self, dx: int, dy: int) -> None:
+        super().scrollContentsBy(dx, dy)
+        if dy != 0:
+            self._sync_header_pool()
+
+    # ── Theme ──────────────────────────────────────────────────────────────
 
     def _apply_scene_background(self):
         self.scene.setBackgroundBrush(QBrush(theme_manager.current.row_bg_even))
@@ -176,7 +279,6 @@ class HeaderViewerView(QGraphicsView):
 
     def _on_display_settings_changed(self):
         from sequence_viewer.settings.display_settings_manager import display_settings_manager
-
         new_char_height = display_settings_manager.sequence_char_height
         if self._char_height == new_char_height:
             return
@@ -187,10 +289,12 @@ class HeaderViewerView(QGraphicsView):
         self.scene.invalidate()
         self.viewport().update()
 
+    # ── Edit / selection / input ───────────────────────────────────────────
+
     def _start_edit(self, row_index):
-        if row_index < 0 or row_index >= len(self.header_items):
+        item = self._find_pool_item(row_index)
+        if item is None:
             return
-        item = self.header_items[row_index]
         self._editor.start_edit(
             row_index,
             item,
@@ -200,7 +304,7 @@ class HeaderViewerView(QGraphicsView):
         )
 
     def _handle_selection(self, row, modifiers):
-        item_count = len(self.header_items)
+        item_count = self._total_header_count
         if item_count == 0:
             return
         changed = self._selection_handler.handle_click(row, modifiers, item_count)
@@ -234,7 +338,7 @@ class HeaderViewerView(QGraphicsView):
         if self._editor.is_editing() and not self._editor.is_editing(row):
             self._editor.commit_edit()
 
-        if 0 <= row < len(self.header_items):
+        if 0 <= row < self._total_header_count:
             self._drag.begin_press(event.pos(), row)
             self._handle_selection(row, event.modifiers())
         else:
@@ -252,7 +356,6 @@ class HeaderViewerView(QGraphicsView):
         if event.button() != Qt.LeftButton:
             super().mouseReleaseEvent(event)
             return
-
         reorder = self._drag.handle_release()
         if reorder is not None:
             from_index, to_index = reorder
@@ -264,7 +367,7 @@ class HeaderViewerView(QGraphicsView):
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
             row = self._layout_calc.row_at_viewport_y(event.pos().y())
-            if 0 <= row < len(self.header_items):
+            if 0 <= row < self._total_header_count:
                 self._drag.clear_press()
                 self._start_edit(row)
             event.accept()
@@ -274,7 +377,7 @@ class HeaderViewerView(QGraphicsView):
     def keyPressEvent(self, event):
         key = event.key()
         ctrl = bool(event.modifiers() & Qt.ControlModifier)
-        item_count = len(self.header_items)
+        item_count = self._total_header_count
 
         if ctrl and key == Qt.Key_A:
             changed = self._selection_handler.select_all(item_count)

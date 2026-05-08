@@ -29,8 +29,9 @@ class HeaderDragController:
     def reset(self) -> None:
         if self._drag_source_row is not None:
             row = self._drag_source_row
-            if 0 <= row < len(self._view.header_items):
-                self._view.header_items[row].set_dragging(False)
+            item = self._view._find_pool_item(row)
+            if item is not None:
+                item.set_dragging(False)
         self._drag_source_row = None
         self._drag_insert_pos = None
         self._dragging = False
@@ -48,7 +49,9 @@ class HeaderDragController:
         delta = (event.pos() - self._press_pos).manhattanLength()
         if not self._dragging and delta >= mouse_binding_manager.drag_threshold("header_viewer"):
             self._dragging = True
-            self._view.header_items[self._drag_source_row].set_dragging(True)
+            item = self._view._find_pool_item(self._drag_source_row)
+            if item is not None:
+                item.set_dragging(True)
             self._view.viewport().setCursor(Qt.SizeVerCursor)
         if self._dragging:
             self._drag_insert_pos = self._layout_calculator.insert_pos_at_viewport_y(event.pos().y())

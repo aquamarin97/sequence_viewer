@@ -1,9 +1,12 @@
 # sequence_viewer/features/header_viewer/header_viewer_widget.py
-# features/header_viewer/header_viewer_widget.py
 from __future__ import annotations
+
 from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtGui import QFont, QFontMetrics
+
 from .header_viewer_model import HeaderViewerModel
 from .header_viewer_view import HeaderViewerView
+
 
 class HeaderViewerWidget(HeaderViewerView):
     headerEdited = pyqtSignal(int, str)
@@ -15,17 +18,28 @@ class HeaderViewerWidget(HeaderViewerView):
         super().__init__(parent=parent, row_height=row_height, initial_width=initial_width)
         self._model = HeaderViewerModel()
 
+    # ── Pool data provider ─────────────────────────────────────────────────
+
+    def _get_header_text_for_row(self, row_idx: int) -> str:
+        return f"{row_idx + 1}. {self._model.get_header(row_idx)}"
+
+    # ── Signal forwarding ──────────────────────────────────────────────────
+
     def _on_edit_committed(self, row_index, new_text): self.headerEdited.emit(row_index, new_text)
     def _on_row_move_requested(self, from_index, to_index): self.rowMoveRequested.emit(from_index, to_index)
     def _on_selection_changed(self, selected_rows): self.selectionChanged.emit(selected_rows)
     def _on_rows_delete_requested(self, rows): self.rowsDeleteRequested.emit(rows)
 
-    def add_header(self, text):
-        row_index = self._model.add_header(text)
-        display_text = f"{row_index + 1}. {text}"
-        self.add_header_item(display_text)
+    # ── Public API ─────────────────────────────────────────────────────────
 
-    def clear(self): self._model.clear_headers(); self.clear_items()
+    def add_header(self, text: str) -> None:
+        row_index = self._model.add_header(text)
+        self.add_header_item(f"{row_index + 1}. {text}")
+
+    def clear(self):
+        self._model.clear_headers()
+        self.clear_items()
+
     def get_headers(self): return self._model.get_headers()
     def get_row_count(self): return self._model.get_row_count()
 
@@ -36,7 +50,6 @@ class HeaderViewerWidget(HeaderViewerView):
         self.selection.remove_row(row)
 
     def clear_interaction_state(self) -> None:
-        """Satır seçim state'ini temizler ve görsel güncellemesini yapar."""
         changed = self.selection.clear()
         self.apply_selection_to_items(changed)
 
@@ -76,35 +89,46 @@ class HeaderViewerWidget(HeaderViewerView):
         return rest if sep else display_text
 
     def remove_header_item(self, index: int) -> None:
-        if index < 0 or index >= len(self.header_items):
+        if index < 0 or index >= self._total_header_count:
             raise IndexError(f"Header index {index} out of range")
-        item = self.header_items.pop(index)
-        if item.scene() is not None:
-            self.scene.removeItem(item)
+        self._model.remove_header(index)
         self.selection.remove_row(index)
+        self._total_header_count -= 1
+        self._full_header_pool_remount()
         self._update_scene_rect()
 
     def move_header_item(self, from_index: int, to_index: int) -> None:
-        n = len(self.header_items)
-        if not (0 <= from_index < n and 0 <= to_index < n):
+        if not (0 <= from_index < self._total_header_count and
+                0 <= to_index < self._total_header_count):
             raise IndexError("move_header_item out of range")
         if from_index == to_index:
             return
-        item = self.header_items.pop(from_index)
-        self.header_items.insert(to_index, item)
+        self._model.move_header(from_index, to_index)
         self.move_row_selection(from_index, to_index)
+        self._full_header_pool_remount()
         self._update_scene_rect()
 
     def renumber_from(self, index: int) -> None:
+        # Pool items in range get updated text on next mount/remount.
+        # Touch visible items now so renumbering is immediate.
         start = max(0, index)
-        for i in range(start, len(self.header_items)):
-            item = self.header_items[i]
-            header = self._strip_row_number(item.full_text)
-            item.set_row_index(i)
-            item.set_full_text(f"{i + 1}. {header}")
-        self._update_scene_rect()
+        for item in self.header_items:
+            if item.isVisible() and item.row_index >= start:
+                item.set_full_text(self._get_header_text_for_row(item.row_index))
 
     def set_header_item_text(self, index: int, display_text: str) -> None:
-        if index < 0 or index >= len(self.header_items):
-            raise IndexError(f"Header index {index} out of range")
-        self.header_items[index].set_full_text(display_text)
+        item = self._find_pool_item(index)
+        if item is not None:
+            item.set_full_text(display_text)
+
+    def compute_required_width(self) -> int:
+        headers = self._model.get_headers()
+        if not headers:
+            return 100
+        font = self.header_items[0].font if self.header_items else QFont("Arial")
+        metrics = QFontMetrics(font)
+        max_px = max(
+            metrics.horizontalAdvance(f"{i + 1}. {h}")
+            for i, h in enumerate(headers)
+        )
+        return max_px + 14

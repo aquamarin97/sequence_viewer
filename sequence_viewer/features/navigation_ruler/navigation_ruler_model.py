@@ -13,11 +13,10 @@ class NavigationRulerModel:
     @property
     def cached_max_len(self): return self._cached_max_len
 
-    def recompute_max_len_if_needed(self, sequence_items):
-        seq_count = len(sequence_items)
-        new_max_len = max((len(getattr(it,"sequence","")) for it in sequence_items), default=0)
-        if seq_count != self._last_seq_count or new_max_len != self._cached_max_len:
-            self._last_seq_count = seq_count; self._cached_max_len = new_max_len
+    def recompute_max_len_if_needed(self, max_len: int, seq_count: int):
+        if seq_count != self._last_seq_count or max_len != self._cached_max_len:
+            self._last_seq_count = seq_count
+            self._cached_max_len = max_len
         return self._cached_max_len
 
     def compute_tick_layout(self, pixel_width, target_px=60):

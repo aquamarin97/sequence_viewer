@@ -97,8 +97,9 @@ class OverlayMixin:
 
     def set_h_guides(self, row_indices):
         self._h_guide_rows = row_indices
-        for i, item in enumerate(getattr(self, "sequence_items", [])):
-            item.set_row_highlighted(i in self._h_guide_rows)
+        for item in getattr(self, "sequence_items", []):
+            if item.isVisible():
+                item.set_row_highlighted(item.row_index in self._h_guide_rows)
         self.viewport().update()
 
     def clear_h_guides(self):

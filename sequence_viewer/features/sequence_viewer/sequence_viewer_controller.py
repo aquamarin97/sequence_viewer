@@ -67,13 +67,21 @@ class SequenceViewerController:
         self._mouse.notify_selection_changed()
 
     def copy_selection_to_clipboard(self) -> None:
+        sel = self._view._selection_range
+        if sel is None:
+            return
+        rs, re, cs, ce = sel
+        start_col = min(cs, ce)
+        end_col = max(cs, ce) + 1
         lines = []
-        for item in self._view.sequence_items:
-            if item.selection_range is not None:
-                start, end = item.selection_range
-                fragment = item.sequence[start:end]
-                if fragment:
-                    lines.append(fragment)
+        for row in range(rs, re + 1):
+            try:
+                seq = self._model.get_sequence(row)
+            except IndexError:
+                continue
+            fragment = str(seq)[start_col:end_col]
+            if fragment:
+                lines.append(fragment)
         if lines:
             QApplication.clipboard().setText("\n".join(lines))
 

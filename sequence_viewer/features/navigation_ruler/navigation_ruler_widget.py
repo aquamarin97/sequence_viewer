@@ -49,7 +49,10 @@ class RulerWidget(QWidget):
         p.end(); self._ruler_pixmap = pm
 
     def _x_to_nt(self, x):
-        self._model.recompute_max_len_if_needed(self.viewer.sequence_items)
+        self._model.recompute_max_len_if_needed(
+            getattr(self.viewer, "max_sequence_length", 0),
+            getattr(self.viewer, "_total_row_count", 0),
+        )
         return self._model.x_to_nt(x, self.rect().width())
 
     def resizeEvent(self, event): self._invalidate_ruler_pixmap(); super().resizeEvent(event)
@@ -57,7 +60,10 @@ class RulerWidget(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self); rect = self.rect(); width = rect.width(); height = self.height()
         t = theme_manager.current
-        max_len = self._model.recompute_max_len_if_needed(self.viewer.sequence_items)
+        max_len = self._model.recompute_max_len_if_needed(
+            getattr(self.viewer, "max_sequence_length", 0),
+            getattr(self.viewer, "_total_row_count", 0),
+        )
         if max_len <= 0 or width <= 0:
             painter.fillRect(rect, QBrush(t.nav_ruler_bg)); painter.setPen(QPen(t.ruler_border))
             painter.drawRect(rect.adjusted(0,0,-1,-1)); painter.end(); return

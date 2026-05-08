@@ -146,7 +146,4 @@ class WorkspaceSignalMapper:
         changed = ctx.header_viewer.clear_selection()
         ctx.header_viewer.apply_selection_to_items(changed)
         ctx.sequence_viewer.clear_h_guides()
-        for item in ctx.sequence_viewer.sequence_items:
-            item.clear_selection()
-        ctx.sequence_viewer.scene.invalidate()
-        ctx.sequence_viewer.viewport().update()
+        ctx.sequence_viewer.clear_visual_selection()

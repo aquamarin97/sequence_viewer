@@ -56,7 +56,7 @@ class WorkspaceLayoutScrollSync:
 
     def on_splitter_moved(self, _pos: int, _index: int) -> None:
         sizes = self._ctx.splitter.sizes()
-        if len(sizes) < 2 or not self._ctx.header_viewer.header_items:
+        if len(sizes) < 2 or self._ctx.header_viewer.get_row_count() == 0:
             return
         left, right = sizes
         required = self._ctx.header_viewer.compute_required_width()
@@ -109,7 +109,7 @@ class WorkspaceLayoutScrollSync:
         self._ctx.left_panel.update()
 
     def update_header_max_width(self) -> None:
-        if self._ctx.header_viewer.header_items:
+        if self._ctx.header_viewer.get_row_count() > 0:
             req = self._ctx.header_viewer.compute_required_width()
             self._ctx.header_viewer.setMaximumWidth(req)
             self._ctx.left_panel.setMaximumWidth(req)

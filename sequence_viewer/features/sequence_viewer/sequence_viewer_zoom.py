@@ -2,6 +2,8 @@
 # features/sequence_viewer/sequence_viewer_zoom.py
 from __future__ import annotations
 from PyQt5.QtCore import QEasingCurve, QVariantAnimation
+from PyQt5.QtGui import QTransform
+from PyQt5.QtWidgets import QGraphicsScene
 from sequence_viewer.graphics.sequence_item.sequence_item import SequenceGraphicsItem
 
 
@@ -29,10 +31,10 @@ class ZoomMixin:
         self._zoom_animation.finished.connect(self._on_zoom_finished)
         self._zoom_center_nt = None
         self._zoom_view_width_px = None
+        # Scene-space char_width at animation start — the transform baseline.
+        self._zoom_base_cw: float | None = None
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+    # ── public API ────────────────────────────────────────────────────────────
 
     def current_char_width(self):
         return self._effective_char_width()
@@ -58,28 +60,29 @@ class ZoomMixin:
         if abs(new_char_width - self.char_width) < 0.0001 and center_nt is None:
             return
         applied = float(new_char_width)
-        is_animating = self._zoom_animation.state() == QVariantAnimation.Running
+        is_animating = (
+            self._zoom_animation.state() == QVariantAnimation.Running
+            and self._zoom_base_cw is not None
+            and self._zoom_base_cw > 0
+        )
         if is_animating:
-            # During animation only update rows actually on screen.
-            # Off-screen items are synced once in _on_zoom_finished.
-            vis_top, vis_bottom = self._visible_row_range()
-            for item in self.sequence_items:
-                y = item.y()
-                if y <= vis_bottom and y + item.char_height >= vis_top:
-                    item._set_char_width_fast(applied)
-            # item[0] may be off-screen; keep it synced so the read-back below is valid.
-            if self.sequence_items:
-                self.sequence_items[0]._set_char_width_fast(applied)
+            # O(1): scale the view matrix instead of touching any item.
+            # Items keep their scene-space geometry; the transform handles sizing.
+            self.setTransform(QTransform().scale(applied / self._zoom_base_cw, 1.0))
+            self.char_width = applied
+            if center_nt is not None:
+                self._recenter_horizontally(center_nt, view_width_px)
+            self.viewport().update()
         else:
             for item in self.sequence_items:
                 item.set_char_width(applied)
-        if self.sequence_items:
-            applied = float(self.sequence_items[0].char_width)
-        self.char_width = applied
-        self._update_scene_rect(invalidate=not is_animating)
-        if center_nt is not None:
-            self._recenter_horizontally(center_nt, view_width_px)
-        self.viewport().update()
+            if self.sequence_items:
+                applied = float(self.sequence_items[0].char_width)
+            self.char_width = applied
+            self._update_scene_rect()
+            if center_nt is not None:
+                self._recenter_horizontally(center_nt, view_width_px)
+            self.viewport().update()
 
     def start_zoom_animation(self, target_char_width, center_nt, view_width_px=None):
         if view_width_px is None:
@@ -92,6 +95,10 @@ class ZoomMixin:
             self._zoom_view_width_px = view_width_px
             self._zoom_animation.setEndValue(target_char_width)
             return
+        # Freeze the scene-space baseline before the first transform frame.
+        self._zoom_base_cw = (
+            float(self.sequence_items[0].char_width) if self.sequence_items else current
+        )
         self._zoom_center_nt = center_nt
         self._zoom_view_width_px = view_width_px
         self._zoom_animation.setDuration(120)
@@ -121,9 +128,7 @@ class ZoomMixin:
         self.scene.invalidate()
         self.viewport().update()
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    # ── internal helpers ──────────────────────────────────────────────────────
 
     def _effective_char_width(self):
         if self._zoom_animation.state() == QVariantAnimation.Running:
@@ -149,7 +154,9 @@ class ZoomMixin:
             center_nt = max(0.0, min(center_nt, float(self.max_sequence_length)))
         cw = self._effective_char_width()
         ideal_left = center_nt * cw - view_width_px / 2.0
-        max_left = max(0.0, scene_w - view_width_px)
+        # hbar.maximum() is always correct under any view transform; avoids
+        # the stale scene_w - viewport_w formula that breaks during scaling.
+        max_left = max(0.0, float(self.horizontalScrollBar().maximum()))
         ideal_left = max(0.0, min(ideal_left, max_left))
         hbar = self.horizontalScrollBar()
         if abs(float(hbar.value()) - ideal_left) >= 0.5:
@@ -164,19 +171,31 @@ class ZoomMixin:
             pass
 
     def _on_zoom_finished(self):
-        """Animasyon bitişinde ertelenen geometry değişikliklerini uygula."""
+        """Animasyon bitişinde transform sıfırla, tüm item'ları tek seferde senkronize et."""
         final_cw = self.char_width
-        vis_top, vis_bottom = self._visible_row_range()
+        self._zoom_base_cw = None
+
+        # Reset to identity — items will render at final_cw in scene space.
+        self.setTransform(QTransform())
+
+        # NoIndex eliminates per-call BSP overhead inside the loop.
+        # Switching back to BspTreeIndex triggers a single C++ rebuild,
+        # which is faster than n individual prepareGeometryChange BSP updates.
+        self.scene.setItemIndexMethod(QGraphicsScene.NoIndex)
         for item in self.sequence_items:
-            y = item.y()
-            if not (y <= vis_bottom and y + item.char_height >= vis_top):
-                # Off-screen items were skipped during animation; sync their model now.
-                item._set_char_width_fast(final_cw)
-            # prepareGeometryChange() is always required so the scene's spatial
-            # index reflects the new bounding rect (especially important on zoom-in
-            # where the rect widens and new screen regions become reachable).
+            item._set_char_width_fast(final_cw)
             item.prepareGeometryChange()
+        self.scene.setItemIndexMethod(QGraphicsScene.BspTreeIndex)
+
         self._update_scene_rect()
+
+        # Re-establish the correct scroll position in the new coordinate system.
+        if self._zoom_center_nt is not None:
+            self._recenter_horizontally(
+                self._zoom_center_nt,
+                float(self._zoom_view_width_px or self.viewport().width()),
+            )
+
         self.viewport().update()
 
     def _visible_row_range(self) -> tuple:
@@ -194,5 +213,3 @@ class ZoomMixin:
             if item.display_mode == SequenceGraphicsItem.LINE_MODE:
                 return self.trailing_padding_line_px
         return self.trailing_padding_text_px
-
-

@@ -30,10 +30,17 @@ class WorkspaceClipboardController:
                 if i in selected:
                     lines.append(sequence)
         else:
-            for item in ctx.sequence_viewer.sequence_items:
-                if item.selection_range is not None:
-                    start, end = item.selection_range
-                    fragment = item.sequence[start:end]
+            sel = getattr(ctx.sequence_viewer, "_selection_range", None)
+            if sel is not None:
+                rs, re, cs, ce = sel
+                start_col = min(cs, ce)
+                end_col = max(cs, ce) + 1
+                for row in range(rs, re + 1):
+                    try:
+                        seq = ctx.model.get_sequence(row)
+                    except (IndexError, AttributeError):
+                        continue
+                    fragment = str(seq)[start_col:end_col]
                     if fragment:
                         lines.append(fragment)
         if lines:
@@ -42,18 +49,22 @@ class WorkspaceClipboardController:
     def copy_fasta(self) -> None:
         ctx = self._ctx
         blocks: list[str] = []
-        has_fragment_selection = any(
-            item.selection_range is not None for item in ctx.sequence_viewer.sequence_items
-        )
+        sel = getattr(ctx.sequence_viewer, "_selection_range", None)
+        has_fragment_selection = sel is not None
         selected = ctx.header_viewer.selected_rows()
         if has_fragment_selection:
-            for i, item in enumerate(ctx.sequence_viewer.sequence_items):
-                if item.selection_range is not None:
-                    start, end = item.selection_range
-                    fragment = item.sequence[start:end]
-                    if fragment:
-                        header = ctx.model.get_header(i)
-                        blocks.append(f">{header}\n{fragment}")
+            rs, re, cs, ce = sel
+            start_col = min(cs, ce)
+            end_col = max(cs, ce) + 1
+            for row in range(rs, re + 1):
+                try:
+                    header = ctx.model.get_header(row)
+                    seq = ctx.model.get_sequence(row)
+                except (IndexError, AttributeError):
+                    continue
+                fragment = str(seq)[start_col:end_col]
+                if fragment:
+                    blocks.append(f">{header}\n{fragment}")
         elif selected:
             for i, (header, sequence) in enumerate(ctx.model.all_rows()):
                 if i in selected:

@@ -1,5 +1,4 @@
 # sequence_viewer/features/sequence_viewer/sequence_viewer_widget.py
-# features/sequence_viewer/sequence_viewer_widget.py
 from typing import Optional, Tuple, List
 from PyQt5.QtCore import pyqtSignal, Qt
 from .sequence_viewer_model import SequenceViewerModel
@@ -22,14 +21,15 @@ class SequenceViewerWidget(SequenceViewerView):
         self.set_controller(self._controller)
         self._alignment_model = None
 
-        # Scroll → paneli gizle (hover ile tekrar açılabilir)
         self.horizontalScrollBar().valueChanged.connect(self._on_scroll)
         self.verticalScrollBar().valueChanged.connect(self._on_scroll)
 
     def _on_scroll(self) -> None:
-        """Scroll sırasında seçim yokmuş gibi değil; sadece paneli gizle."""
         if self._controller and not self._controller._is_selecting:
             self._controller._drag_tooltip.clear_panel()
+
+    def _get_sequence_for_row(self, row_idx: int) -> str:
+        return self._model.get_sequence(row_idx)
 
     def set_alignment_model(self, alignment_model):
         self._alignment_model = alignment_model
@@ -43,10 +43,9 @@ class SequenceViewerWidget(SequenceViewerView):
 
     def remove_sequence(self, index: int) -> None:
         self._model.remove_sequence(index)
-        item = self.sequence_items.pop(index)
-        if item.scene() is not None:
-            self.scene.removeItem(item)
-        self._renumber_sequence_items(start=index)
+        self.max_sequence_length = self._model.max_sequence_length
+        self._total_row_count -= 1
+        self._full_pool_remount()
         self._update_scene_rect()
         self.viewport().update()
 
@@ -54,19 +53,9 @@ class SequenceViewerWidget(SequenceViewerView):
         self._model.move_sequence(from_index, to_index)
         if from_index == to_index:
             return
-        item = self.sequence_items.pop(from_index)
-        self.sequence_items.insert(to_index, item)
-        self._renumber_sequence_items(start=min(from_index, to_index))
-        self._reposition_items()
+        self._full_pool_remount()
         self._update_scene_rect()
         self.viewport().update()
-
-    def _renumber_sequence_items(self, *, start: int = 0) -> None:
-        for row_index in range(max(0, start), len(self.sequence_items)):
-            item = self.sequence_items[row_index]
-            item.row_index = row_index
-            item.set_row_highlighted(row_index in self._h_guide_rows)
-            item.update()
 
     def clear(self):
         self._controller.clear()
@@ -91,11 +80,9 @@ class SequenceViewerWidget(SequenceViewerView):
 
     def show_info_panel(self, row_start: int, row_end: int,
                         col_start: int, col_end: int) -> None:
-        """Annotation click gibi dış olaylardan bp/Tm panelini gösterir."""
         self._controller.show_info_panel(row_start, row_end, col_start, col_end)
 
     def clear_interaction_state(self) -> None:
-        """Tüm etkileşim state'ini temizler: seçim, guide çizgileri, boyutlandırma aralığı."""
         self.clear_visual_selection()
         try:
             self._model.clear_selection()

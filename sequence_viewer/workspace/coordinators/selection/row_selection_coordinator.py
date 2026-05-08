@@ -43,11 +43,12 @@ class WorkspaceRowSelectionCoordinator:
             n = ctx.model.row_count()
             max_len = ctx.model.max_sequence_length
             if n > 0 and max_len > 0:
-                for i, item in enumerate(ctx.sequence_viewer.sequence_items):
-                    if i in selected_rows:
-                        item.set_selection(0, max_len)
-                    else:
-                        item.clear_selection()
+                for item in ctx.sequence_viewer.sequence_items:
+                    if item.isVisible():
+                        if item.row_index in selected_rows:
+                            item.set_selection(0, max_len)
+                        else:
+                            item.clear_selection()
                 ctx.sequence_viewer.scene.invalidate()
                 ctx.sequence_viewer.viewport().update()
 

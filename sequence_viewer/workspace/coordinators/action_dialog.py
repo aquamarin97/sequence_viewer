@@ -79,7 +79,7 @@ class WorkspaceActionDialogCoordinator:
 
     def on_row_appended(self, index: int, header: str, sequence: str) -> None:
         ctx = self._ctx
-        ctx.header_viewer.add_header_item(f"{index + 1}. {header}")
+        ctx.header_viewer.add_header(header)
         ctx.sequence_viewer.add_sequence(sequence)
         ctx.ruler.update()
         ctx.layout_sync.update_header_max_width()
@@ -138,10 +138,7 @@ class WorkspaceActionDialogCoordinator:
         ctx.header_viewer.clear()
         ctx.sequence_viewer.clear()
         for i, (header, sequence) in enumerate(ctx.model.all_rows()):
-            item = ctx.header_viewer.add_header_item(f"{i + 1}. {header}")
-            item.set_row_index(i)
-            if ctx.header_viewer.is_row_selected(i):
-                item.set_selected(True)
+            ctx.header_viewer.add_header(header)
             ctx.sequence_viewer.add_sequence(sequence)
         layout = ctx.layout_sync.compute_row_layout()
         ctx.layout_sync.apply_layout(layout)

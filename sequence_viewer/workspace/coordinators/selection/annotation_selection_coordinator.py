@@ -88,22 +88,29 @@ class WorkspaceAnnotationSelectionCoordinator:
             ctx.header_viewer.apply_selection_to_items(changed)
             return
 
-        items = ctx.sequence_viewer.sequence_items
+        pool_by_row = {
+            item.row_index: item
+            for item in ctx.sequence_viewer.sequence_items
+            if item.isVisible()
+        }
         row_ranges_map: dict = {}
         per_row_indices: set = set()
         for ann, row_index in self._state.selected_annotations:
             if row_index is None:
-                for i in range(len(items)):
+                for i in range(n):
                     row_ranges_map.setdefault(i, []).append((ann.start, ann.end))
-            elif 0 <= row_index < len(items):
+            elif 0 <= row_index < n:
                 per_row_indices.add(row_index)
                 row_ranges_map.setdefault(row_index, []).append((ann.start, ann.end))
 
         for row_index, ranges in row_ranges_map.items():
+            item = pool_by_row.get(row_index)
+            if item is None:
+                continue
             if len(ranges) == 1:
-                items[row_index].set_selection(ranges[0][0], ranges[0][1])
+                item.set_selection(ranges[0][0], ranges[0][1])
             else:
-                items[row_index].set_multi_selection(ranges)
+                item.set_multi_selection(ranges)
         ctx.sequence_viewer.scene.invalidate()
         ctx.sequence_viewer.viewport().update()
 

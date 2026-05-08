@@ -16,22 +16,26 @@ if TYPE_CHECKING:
 
 
 class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsView):
+    _POOL_BUFFER: int = 8
+
     def __init__(self, parent=None, *, char_width=12.0, char_height=18.0):
         super().__init__(parent)
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self.char_width = float(char_width)
-        self._base_char_width = float(char_width)  # unzoomed reference for LOD calculations
+        self._base_char_width = float(char_width)
         self.char_height = int(round(char_height))
         self._per_row_annot_h = 0
         self._row_layout = None
         self.trailing_padding_line_px = 80.0
         self.trailing_padding_text_px = 30.0
         self.max_sequence_length = 0
-        self.sequence_items = []
+        self.sequence_items: list[SequenceGraphicsItem] = []   # item pool
+        self._total_row_count: int = 0
+        self._pool_first_row: int = 0
+        self._selection_range = None    # (row_s, row_e, col_s, col_e) or None
         self._controller = None
 
-        # Mixin state
         self._init_zoom()
         self._init_overlay()
 
@@ -50,9 +54,7 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
         self._apply_scene_background()
 
-    # ------------------------------------------------------------------
-    # Theme
-    # ------------------------------------------------------------------
+    # ── Theme ──────────────────────────────────────────────────────────────
 
     def _apply_scene_background(self):
         from PyQt5.QtGui import QBrush
@@ -73,14 +75,12 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         self.scene.invalidate()
         self.viewport().update()
 
-    # ------------------------------------------------------------------
-    # Row layout
-    # ------------------------------------------------------------------
+    # ── Row layout ─────────────────────────────────────────────────────────
 
     def apply_row_layout(self, layout):
         self._row_layout = layout
         self._per_row_annot_h = 0
-        self._reposition_items()
+        self._full_pool_remount()
         self._update_scene_rect()
 
     @property
@@ -100,50 +100,142 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
 
     def _reposition_items(self):
         layout = self._row_layout
-        if layout is not None:
-            for i, item in enumerate(self.sequence_items):
-                if i < layout.row_count:
-                    item.setPos(0, float(layout.seq_y_offsets[i]))
-        else:
-            stride = self._per_row_annot_h + self.char_height
-            for i, item in enumerate(self.sequence_items):
-                item.setPos(0, float(i * stride + self._per_row_annot_h))
+        for item in self.sequence_items:
+            if not item.isVisible():
+                continue
+            row_idx = item.row_index
+            if layout is not None and row_idx < layout.row_count:
+                item.setPos(0, float(layout.seq_y_offsets[row_idx]))
+            else:
+                stride = self._per_row_annot_h + self.char_height
+                item.setPos(0, float(row_idx * stride + self._per_row_annot_h))
 
-    # ------------------------------------------------------------------
-    # Controller
-    # ------------------------------------------------------------------
+    # ── Controller ─────────────────────────────────────────────────────────
 
     def set_controller(self, controller):
         self._controller = controller
 
-    # ------------------------------------------------------------------
-    # Sequence items
-    # ------------------------------------------------------------------
+    # ── Pool internals ─────────────────────────────────────────────────────
 
-    def add_sequence_item(self, sequence_string):
-        row_index = len(self.sequence_items)
-        item = SequenceGraphicsItem(
-            sequence=sequence_string,
-            char_width=self.char_width,
-            char_height=self.char_height,
-            row_index=row_index,
-            base_char_width=self._base_char_width,
-        )
+    def _desired_pool_window(self) -> tuple[int, int]:
+        if self._total_row_count == 0:
+            return 0, -1
+        scroll_y = float(self.verticalScrollBar().value())
+        vp_h = float(max(1, self.viewport().height()))
         layout = self._row_layout
-        if layout is not None and row_index < layout.row_count:
-            y = float(layout.seq_y_offsets[row_index])
+        if layout is not None and layout.row_count > 0:
+            vis_first = layout.row_at_y(scroll_y)
+            vis_last = layout.row_at_y(scroll_y + vp_h)
         else:
-            y = float(row_index * (self._per_row_annot_h + self.char_height) + self._per_row_annot_h)
-        item.setPos(0, y)
-        item.set_row_highlighted(row_index in self._h_guide_rows)
-        self.scene.addItem(item)
-        self.sequence_items.append(item)
-        self._update_scene_rect()
-        return item
+            stride = max(1, self._per_row_annot_h + self.char_height)
+            vis_first = int(scroll_y / stride)
+            vis_last = int((scroll_y + vp_h) / stride)
+        first = max(0, vis_first - self._POOL_BUFFER)
+        last = min(self._total_row_count - 1, vis_last + self._POOL_BUFFER)
+        return first, last
+
+    def _y_for_row(self, row_idx: int) -> float:
+        layout = self._row_layout
+        if layout is not None and row_idx < layout.row_count:
+            return float(layout.seq_y_offsets[row_idx])
+        stride = self._per_row_annot_h + self.char_height
+        return float(row_idx * stride + self._per_row_annot_h)
+
+    def _get_sequence_for_row(self, row_idx: int) -> str:
+        return ''
+
+    def _ensure_pool_size(self, needed: int) -> None:
+        while len(self.sequence_items) < needed:
+            item = SequenceGraphicsItem(
+                sequence='',
+                char_width=self.char_width,
+                char_height=self.char_height,
+                row_index=0,
+                base_char_width=self._base_char_width,
+            )
+            item.setVisible(False)
+            self.scene.addItem(item)
+            self.sequence_items.append(item)
+
+    def _mount_item(self, item: SequenceGraphicsItem, row_idx: int) -> None:
+        if row_idx < 0 or row_idx >= self._total_row_count:
+            item.setVisible(False)
+            return
+        seq = self._get_sequence_for_row(row_idx)
+        item.prepareGeometryChange()
+        item._model.sequence = seq
+        item._model.sequence_upper = seq.upper()
+        item._model.length = len(seq)
+        item.row_index = row_idx
+        item.setPos(0, self._y_for_row(row_idx))
+        item.setVisible(True)
+        item.set_row_highlighted(row_idx in self._h_guide_rows)
+        sel = self._selection_range
+        if sel and sel[0] <= row_idx <= sel[1] and sel[2] >= 0 and sel[3] >= 0:
+            item._model.set_selection(sel[2], sel[3])
+        else:
+            item._model.clear_selection()
+        item.update()
+
+    def _sync_pool(self) -> None:
+        if self._total_row_count == 0:
+            return
+        first, last = self._desired_pool_window()
+        if last < first:
+            return
+        needed = last - first + 1
+        self._ensure_pool_size(needed)
+        desired: set[int] = set(range(first, last + 1))
+        mounted: dict[int, SequenceGraphicsItem] = {}
+        free: list[SequenceGraphicsItem] = []
+        for item in self.sequence_items:
+            r = item.row_index
+            if item.isVisible() and 0 <= r < self._total_row_count and r in desired:
+                mounted[r] = item
+            else:
+                free.append(item)
+        for row in sorted(desired - set(mounted.keys())):
+            if not free:
+                break
+            self._mount_item(free.pop(), row)
+        self._pool_first_row = first
+
+    def _full_pool_remount(self) -> None:
+        if self._total_row_count == 0:
+            for item in self.sequence_items:
+                item.setVisible(False)
+            return
+        first, last = self._desired_pool_window()
+        needed = max(last - first + 1, 0)
+        self._ensure_pool_size(needed)
+        for i, item in enumerate(self.sequence_items):
+            row_idx = first + i
+            if row_idx <= last:
+                self._mount_item(item, row_idx)
+            else:
+                item.setVisible(False)
+        self._pool_first_row = first
+
+    # ── Sequence items (public API) ────────────────────────────────────────
+
+    def add_sequence_item(self, sequence_string: str) -> None:
+        self._total_row_count += 1
+        seq_len = len(sequence_string)
+        if seq_len > self.max_sequence_length:
+            self.max_sequence_length = seq_len
+        row_idx = self._total_row_count - 1
+        _, last = self._desired_pool_window()
+        if row_idx <= last:
+            self._ensure_pool_size(len(self.sequence_items) + 1)
+            self._mount_item(self.sequence_items[-1], row_idx)
+        self._update_scene_rect(invalidate=False)
 
     def clear_items(self):
         self.sequence_items.clear()
         self.scene.clear()
+        self._total_row_count = 0
+        self._pool_first_row = 0
+        self._selection_range = None
         self.max_sequence_length = 0
         self._row_layout = None
         self._selection_dim_ranges = []
@@ -151,46 +243,49 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         self.scene.invalidate()
 
     def clear_visual_selection(self):
+        self._selection_range = None
         for item in self.sequence_items:
-            item.clear_selection()
+            item._model.clear_selection()
+            item.update()
         self.scene.invalidate()
         self.viewport().update()
 
     def set_visual_selection(self, row_start, row_end, col_start, col_end):
-        for i, item in enumerate(self.sequence_items):
-            if row_start <= i <= row_end and col_start >= 0 and col_end >= 0:
+        self._selection_range = (row_start, row_end, col_start, col_end)
+        for item in self.sequence_items:
+            if not item.isVisible():
+                continue
+            r = item.row_index
+            if row_start <= r <= row_end and col_start >= 0 and col_end >= 0:
                 item.set_selection(col_start, col_end)
             else:
-                item.clear_selection()
+                item._model.clear_selection()
+                item.update()
         self.scene.invalidate()
         self.viewport().update()
 
-    # ------------------------------------------------------------------
-    # Scene rect
-    # ------------------------------------------------------------------
+    # ── Scene rect ─────────────────────────────────────────────────────────
 
     def _update_scene_rect(self, *, invalidate: bool = True):
-        if not self.sequence_items:
+        if self._total_row_count == 0:
             self.scene.setSceneRect(0, 0, 0, 0)
             self.max_sequence_length = 0
+            if invalidate:
+                self.scene.invalidate()
             return
-        max_len = max(len(item.sequence) for item in self.sequence_items)
-        self.max_sequence_length = max_len
         trailing = self._current_trailing_padding()
-        width = max_len * self.char_width + trailing
+        width = self.max_sequence_length * self.char_width + trailing
         layout = self._row_layout
         if layout is not None and layout.row_count > 0:
             height = float(layout.total_height)
         else:
             stride = self._per_row_annot_h + self.char_height
-            height = float(len(self.sequence_items) * stride)
+            height = float(self._total_row_count * stride)
         self.scene.setSceneRect(0, 0, width, height)
         if invalidate:
             self.scene.invalidate()
 
-    # ------------------------------------------------------------------
-    # Coordinate conversion
-    # ------------------------------------------------------------------
+    # ── Coordinate conversion ──────────────────────────────────────────────
 
     def scene_pos_to_row_col(self, scene_pos):
         layout = self._row_layout
@@ -206,10 +301,6 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         return raw_row, col
 
     def selection_viewport_anchor(self, row_end: int, col_end: int):
-        """
-        Seçimin sağ-alt köşesinin viewport koordinatını döndürür.
-        Dönen nokta FloatingPanel.show_at() için anchor olarak kullanılır.
-        """
         from PyQt5.QtCore import QPoint, QPointF
         cw = self._effective_char_width()
         scene_x = (col_end + 1) * cw
@@ -222,4 +313,14 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         vp = self.mapFromScene(QPointF(scene_x, scene_y))
         return QPoint(int(vp.x()), int(vp.y()))
 
+    # ── Scroll / resize overrides ──────────────────────────────────────────
 
+    def scrollContentsBy(self, dx: int, dy: int) -> None:
+        super().scrollContentsBy(dx, dy)
+        if dy != 0:
+            self._sync_pool()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._total_row_count > 0:
+            self._sync_pool()

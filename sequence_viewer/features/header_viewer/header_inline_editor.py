@@ -44,9 +44,9 @@ class HeaderInlineEditor:
     def refresh_style(self, header_items) -> None:
         if self._widget is None or self._editing_row is None:
             return
-        row = self._editing_row
-        if 0 <= row < len(header_items):
-            self._apply_style(self._widget, header_items[row])
+        item = self._view._find_pool_item(self._editing_row)
+        if item is not None:
+            self._apply_style(self._widget, item)
 
     def commit_edit(self) -> None:
         if self._widget is None or self._editing_row is None:
@@ -67,8 +67,9 @@ class HeaderInlineEditor:
         if self._editing_row is not None:
             row = self._editing_row
             self._editing_row = None
-            if 0 <= row < len(self._view.header_items):
-                self._view.header_items[row].set_hovered(False)
+            item = self._view._find_pool_item(row)
+            if item is not None:
+                item.set_hovered(False)
 
     def _apply_style(self, editor, item) -> None:
         theme = theme_manager.current
