@@ -2,7 +2,6 @@
 # features/sequence_viewer/sequence_viewer_zoom.py
 from __future__ import annotations
 from PyQt5.QtCore import QEasingCurve, QVariantAnimation
-from PyQt5.QtGui import QTransform
 from PyQt5.QtWidgets import QGraphicsScene
 from sequence_viewer.graphics.sequence_item.sequence_item import SequenceGraphicsItem
 
@@ -55,21 +54,36 @@ class ZoomMixin:
         return max(available / float(max_len), 0.000001)
 
     def apply_char_width(self, new_char_width, center_nt=None, view_width_px=None):
+        """Char genişliğini uygular; animasyon sırasında hızlı yol kullanır.
+
+        PERFORMANS — animasyon branch'i (is_animating=True):
+          Her frame'de çağrılır (~60fps, 120ms animasyon). Şu anda her item için
+          _set_char_width_fast kullanılır: model güncellenir ama prepareGeometryChange /
+          BSP ağacı / bireysel update() çağrısı yapılmaz. _update_scene_rect() ise
+          scrollbar aralığını güncel tutar, bu sayede centering ve seçim gösterimi
+          her frame'de doğru kalır. Tek viewport().update() ile repaint tetiklenir.
+
+          YAPILMAMASI GEREKENLER:
+          - setTransform(scale) kullanmak: viewport'u texture gibi gererek tüm içeriği
+            pikselleştirir; scrollbar aralığı güncellenemez, seçim kaybolur, animasyon
+            sonunda ani zıplama oluşur.
+          - set_char_width() (hızlı olmayan) kullanmak: her item başına
+            prepareGeometryChange + BSP güncellemesi + update() tetikler → 750+ annotation
+            ile frame drop kaçınılmaz olur.
+          - _update_scene_rect() çağrısını kaldırmak: scrollbar maximum'u güncellenemez,
+            _recenter_horizontally yanlış konum hesaplar, seçim görünümden kayar.
+        """
         if view_width_px is None:
             view_width_px = float(self.viewport().width())
         if abs(new_char_width - self.char_width) < 0.0001 and center_nt is None:
             return
         applied = float(new_char_width)
-        is_animating = (
-            self._zoom_animation.state() == QVariantAnimation.Running
-            and self._zoom_base_cw is not None
-            and self._zoom_base_cw > 0
-        )
+        is_animating = self._zoom_animation.state() == QVariantAnimation.Running
         if is_animating:
-            # O(1): scale the view matrix instead of touching any item.
-            # Items keep their scene-space geometry; the transform handles sizing.
-            self.setTransform(QTransform().scale(applied / self._zoom_base_cw, 1.0))
+            for item in self.sequence_items:
+                item._set_char_width_fast(applied)
             self.char_width = applied
+            self._update_scene_rect()
             if center_nt is not None:
                 self._recenter_horizontally(center_nt, view_width_px)
             self.viewport().update()
@@ -171,31 +185,36 @@ class ZoomMixin:
             pass
 
     def _on_zoom_finished(self):
-        """Animasyon bitişinde transform sıfırla, tüm item'ları tek seferde senkronize et."""
-        final_cw = self.char_width
+        """Animasyon bitişinde BSP ağacını senkronize et.
+
+        PERFORMANS — neden bu yapı:
+          Animasyon boyunca _set_char_width_fast ile item'lar zaten son char_width'e
+          ulaşmış olur; burada tekrar model güncellemesi gerekmez.
+
+          NoIndex → N × prepareGeometryChange → BspTreeIndex sırası kritik:
+          NoIndex modunda bireysel BSP güncellemesi tetiklenmez (O(1) per call),
+          BspTreeIndex'e geçişte C++ tek seferde O(N log N) yeniden yapılanma yapar.
+          Bu, N ayrı BSP güncellemesinden çok daha hızlıdır.
+
+          YAPILMAMASI GEREKENLER:
+          - NoIndex'siz prepareGeometryChange döngüsü: her çağrı BSP'yi tek tek
+            günceller → N × O(N log N) maliyet.
+          - _set_char_width_fast yerine set_char_width kullanmak: her item başına
+            gereksiz update() ve prepareGeometryChange tetikler.
+        """
         self._zoom_base_cw = None
 
-        # Reset to identity — items will render at final_cw in scene space.
-        self.setTransform(QTransform())
-
-        # NoIndex eliminates per-call BSP overhead inside the loop.
-        # Switching back to BspTreeIndex triggers a single C++ rebuild,
-        # which is faster than n individual prepareGeometryChange BSP updates.
         self.scene.setItemIndexMethod(QGraphicsScene.NoIndex)
         for item in self.sequence_items:
-            item._set_char_width_fast(final_cw)
             item.prepareGeometryChange()
         self.scene.setItemIndexMethod(QGraphicsScene.BspTreeIndex)
 
         self._update_scene_rect()
-
-        # Re-establish the correct scroll position in the new coordinate system.
         if self._zoom_center_nt is not None:
             self._recenter_horizontally(
                 self._zoom_center_nt,
                 float(self._zoom_view_width_px or self.viewport().width()),
             )
-
         self.viewport().update()
 
     def _visible_row_range(self) -> tuple:

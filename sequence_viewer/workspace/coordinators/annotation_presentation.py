@@ -324,8 +324,24 @@ class WorkspaceAnnotationPresentation:
         self.rebuild_ann_items(layout)
 
     def on_zoom_changed(self, *_) -> None:
+        """Zoom değişiminde annotation item konumlarını günceller.
+
+        PERFORMANS — neden _ann_geo_cache:
+          Zoom sırasında yalnızca scene_x = start * cw değişir; scene_y (satır Y
+          ofseti, lane ataması) sabit kalır. _ann_geo_cache bu sabit değerleri
+          rebuild_ann_items sırasında bir kez hesaplar. Böylece her zoom frame'inde
+          compute_row_layout() + lane assignment hesabı (O(N)) atlanır.
+
+          YAPILMAMASI GEREKENLER:
+          - Bu metodun animasyon sırasında bloke edilmesi: görüntü dönüşümü (setTransform)
+            kullanılmadığından annotation item'larının her frame güncellenmesi gerekir;
+            aksi hâlde annotation'lar eski konumda kalır.
+          - Cache olmadan compute_row_layout() çağırmak: 750+ annotation ile her frame
+            O(N) layout hesabı → ciddi frame drop.
+          - signal_mapping.py'deki hbar.rangeChanged → on_zoom_changed bağlantısını
+            animasyon sırasında açmak: aynı frame'de çift çağrıya yol açar.
+        """
         if self._ann_geo_cache:
-            # Fast path: Y positions cached, compute_row_layout() not needed
             cw = float(self._ctx.sequence_viewer.current_char_width())
             ann_h = float(annotation_style_manager.get_lane_height())
             self._apply_positions_from_cache(cw, ann_h)
