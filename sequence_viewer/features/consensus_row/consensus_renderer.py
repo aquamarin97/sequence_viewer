@@ -59,7 +59,7 @@ class ConsensusRenderer:
         above_h = float(strip_height(above_geometry.total_lanes))
         seq_char_h = float(int(round(widget._sequence_viewer.char_height)))
         seq_top = above_h
-        max_len = widget._alignment_model.max_sequence_length
+        max_len = widget._consensus_length()
         start_col = max(0, int(math.floor(view_left / char_width)))
         end_col = min(max_len, int(math.ceil((view_left + width) / char_width)))
         selection_ranges = widget._selection_ranges
@@ -76,14 +76,22 @@ class ConsensusRenderer:
             self._render_guides(painter, widget, char_width, seq_top, seq_char_h)
             return hit_rects
 
-        consensus = widget._model.cached_consensus()
-        if consensus is None:
-            sequences = [seq for _, seq in widget._alignment_model.all_rows()]
-            consensus = widget._model.get_consensus(sequences)
-        if not consensus:
-            return []
+        consensus_slice = widget._consensus_slice(start_col, end_col)
+        if not consensus_slice:
+            hit_rects = self._render_annotations(
+                painter, widget, annotations, char_width, view_left, float(width), seq_char_h
+            )
+            self._paint_dim_overlay(painter, widget._sequence_viewer, char_width, float(width), float(height), theme)
+            self._render_guides(painter, widget, char_width, seq_top, seq_char_h)
+            return hit_rects
 
+        visible_len = len(consensus_slice)
+        consensus_upper = consensus_slice.upper()
+        end_col = start_col + visible_len
+
+        sel_mask = None
         if selection_ranges:
+            sel_mask = bytearray(visible_len)
             sel_color = QColor(theme.seq_selection_bg)
             painter.setBrush(QBrush(sel_color))
             painter.setPen(Qt.NoPen)
@@ -91,18 +99,26 @@ class ConsensusRenderer:
                 sel_l = max(sel_s, start_col)
                 sel_r = min(sel_e, end_col)
                 if sel_r > sel_l:
-                    for col in range(sel_l, sel_r):
-                        painter.drawRect(QRectF(col * char_width - view_left, seq_top, char_width, seq_char_h))
+                    sel_mask[sel_l - start_col : sel_r - start_col] = b'\x01' * (sel_r - sel_l)
+                    painter.drawRect(
+                        QRectF(
+                            sel_l * char_width - view_left,
+                            seq_top,
+                            (sel_r - sel_l) * char_width,
+                            seq_char_h,
+                        )
+                    )
 
         font_pt = widget._font.pointSizeF()
         box_ref = min(seq_char_h * 0.7, font_pt)
         box_h = max(box_ref, 1.0)
         box_y = seq_top + (seq_char_h - box_h) / 2.0
-        for col in range(start_col, end_col):
-            base = consensus[col]
+        for j, base in enumerate(consensus_slice):
+            base_u = consensus_upper[j]
+            col = start_col + j
             x = col * char_width - view_left
-            selected = any(s <= col < e for s, e in selection_ranges)
-            color = QColor(255, 255, 255) if selected else widget._color_map.get(base, theme.text_primary)
+            selected = sel_mask is not None and sel_mask[j]
+            color = QColor(255, 255, 255) if selected else widget._color_map.get(base_u, theme.text_primary)
             if mode == "box":
                 painter.setBrush(QBrush(color))
                 painter.setPen(Qt.NoPen)

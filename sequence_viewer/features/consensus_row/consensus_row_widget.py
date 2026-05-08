@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from typing import Optional, Tuple
 
-from PyQt5.QtCore import Qt, QVariantAnimation, pyqtSignal, QRectF
+from PyQt5.QtCore import Qt, QVariantAnimation, pyqtSignal, QRectF, QTimer
 from PyQt5.QtGui import QFont, QPainter
 from PyQt5.QtWidgets import QWidget
 
@@ -62,6 +62,8 @@ class ConsensusRowWidget(QWidget):
         self._renderer = ConsensusRenderer()
         self._hit_rects: list = []
         self._ann_geometry: tuple = (build_side_geometry([]), build_side_geometry([]))
+        self._consensus_sequence = None
+        self._compute_request_pending = False
 
         # ── Seçim state ──────────────────────────────────────────────────
         self._is_selected: bool = False
@@ -133,6 +135,7 @@ class ConsensusRowWidget(QWidget):
 
         self._sync_ann_geometry()
         self._update_visibility()
+        self._request_development_consensus()
 
     def _on_hbar_scroll(self, *_) -> None:
         anim = getattr(self._sequence_viewer, "_zoom_animation", None)
@@ -176,6 +179,7 @@ class ConsensusRowWidget(QWidget):
 
     def set_method(self, method, threshold=None):
         self._model.set_method(method, threshold)
+        self._request_development_consensus()
         self.update()
 
     @property
@@ -187,6 +191,8 @@ class ConsensusRowWidget(QWidget):
         return self._model.threshold
 
     def _get_consensus(self):
+        if self._consensus_sequence is not None:
+            return self._sequence_to_str(self._consensus_sequence)
         consensus = self._model.cached_consensus()
         if consensus is not None:
             return consensus
@@ -194,6 +200,59 @@ class ConsensusRowWidget(QWidget):
         if not sequences:
             return None
         return self._model.get_consensus_blocking(sequences)
+
+    def set_consensus_sequence(self, sequence) -> None:
+        """Set an externally supplied consensus-like sequence for rendering."""
+        self._consensus_sequence = sequence
+        self._model.invalidate()
+        self.update()
+
+    def clear_consensus_sequence(self) -> None:
+        self._consensus_sequence = None
+        self._model.invalidate()
+        self._request_development_consensus()
+        self.update()
+
+    def _consensus_source(self):
+        if self._consensus_sequence is not None:
+            return self._consensus_sequence
+        return self._model.cached_consensus()
+
+    def _consensus_slice(self, start_col: int, end_col: int) -> str:
+        source = self._consensus_source()
+        if source is None or start_col >= end_col:
+            return ""
+        return source[start_col:end_col]
+
+    def _consensus_length(self) -> int:
+        source = self._consensus_source()
+        if source is not None:
+            return len(source)
+        return self._alignment_model.max_sequence_length
+
+    @staticmethod
+    def _sequence_to_str(sequence) -> str:
+        return sequence.to_str() if hasattr(sequence, "to_str") else str(sequence)
+
+    def _request_development_consensus(self) -> None:
+        if self._consensus_sequence is not None:
+            return
+        if not self._alignment_model.is_aligned or self._alignment_model.row_count() == 0:
+            return
+        if self._compute_request_pending:
+            return
+        self._compute_request_pending = True
+        QTimer.singleShot(0, self._start_development_consensus)
+
+    def _start_development_consensus(self) -> None:
+        self._compute_request_pending = False
+        if self._consensus_sequence is not None:
+            return
+        if not self._alignment_model.is_aligned or self._alignment_model.row_count() == 0:
+            return
+        sequences = [seq for _, seq in self._alignment_model.all_rows()]
+        if sequences:
+            self._model.get_consensus(sequences)
 
     # ── Hover public API ─────────────────────────────────────────────────
 
@@ -225,7 +284,7 @@ class ConsensusRowWidget(QWidget):
 
     def select_all(self):
         """Tüm konsensüs dizisini seçili hale getirir."""
-        max_len = self._alignment_model.max_sequence_length
+        max_len = self._consensus_length()
         if max_len > 0:
             self._selection_ranges = [(0, max_len)]
             self._is_selected = True
@@ -310,6 +369,7 @@ class ConsensusRowWidget(QWidget):
         self._update_visibility()
         if is_aligned:
             self._model.invalidate()
+            self._request_development_consensus()
             self.update()
 
     # ── Settings / tema callback'leri ────────────────────────────────────
@@ -317,11 +377,11 @@ class ConsensusRowWidget(QWidget):
     def _on_color_styles_changed(self):
         from sequence_viewer.settings.color_styles import color_style_manager as _csm
         self._color_map = _csm.consensus_nucleotide_color_map()
-        self._model.invalidate()
         self.update()
 
     def _on_data_changed(self, *_):
         self._model.invalidate()
+        self._request_development_consensus()
         self.update()
 
     def _on_theme_changed(self):
@@ -344,7 +404,7 @@ class ConsensusRowWidget(QWidget):
         cw = self._get_char_width()
         if cw <= 0:
             return None
-        max_len = self._alignment_model.max_sequence_length
+        max_len = self._consensus_length()
         if max_len == 0:
             return None
         col = int((x + self._get_view_left()) / cw)

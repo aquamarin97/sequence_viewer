@@ -158,7 +158,11 @@ class OverlayMixin:
             return
         vis_top, vis_bottom = rect.top(), rect.bottom()
         painter.fillRect(rect, t.seq_bg)
-        for i in range(layout.row_count):
+        if vis_bottom < 0 or vis_top > layout.total_height:
+            return
+        first_row = layout.row_at_y(vis_top)
+        last_row = layout.row_at_y(vis_bottom)
+        for i in range(first_row, last_row + 1):
             y_top = float(layout.y_offsets[i])
             y_bottom = y_top + float(layout.row_strides[i])
             if y_bottom < vis_top or y_top > vis_bottom:
