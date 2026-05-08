@@ -77,10 +77,10 @@ class WorkspaceActionDialogCoordinator:
     def on_rows_delete_requested(self, rows) -> None:
         self._ctx.command_controller.delete_rows_with_undo(rows)
 
-    def on_row_appended(self, index: int, header: str, sequence: str) -> None:
+    def on_row_appended(self, index: int, header: str) -> None:
         ctx = self._ctx
         ctx.header_viewer.add_header(header)
-        ctx.sequence_viewer.add_sequence(sequence)
+        ctx.sequence_viewer.add_sequence(ctx.model.get_record(index).sequence)
         ctx.ruler.update()
         ctx.layout_sync.update_header_max_width()
         layout = ctx.layout_sync.compute_row_layout()
@@ -137,9 +137,9 @@ class WorkspaceActionDialogCoordinator:
         ctx.annotation_presentation.remove_all_ann_items()
         ctx.header_viewer.clear()
         ctx.sequence_viewer.clear()
-        for i, (header, sequence) in enumerate(ctx.model.all_rows()):
-            ctx.header_viewer.add_header(header)
-            ctx.sequence_viewer.add_sequence(sequence)
+        for record in ctx.model.all_records():
+            ctx.header_viewer.add_header(record.header)
+            ctx.sequence_viewer.add_sequence(record.sequence)
         layout = ctx.layout_sync.compute_row_layout()
         ctx.layout_sync.apply_layout(layout)
         ctx.ruler.update()

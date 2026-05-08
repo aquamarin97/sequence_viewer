@@ -164,7 +164,6 @@ class SequenceViewerView(ZoomMixin, OverlayMixin, InteractionMixin, QGraphicsVie
         seq = self._get_sequence_for_row(row_idx)
         item.prepareGeometryChange()
         item._model.sequence = seq
-        item._model.sequence_upper = seq.upper()
         item._model.length = len(seq)
         item.row_index = row_idx
         item.setPos(0, self._y_for_row(row_idx))

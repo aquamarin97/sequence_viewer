@@ -37,8 +37,6 @@ class SequenceGraphicsItem(QGraphicsItem):
     @property
     def sequence(self): return self._model.sequence
     @property
-    def sequence_upper(self): return self._model.sequence_upper
-    @property
     def length(self): return self._model.length
     @property
     def char_width(self): return self._model.char_width
@@ -153,6 +151,11 @@ class SequenceGraphicsItem(QGraphicsItem):
             painter.restore()
             return
 
+        # Decode only the visible column slice — for LazySequence this calls decode_range(),
+        # for plain str it is an O(vis_len) slice copy. Either way _vis is a plain str.
+        _vis = model.sequence[start_idx:end_idx]
+        _vis_upper = _vis.upper()
+
         # --- Selection: build O(vis_len) mask and draw one rect per range ---
         # Replaces O(vis_len * n_ranges) any() check and per-character drawRect.
         sel_mask = None
@@ -166,8 +169,6 @@ class SequenceGraphicsItem(QGraphicsItem):
                     sel_mask[lo - start_idx : hi - start_idx] = b'\x01' * (hi - lo)
                     painter.drawRect(QRectF(lo * cw, 0.0, (hi - lo) * cw, char_h))
 
-        seq       = model.sequence
-        seq_upper = model.sequence_upper
         color_map = model.color_map
         _fallback = QColor(50, 50, 50)
 
@@ -185,9 +186,8 @@ class SequenceGraphicsItem(QGraphicsItem):
             dy = 0.0
 
             for j in range(vis_len):
-                i = start_idx + j
-                base_char = seq[i]
-                base_u    = seq_upper[i]
+                base_char = _vis[j]
+                base_u    = _vis_upper[j]
 
                 if sel_mask is not None and sel_mask[j]:
                     pm = _local_sel.get(base_char)
@@ -205,7 +205,7 @@ class SequenceGraphicsItem(QGraphicsItem):
                 if not dy:
                     dy = (char_h - pm.height()) / 2.0
 
-                x = i * cw
+                x = (start_idx + j) * cw
                 painter.drawPixmap(QPointF(x + (cw - pm.width()) / 2.0, dy), pm)
 
         elif effective_mode == SequenceItemModel.BOX_MODE:
@@ -216,15 +216,14 @@ class SequenceGraphicsItem(QGraphicsItem):
             # Group x-positions by color → ≤5 setBrush calls for ATGCN instead of one per char
             buckets: dict = {}  # (r,g,b) -> [QColor, [x, ...]]
             for j in range(vis_len):
-                i      = start_idx + j
-                base_u = seq_upper[i]
+                base_u = _vis_upper[j]
                 color  = color_map.get(base_u, _fallback)
                 rgb    = (color.red(), color.green(), color.blue())
                 entry  = buckets.get(rgb)
                 if entry is None:
-                    buckets[rgb] = [color, [i * cw]]
+                    buckets[rgb] = [color, [(start_idx + j) * cw]]
                 else:
-                    entry[1].append(i * cw)
+                    entry[1].append((start_idx + j) * cw)
 
             for _rgb, (color, xs) in buckets.items():
                 painter.setBrush(QBrush(color))

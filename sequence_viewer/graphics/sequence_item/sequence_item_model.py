@@ -14,7 +14,6 @@ class SequenceItemModel:
 
     def __init__(self, sequence, char_width=12.0, char_height=18.0, color_map=None, base_char_width=None):
         self.sequence = sequence
-        self.sequence_upper = sequence.upper()
         self.length = len(sequence)
         self.char_width = max(char_width, 0.001)
         self.char_height = max(1, int(round(char_height)))

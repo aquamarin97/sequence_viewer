@@ -23,7 +23,7 @@ class AlignmentDataModelSnapshot:
     consensus_annotations: List[Annotation]
 
 class AlignmentDataModel(QObject):
-    rowAppended    = pyqtSignal(int, str, str)
+    rowAppended    = pyqtSignal(int, str)
     rowRemoved     = pyqtSignal(int)
     rowMoved       = pyqtSignal(int, int)
     headerChanged  = pyqtSignal(int, str)
@@ -83,7 +83,7 @@ class AlignmentDataModel(QObject):
         record = SequenceRecord(header=header, sequence=sequence)
         index = len(self._rows)
         self._rows.append(record)
-        self.rowAppended.emit(index, header, _to_str(sequence))
+        self.rowAppended.emit(index, header)
         return index
 
     def append_records_bulk(self, records: list) -> None:

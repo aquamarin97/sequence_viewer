@@ -79,7 +79,7 @@ class SequenceViewerController:
                 seq = self._model.get_sequence(row)
             except IndexError:
                 continue
-            fragment = str(seq)[start_col:end_col]
+            fragment = seq[start_col:end_col]
             if fragment:
                 lines.append(fragment)
         if lines:
