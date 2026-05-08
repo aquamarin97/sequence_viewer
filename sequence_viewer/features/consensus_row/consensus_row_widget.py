@@ -52,7 +52,7 @@ class ConsensusRowWidget(QWidget):
         self._sequence_viewer = sequence_viewer
 
         # ── Model ve render ──────────────────────────────────────────────
-        self._model = ConsensusRowModel(method=ConsensusMethod.PLURALITY)
+        self._model = ConsensusRowModel(method=ConsensusMethod.PLURALITY, parent=self)
         self._font = QFont(display_settings_manager.consensus_font_family)
         self._font.setStyleHint(QFont.Monospace)
         self._font.setFixedPitch(True)
@@ -98,6 +98,9 @@ class ConsensusRowWidget(QWidget):
         ):
             sig.connect(self.update_visibility)
         self._alignment_model.alignmentStateChanged.connect(self._on_alignment_changed)
+
+        # Background consensus hesabı bitince repaint tetikle
+        self._model.consensusReady.connect(self.update, Qt.QueuedConnection)
 
         # ── Viewer sinyal bağlantıları ───────────────────────────────────
         hbar = self._sequence_viewer.horizontalScrollBar()
@@ -170,7 +173,7 @@ class ConsensusRowWidget(QWidget):
         sequences = [seq for _, seq in self._alignment_model.all_rows()]
         if not sequences:
             return None
-        return self._model.get_consensus(sequences)
+        return self._model.get_consensus_blocking(sequences)
 
     # ── Hover public API ─────────────────────────────────────────────────
 
@@ -202,9 +205,9 @@ class ConsensusRowWidget(QWidget):
 
     def select_all(self):
         """Tüm konsensüs dizisini seçili hale getirir."""
-        consensus = self._get_consensus()
-        if consensus:
-            self._selection_ranges = [(0, len(consensus))]
+        max_len = self._alignment_model.max_sequence_length
+        if max_len > 0:
+            self._selection_ranges = [(0, max_len)]
             self._is_selected = True
             self.sync_focus_to_sequence_viewer()
             self.update()
@@ -320,11 +323,11 @@ class ConsensusRowWidget(QWidget):
         cw = self._get_char_width()
         if cw <= 0:
             return None
-        col = int((x + self._get_view_left()) / cw)
-        consensus = self._get_consensus()
-        if consensus is None:
+        max_len = self._alignment_model.max_sequence_length
+        if max_len == 0:
             return None
-        return max(0, min(col, len(consensus) - 1))
+        col = int((x + self._get_view_left()) / cw)
+        return max(0, min(col, max_len - 1))
 
     def _scene_col_at_x(self, vp_x: float) -> int:
         cw = self._get_char_width()
@@ -420,8 +423,8 @@ class ConsensusRowWidget(QWidget):
             self._drag_tooltip.clear_tooltip()
             return
         bp = selection_bp(lo, hi)
-        consensus = self._get_consensus()
-        tm = calculate_tm(consensus[lo:hi + 1]) if consensus else None
+        consensus = self._model.cached_consensus()
+        tm = calculate_tm(consensus[lo:hi + 1]) if consensus is not None else None
         tooltip_parent = self.parentWidget() or self
         if self._drag_tooltip.parentWidget() is not tooltip_parent:
             self._drag_tooltip.setParent(tooltip_parent)

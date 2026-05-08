@@ -50,13 +50,6 @@ class ConsensusRenderer:
             painter.drawText(rect.adjusted(6, 0, 0, 0), Qt.AlignVCenter | Qt.AlignLeft, "—")
             return []
 
-        consensus = widget._model.cached_consensus()
-        if consensus is None:
-            sequences = [seq for _, seq in widget._alignment_model.all_rows()]
-            consensus = widget._model.get_consensus(sequences)
-        if not consensus:
-            return []
-
         char_width = widget._get_char_width()
         view_left = widget._get_view_left()
         if char_width <= 0:
@@ -70,8 +63,9 @@ class ConsensusRenderer:
         above_h = float(side_strip_height(above_annotations))
         seq_char_h = float(int(round(widget._sequence_viewer.char_height)))
         seq_top = above_h
+        max_len = widget._alignment_model.max_sequence_length
         start_col = max(0, int(math.floor(view_left / char_width)))
-        end_col = min(len(consensus), int(math.ceil((view_left + width) / char_width)))
+        end_col = min(max_len, int(math.ceil((view_left + width) / char_width)))
         selection_ranges = widget._selection_ranges
         hit_rects = []
 
@@ -85,6 +79,13 @@ class ConsensusRenderer:
             self._paint_dim_overlay(painter, widget._sequence_viewer, char_width, float(width), float(height), theme)
             self._render_guides(painter, widget, char_width, seq_top, seq_char_h)
             return hit_rects
+
+        consensus = widget._model.cached_consensus()
+        if consensus is None:
+            sequences = [seq for _, seq in widget._alignment_model.all_rows()]
+            consensus = widget._model.get_consensus(sequences)
+        if not consensus:
+            return []
 
         if selection_ranges:
             sel_color = QColor(theme.seq_selection_bg)
@@ -102,7 +103,7 @@ class ConsensusRenderer:
         box_h = max(box_ref, 1.0)
         box_y = seq_top + (seq_char_h - box_h) / 2.0
         for col in range(start_col, end_col):
-            base = consensus[col].upper()
+            base = consensus[col]
             x = col * char_width - view_left
             selected = any(s <= col < e for s, e in selection_ranges)
             color = QColor(255, 255, 255) if selected else widget._color_map.get(base, theme.text_primary)
