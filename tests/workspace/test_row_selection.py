@@ -6,6 +6,7 @@ from sequence_viewer.workspace.coordinators.selection import row_selection_coord
 from sequence_viewer.workspace.coordinators.selection.row_selection_coordinator import (
     WorkspaceRowSelectionCoordinator,
 )
+from sequence_viewer.workspace.signal_mapping import WorkspaceSignalMapper
 
 
 def make_annotation() -> Annotation:
@@ -48,3 +49,23 @@ def test_on_consensus_spacer_clicked_ctrl_selected_deselects(ctx, state) -> None
 
     ctx.consensus_spacer.set_selected.assert_called_once_with(False)
     ctx.consensus_row.set_selected.assert_not_called()
+
+
+def test_consensus_row_click_clears_regular_row_highlight_state(ctx) -> None:
+    ctx.header_viewer.clear_selection.return_value = frozenset({1})
+    mapper = WorkspaceSignalMapper(
+        ctx,
+        on_model_reset=lambda: None,
+        on_alignment_state_changed=lambda _state: None,
+        on_display_settings_changed=lambda: None,
+    )
+
+    mapper._clear_header_selection_for_consensus()
+
+    ctx.consensus_spacer.set_selected.assert_called_once_with(True)
+    ctx.consensus_row.set_selected.assert_called_once_with(True)
+    ctx.header_viewer.apply_selection_to_items.assert_called_once_with(frozenset({1}))
+    ctx.sequence_viewer.clear_h_guides.assert_called_once()
+    ctx.sequence_viewer.clear_visual_selection.assert_called_once()
+    ctx.sequence_viewer.clear_selection_model.assert_called_once()
+    ctx.sequence_viewer.clear_selection_dim_range.assert_called_once()

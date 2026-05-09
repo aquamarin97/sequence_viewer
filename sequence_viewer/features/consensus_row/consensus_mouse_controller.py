@@ -88,6 +88,7 @@ class ConsensusMouseController:
         scene_col = self._w._scene_col_at_x(float(event.pos().x()))
         self._drag.begin_press(event.pos(), scene_col)
         self._w._is_selected = True
+        self._w._notify_spacer_selected(True)
         self._w.headerClearRequested.emit()
         self._w.positionRulerRefreshRequested.emit()
         event.accept()

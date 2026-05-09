@@ -146,7 +146,10 @@ class WorkspaceSignalMapper:
     def _clear_header_selection_for_consensus(self) -> None:
         ctx = self._ctx
         ctx.consensus_spacer.set_selected(True)
+        ctx.consensus_row.set_selected(True)
         changed = ctx.header_viewer.clear_selection()
         ctx.header_viewer.apply_selection_to_items(changed)
         ctx.sequence_viewer.clear_h_guides()
         ctx.sequence_viewer.clear_visual_selection()
+        ctx.sequence_viewer.clear_selection_model()
+        ctx.sequence_viewer.clear_selection_dim_range()
