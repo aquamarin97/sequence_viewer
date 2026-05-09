@@ -31,6 +31,7 @@ class OverlayMixin:
     def _init_overlay(self):
         self._v_guide_cols: list = []
         self._v_guide_observers: list = []
+        self._caret_observers: list = []
         self._h_guide_rows: frozenset = frozenset()
         self._selection_dim_ranges: list = []  # [(left_col, right_col), ...] focus alanları
         self._caret = None        # (col, row) | None — aktif I-beam (tıklama sonrası)
@@ -59,15 +60,22 @@ class OverlayMixin:
     # Caret (metin kursörü) public API
     # ------------------------------------------------------------------
 
+    def add_caret_observer(self, callback):
+        self._caret_observers.append(callback)
+
     def set_caret(self, col: int, row: int):
         """Belirtilen kolon/satır kesişimine aktif I-beam caret koy."""
         self._caret = (col, row)
         self.viewport().update()
+        for cb in self._caret_observers:
+            cb()
 
     def clear_caret(self):
         if self._caret is not None:
             self._caret = None
             self.viewport().update()
+            for cb in self._caret_observers:
+                cb()
 
     def set_hover_caret(self, col: int, row: int):
         """Ghost I-beam preview cursor'ı konumlandır (hover state)."""

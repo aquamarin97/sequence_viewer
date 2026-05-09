@@ -54,11 +54,11 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self.annotation = annotation
         self.update()
 
-    def set_selected_visual(self, selected):
+    def set_selected_visual(self, selected, *, animate=True):
         if self._selected == selected:
             return
         self._selected = selected
-        if selected:
+        if selected and animate:
             self._anim_frame = 0
             self._anim_scale = _ANIM_FRAMES[0]
             self._anim_timer.start(_ANIM_INTERVAL_MS)

@@ -169,6 +169,8 @@ class ConsensusRenderer:
         seq_top = float(strip_height(above_geometry.total_lanes))
         painter.setRenderHint(QPainter.Antialiasing, True)
         parent_by_id = {ann.id: ann for ann in annotations}
+        anim_ids = widget._anim_ids
+        anim_scale = widget._anim_scale
         for ann in annotations:
             x = ann.start * char_width - view_left
             ann_width = char_width if ann.type == AnnotationType.MISMATCH_MARKER else ann.length() * char_width
@@ -203,6 +205,12 @@ class ConsensusRenderer:
             ann_color = ann.resolved_color()
             ann_strand = getattr(ann, "strand", "+")
             painter.save()
+            if ann.id in anim_ids and abs(anim_scale - 1.0) > 0.001:
+                cx = clipped_x + clipped_w / 2.0
+                cy = ann_y + lane_h / 2.0
+                painter.translate(cx, cy)
+                painter.scale(anim_scale, anim_scale)
+                painter.translate(-cx, -cy)
             if ann.type == AnnotationType.PRIMER:
                 draw_primer(painter, clipped_x, ann_y, clipped_w, lane_h, ann_color, ann.label, strand=ann_strand, char_width=ann_char_w)
             elif ann.type == AnnotationType.PROBE:

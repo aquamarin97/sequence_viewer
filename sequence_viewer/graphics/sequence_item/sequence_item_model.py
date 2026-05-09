@@ -56,16 +56,18 @@ class SequenceItemModel:
         if scale >= 1.8: snapped_size = max_fs
         elif scale >= 1.2: snapped_size = max(1.0, max_fs * (10.0 / 12.0))
         elif scale >= 0.7: snapped_size = max(1.0, max_fs * (8.0 / 12.0))
+        elif scale >= 0.45: snapped_size = max(1.0, max_fs * (6.0 / 12.0))
+        elif scale >= 0.25: snapped_size = max(1.0, max_fs * (4.0 / 12.0))
         else: snapped_size = max(1.0, self.base_font_size * scale)
         self.current_font_size = snapped_size
-        text_box_threshold = max_fs * (8.0 / 11.0)
-        box_line_threshold = max_fs * (5.0 / 11.0)
+        text_box_threshold = max_fs * (7.0 / 11.0)
+        box_line_threshold = max_fs * (3.5 / 11.0)
         if self.current_font_size >= text_box_threshold: self.display_mode = self.TEXT_MODE
         elif self.current_font_size >= box_line_threshold: self.display_mode = self.BOX_MODE
         else: self.display_mode = self.LINE_MODE
         box_ref = min(self.char_height * 0.7, self.current_font_size)
         self.box_height = max(box_ref, 1.0)
-        self.line_height = self.char_height * 0.3
+        self.line_height = max(1.0, min(self.char_height * 0.7, max_fs * (4.0 / 12.0)))
 
     @property
     def selection_range(self):

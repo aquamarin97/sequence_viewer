@@ -160,7 +160,7 @@ class WorkspaceAnnotationPresentation:
             scene.addItem(item)
             self.ann_items.setdefault(ann.id, []).append(item)
             if ann.id in self._selected_ann_ids:
-                item.set_selected_visual(True)
+                item.set_selected_visual(True, animate=False)
 
     def update_ann_items_geometry(self, layout: RowLayout) -> None:
         if not self.ann_items or layout.row_count == 0:

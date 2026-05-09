@@ -20,6 +20,9 @@ from sequence_viewer.features.annotation_layer.annotation_layout_engine import (
     partition_annotations_by_side,
     side_strip_height,
 )
+from sequence_viewer.features.annotation_layer.annotation_graphics_item import (
+    _ANIM_FRAMES, _ANIM_INTERVAL_MS,
+)
 from sequence_viewer.features.consensus_row.consensus_annotation_handler import (
     ConsensusAnnotationHandler,
 )
@@ -70,6 +73,13 @@ class ConsensusRowWidget(QWidget):
         self._selected_ann_ids: set = set()
         self._selection_ranges: list = []  # [(start_incl, end_excl), ...]
 
+        # ── Annotation tıklama animasyonu ─────────────────────────────────
+        self._anim_scale: float = 1.0
+        self._anim_frame: int = 0
+        self._anim_ids: set = set()
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._anim_step)
+
         # ── Alt controller'lar ───────────────────────────────────────────
         _tooltip = DragTooltip(parent=self)
         self._ann_handler = ConsensusAnnotationHandler(alignment_model)
@@ -118,6 +128,8 @@ class ConsensusRowWidget(QWidget):
             anim.valueChanged.connect(self.update)
         if hasattr(sequence_viewer, "add_v_guide_observer"):
             sequence_viewer.add_v_guide_observer(self.update)
+        if hasattr(sequence_viewer, "add_caret_observer"):
+            sequence_viewer.add_caret_observer(self.update)
 
         # ── Tema / ayar sinyal bağlantıları ─────────────────────────────
         theme_manager.themeChanged.connect(lambda _: self._on_theme_changed())
@@ -268,6 +280,25 @@ class ConsensusRowWidget(QWidget):
 
     def get_selected_annotation_ids(self) -> set:
         return set(self._selected_ann_ids)
+
+    def _start_ann_animation(self, ann_ids: set) -> None:
+        if not ann_ids:
+            return
+        self._anim_ids = ann_ids
+        self._anim_frame = 0
+        self._anim_scale = _ANIM_FRAMES[0]
+        self._anim_timer.start(_ANIM_INTERVAL_MS)
+
+    def _anim_step(self) -> None:
+        self._anim_frame += 1
+        if self._anim_frame >= len(_ANIM_FRAMES):
+            self._anim_timer.stop()
+            self._anim_scale = 1.0
+            self._anim_frame = 0
+            self._anim_ids.clear()
+        else:
+            self._anim_scale = _ANIM_FRAMES[self._anim_frame]
+        self.update()
 
     def clear_selection(self):
         self._selection_ranges = []

@@ -195,8 +195,11 @@ class ConsensusMouseController:
     def _apply_annotation_result(self, result: "AnnotationSelectResult") -> None:
         if result.clear_workspace:
             self._w.workspaceAnnotationClearRequested.emit()
+        newly_selected = set(result.selected_ids) - self._w._selected_ann_ids
         self._w._selected_ann_ids = set(result.selected_ids)
         self._w._is_selected = bool(result.selected_ids)
+        if newly_selected:
+            self._w._start_ann_animation(newly_selected)
         self._w._selection_ranges = result.selection_ranges
         self._w.spacerSelectionChanged.emit(self._w._is_selected)
         if result.guide_cols:

@@ -139,6 +139,9 @@ class WorkspaceSignalMapper:
         if ctx.annotation_selection.has_selected_annotations():
             ctx.annotation_selection.clear_selected_annotations()
             ctx.annotation_selection.clear_all_annotation_visuals()
+        changed = ctx.header_viewer.clear_selection()
+        ctx.header_viewer.apply_selection_to_items(changed)
+        ctx.sequence_viewer.clear_h_guides()
 
     def _clear_header_selection_for_consensus(self) -> None:
         ctx = self._ctx
