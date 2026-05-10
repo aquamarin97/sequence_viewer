@@ -41,6 +41,24 @@ class SequenceViewerWidget(SequenceViewerView):
     def add_sequence(self, sequence_string):
         self._controller.add_sequence(sequence_string)
 
+    def set_sequences(self, sequences) -> None:
+        self._model.set_sequences(sequences)
+        self.max_sequence_length = self._model.max_sequence_length
+        self._total_row_count = self._model.get_row_count()
+        self._selection_range = None
+        self._full_pool_remount()
+        self._update_scene_rect(invalidate=False)
+        self.viewport().update()
+
+    def set_sequence_source(self, row_count: int, max_sequence_length: int, sequence_provider) -> None:
+        self._model.set_sequence_source(row_count, max_sequence_length, sequence_provider)
+        self.max_sequence_length = self._model.max_sequence_length
+        self._total_row_count = self._model.get_row_count()
+        self._selection_range = None
+        self._full_pool_remount()
+        self._update_scene_rect(invalidate=False)
+        self.viewport().update()
+
     def remove_sequence(self, index: int) -> None:
         self._model.remove_sequence(index)
         self.max_sequence_length = self._model.max_sequence_length

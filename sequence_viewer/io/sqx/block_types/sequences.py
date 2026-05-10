@@ -26,6 +26,13 @@ _INT_TO_ANN_TYPE: dict[int, AnnotationType] = {v: k for k, v in _ANN_TYPE_TO_INT
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+def _decode_sqx_string(data: bytes) -> str:
+    try:
+        return data.decode('utf-8')
+    except UnicodeDecodeError:
+        return data.decode('latin-1')
+
+
 def _uuid_to_bytes(uid: str) -> bytes:
     return _uuid_mod.UUID(uid).bytes
 
@@ -167,11 +174,10 @@ def serialize_record_meta(record: SequenceRecord, source_file: str = "") -> byte
 
 
 def deserialize_record_meta(buf: Any, offset: int) -> tuple[dict, int]:
-    """Parse SEQ RECORD metadata (not encoded_data) from *buf* at *offset*."""
     header_len = struct.unpack_from('<H', buf, offset)[0]; offset += 2
-    header = bytes(buf[offset:offset + header_len]).decode('utf-8'); offset += header_len
+    header = _decode_sqx_string(bytes(buf[offset:offset + header_len])); offset += header_len
     sf_len = struct.unpack_from('<H', buf, offset)[0]; offset += 2
-    source_file = bytes(buf[offset:offset + sf_len]).decode('utf-8'); offset += sf_len
+    source_file = _decode_sqx_string(bytes(buf[offset:offset + sf_len])); offset += sf_len
     seq_type, encoding = struct.unpack_from('<BB', buf, offset); offset += 2
     ann_count = struct.unpack_from('<I', buf, offset)[0]; offset += 4
     annotations: list[Annotation] = []
@@ -185,7 +191,6 @@ def deserialize_record_meta(buf: Any, offset: int) -> tuple[dict, int]:
         'encoding': encoding,
         'annotations': annotations,
     }, offset
-
 
 # ── full SEQUENCES block ───────────────────────────────────────────────────────
 

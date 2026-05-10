@@ -35,11 +35,15 @@ class WorkspaceLayoutScrollSync:
         self._ctx = ctx
         self._v_scroll_guard = _ScrollSyncGuard()
 
-    def compute_row_layout(self) -> RowLayout:
+    def compute_row_layout(self, records=None) -> RowLayout:
         ch = self._ctx.sequence_viewer.char_height
         above_heights, below_heights = [], []
-        for record in self._ctx.model.all_records():
-            above_anns, below_anns = partition_annotations_by_side(record.annotations)
+        if records is None:
+            annotation_lists = self._ctx.model.iter_annotation_lists()
+        else:
+            annotation_lists = (record.annotations for record in records)
+        for annotations in annotation_lists:
+            above_anns, below_anns = partition_annotations_by_side(annotations)
             above_heights.append(side_strip_height(above_anns))
             below_heights.append(side_strip_height(below_anns))
         return RowLayout.build(ch, above_heights, below_heights)

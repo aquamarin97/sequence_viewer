@@ -12,6 +12,8 @@ class SequenceViewerTooltipController:
         self._view = view
         self._state = TooltipState()
         self._drag_tooltip = DragTooltip(parent=self._view.viewport())
+        self._cached_sequence_row = None
+        self._cached_sequence = None
 
     @property
     def drag_tooltip(self) -> DragTooltip:
@@ -28,9 +30,11 @@ class SequenceViewerTooltipController:
     def clear(self) -> None:
         self._drag_tooltip.clear_panel()
         self._state.last_sel_range = None
+        self._clear_sequence_cache()
 
     def clear_panel(self) -> None:
         self._drag_tooltip.clear_panel()
+        self._clear_sequence_cache()
 
     def show_info_panel(self, row_start: int, row_end: int, col_start: int, col_end: int) -> None:
         sel_range = (row_start, row_end, col_start, col_end)
@@ -41,6 +45,7 @@ class SequenceViewerTooltipController:
         if sel_range is None or sel_range[3] <= sel_range[2]:
             self._drag_tooltip.clear_panel()
             self._state.last_sel_range = None
+            self._clear_sequence_cache()
             return
         self._state.last_sel_range = sel_range
         self._show_info_panel(sel_range)
@@ -50,6 +55,7 @@ class SequenceViewerTooltipController:
             self._show_info_panel(self._state.last_sel_range)
         else:
             self._drag_tooltip.clear_panel()
+            self._clear_sequence_cache()
 
     def hide_if_selection_cleared(self, is_selecting: bool) -> None:
         if is_selecting:
@@ -67,14 +73,25 @@ class SequenceViewerTooltipController:
         bp = selection_bp(col_start, col_end)
         anchor = self._view.selection_viewport_anchor(row_end, col_end)
         if row_start == row_end:
-            sequences = self._model.get_sequences()
             tm = None
-            if 0 <= row_start < len(sequences):
-                fragment = sequences[row_start][col_start:col_end + 1]
+            if 0 <= row_start < self._model.get_row_count():
+                sequence = self._sequence_for_row(row_start)
+                fragment = sequence[col_start:col_end + 1]
                 tm = calculate_tm(fragment)
             self._drag_tooltip.show_bp_tm(anchor, bp, tm)
         else:
             self._drag_tooltip.show_bp_only(anchor, bp)
+            self._clear_sequence_cache()
+
+    def _sequence_for_row(self, row_index: int):
+        if self._cached_sequence_row != row_index:
+            self._cached_sequence_row = row_index
+            self._cached_sequence = self._model.get_sequence(row_index)
+        return self._cached_sequence
+
+    def _clear_sequence_cache(self) -> None:
+        self._cached_sequence_row = None
+        self._cached_sequence = None
 
 
 class SequenceViewerHoverController:

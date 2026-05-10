@@ -17,6 +17,8 @@ class HeaderViewerWidget(HeaderViewerView):
     def __init__(self, parent=None, *, row_height=18.0, initial_width=160.0):
         super().__init__(parent=parent, row_height=row_height, initial_width=initial_width)
         self._model = HeaderViewerModel()
+        self._max_header_text_px = 0
+        self._required_width_cache = 100
 
     # ── Pool data provider ─────────────────────────────────────────────────
 
@@ -34,10 +36,24 @@ class HeaderViewerWidget(HeaderViewerView):
 
     def add_header(self, text: str) -> None:
         row_index = self._model.add_header(text)
-        self.add_header_item(f"{row_index + 1}. {text}")
+        display_text = f"{row_index + 1}. {text}"
+        self._include_header_width(display_text)
+        self.add_header_item(display_text)
+
+    def set_headers(self, headers) -> None:
+        self._model.set_headers(headers)
+        self._total_header_count = self._model.get_row_count()
+        self._selection.clear()
+        self._editor.cancel_edit()
+        self._drag.reset()
+        self._full_header_pool_remount()
+        self._rebuild_width_cache()
+        self._update_scene_rect()
 
     def clear(self):
         self._model.clear_headers()
+        self._max_header_text_px = 0
+        self._required_width_cache = 100
         self.clear_items()
 
     def get_headers(self): return self._model.get_headers()
@@ -92,6 +108,7 @@ class HeaderViewerWidget(HeaderViewerView):
         if index < 0 or index >= self._total_header_count:
             raise IndexError(f"Header index {index} out of range")
         self._model.remove_header(index)
+        self._invalidate_width_cache()
         self.selection.remove_row(index)
         self._total_header_count -= 1
         self._full_header_pool_remount()
@@ -104,6 +121,7 @@ class HeaderViewerWidget(HeaderViewerView):
         if from_index == to_index:
             return
         self._model.move_header(from_index, to_index)
+        self._invalidate_width_cache()
         self.move_row_selection(from_index, to_index)
         self._full_header_pool_remount()
         self._update_scene_rect()
@@ -117,18 +135,48 @@ class HeaderViewerWidget(HeaderViewerView):
                 item.set_full_text(self._get_header_text_for_row(item.row_index))
 
     def set_header_item_text(self, index: int, display_text: str) -> None:
+        self._model.set_header(index, self._strip_row_number(display_text))
+        self._invalidate_width_cache()
         item = self._find_pool_item(index)
         if item is not None:
             item.set_full_text(display_text)
 
     def compute_required_width(self) -> int:
+        if self._required_width_cache is not None:
+            return self._required_width_cache
+        return self._rebuild_width_cache()
+
+    def _on_display_settings_changed(self):
+        super()._on_display_settings_changed()
+        self._invalidate_width_cache()
+
+    def _font_metrics(self) -> QFontMetrics:
+        font = self.header_items[0].font if self.header_items else QFont("Arial")
+        return QFontMetrics(font)
+
+    def _include_header_width(self, display_text: str) -> None:
+        if self._required_width_cache is None:
+            self._rebuild_width_cache()
+        metrics = self._font_metrics()
+        self._max_header_text_px = max(
+            self._max_header_text_px,
+            metrics.horizontalAdvance(display_text),
+        )
+        self._required_width_cache = max(100, self._max_header_text_px + 14)
+
+    def _invalidate_width_cache(self) -> None:
+        self._required_width_cache = None
+
+    def _rebuild_width_cache(self) -> int:
         headers = self._model.get_headers()
         if not headers:
-            return 100
-        font = self.header_items[0].font if self.header_items else QFont("Arial")
-        metrics = QFontMetrics(font)
-        max_px = max(
+            self._max_header_text_px = 0
+            self._required_width_cache = 100
+            return self._required_width_cache
+        metrics = self._font_metrics()
+        self._max_header_text_px = max(
             metrics.horizontalAdvance(f"{i + 1}. {h}")
             for i, h in enumerate(headers)
         )
-        return max_px + 14
+        self._required_width_cache = max(100, self._max_header_text_px + 14)
+        return self._required_width_cache

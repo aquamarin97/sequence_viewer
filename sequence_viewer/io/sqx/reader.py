@@ -77,19 +77,35 @@ class SQXReader:
     def sequence_count(self) -> int:
         return len(self._seq_entries)
 
-    def read_sequence_record(self, index: int) -> SequenceRecord:
-        """Return a SequenceRecord whose .sequence is a LazySequence (or str for short seqs)."""
+    def max_sequence_length(self) -> int:
+        if not self._seq_entries:
+            return 0
+        return max(e.base_count for e in self._seq_entries)
+
+    def sequence_length(self, index: int) -> int:
+        return self._seq_entries[index].base_count
+
+    def sequence_header(self, index: int) -> str:
+        return self._seq_entries[index].header
+
+    def sequence_annotations(self, index: int) -> list:
+        return list(self._seq_entries[index].annotations)
+
+    def read_sequence(self, index: int) -> LazySequence:
         entry = self._seq_entries[index]
-        abs_data_offset = self._seq_block_offset + entry.data_offset
-        sequence: str | LazySequence = LazySequence(
+        return LazySequence(
             self._mmap,  # type: ignore[arg-type]
-            abs_data_offset,
+            self._seq_block_offset + entry.data_offset,
             entry.base_count,
             entry.encoding,
         )
+
+    def read_sequence_record(self, index: int) -> SequenceRecord:
+        """Return a SequenceRecord whose .sequence is a LazySequence (or str for short seqs)."""
+        entry = self._seq_entries[index]
         return SequenceRecord(
             header=entry.header,
-            sequence=sequence,
+            sequence=self.read_sequence(index),
             id=entry.seq_id,
             annotations=list(entry.annotations),
         )

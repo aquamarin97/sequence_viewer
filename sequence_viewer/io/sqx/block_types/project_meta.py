@@ -4,7 +4,11 @@ from __future__ import annotations
 import struct
 import time
 from dataclasses import dataclass, field
-
+def _decode_sqx_string(data: bytes) -> str:
+    try:
+        return data.decode('utf-8')
+    except UnicodeDecodeError:
+        return data.decode('latin-1')
 
 @dataclass
 class ProjectMeta:
@@ -32,11 +36,12 @@ class ProjectMeta:
         offset += 16
         av_len = struct.unpack_from('<H', data, offset)[0]
         offset += 2
-        app_version = bytes(data[offset:offset + av_len]).decode('utf-8')
+        app_version = _decode_sqx_string(bytes(data[offset:offset + av_len]))
         offset += av_len
         pn_len = struct.unpack_from('<H', data, offset)[0]
         offset += 2
-        project_name = bytes(data[offset:offset + pn_len]).decode('utf-8')
+        project_name = _decode_sqx_string(bytes(data[offset:offset + pn_len]))
+
         return ProjectMeta(
             project_name=project_name,
             app_version=app_version,

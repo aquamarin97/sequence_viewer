@@ -15,6 +15,7 @@ class MouseSelectionState:
     drag_started: bool = False
     drag_end_row: Optional[int] = None
     last_notified_row_range: Optional[tuple[int, int]] = None
+    last_drag_sel_range: Optional[tuple[int, int, int, int]] = None
 
 
 @dataclass

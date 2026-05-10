@@ -301,6 +301,8 @@ class ConsensusRowWidget(QWidget):
         self.update()
 
     def clear_selection(self):
+        if not self._selection_ranges and not self._is_selected and not self._selected_ann_ids:
+            return
         self._selection_ranges = []
         self._is_selected = False
         self._selected_ann_ids.clear()

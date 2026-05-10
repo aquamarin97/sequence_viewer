@@ -77,10 +77,9 @@ class SQXConversionWorker(QThread):
         )
         self.finished.emit(str(self._sqx_path))
 
-# SQXLoadWorker kısmında değişiklik yapmadım, aynen kalabilir.
 class SQXLoadWorker(QThread):
-    """Load an existing .sqx file and read all records in the background."""
-    records_ready = pyqtSignal(object, object)  # (SQXReader, list[SequenceRecord])
+    """Load an existing .sqx file and emit the open reader for lazy access."""
+    reader_ready = pyqtSignal(object)  # SQXReader — directory loaded, records lazy
     failed = pyqtSignal(str)
 
     def __init__(self, sqx_path: Path) -> None:
@@ -91,15 +90,10 @@ class SQXLoadWorker(QThread):
         try:
             from sequence_viewer.io.sqx.reader import SQXReader
             print(f"[LOADER] SQX dosyası okunuyor: {self._sqx_path.name}")
-            
             reader = SQXReader(self._sqx_path)
             reader.open()
-            records = [
-                reader.read_sequence_record(i)
-                for i in range(reader.sequence_count())
-            ]
-            print(f"[LOADER] Toplam {len(records)} kayıt başarıyla yüklendi.")
-            self.records_ready.emit(reader, records)
+            print(f"[LOADER] {reader.sequence_count()} kayıt dizini yüklendi (lazy).")
+            self.reader_ready.emit(reader)
         except Exception as exc:
             print(f"[LOADER ERROR] {exc}")
             self.failed.emit(str(exc))

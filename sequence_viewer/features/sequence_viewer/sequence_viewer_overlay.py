@@ -42,12 +42,17 @@ class OverlayMixin:
     # ------------------------------------------------------------------
 
     def set_v_guides(self, cols: list):
-        self._v_guide_cols = list(cols)
+        new_cols = list(cols)
+        if self._v_guide_cols == new_cols:
+            return
+        self._v_guide_cols = new_cols
         self.viewport().update()
         for cb in self._v_guide_observers:
             cb()
 
     def clear_v_guides(self):
+        if not self._v_guide_cols:
+            return
         self._v_guide_cols = []
         self.viewport().update()
         for cb in self._v_guide_observers:
@@ -65,6 +70,8 @@ class OverlayMixin:
 
     def set_caret(self, col: int, row: int):
         """Belirtilen kolon/satır kesişimine aktif I-beam caret koy."""
+        if self._caret == (col, row):
+            return
         self._caret = (col, row)
         self.viewport().update()
         for cb in self._caret_observers:
@@ -92,18 +99,18 @@ class OverlayMixin:
 
     # Backwards-compat single-guide API
     def set_guide_cols(self, start_col, end_col):
-        self._v_guide_cols = [start_col, end_col + 1]
-        self.viewport().update()
+        self.set_v_guides([start_col, end_col + 1])
 
     def clear_guide_cols(self):
-        self._v_guide_cols = []
-        self.viewport().update()
+        self.clear_v_guides()
 
     # ------------------------------------------------------------------
     # Horizontal guide public API
     # ------------------------------------------------------------------
 
     def set_h_guides(self, row_indices):
+        if self._h_guide_rows == row_indices:
+            return
         self._h_guide_rows = row_indices
         for item in getattr(self, "sequence_items", []):
             if item.isVisible():
@@ -122,14 +129,20 @@ class OverlayMixin:
     # ------------------------------------------------------------------
 
     def set_selection_dim_range(self, left_col: int, right_col: int):
-        self._selection_dim_ranges = [(left_col, right_col)]
+        new_ranges = [(left_col, right_col)]
+        if self._selection_dim_ranges == new_ranges:
+            return
+        self._selection_dim_ranges = new_ranges
         self.viewport().update()
         for cb in self._v_guide_observers:
             cb()
 
     def set_selection_focus_ranges(self, ranges: list):
         """Birden fazla focus aralıĞŸı ayarla â€” aralarındaki boşluklar karartılır."""
-        self._selection_dim_ranges = list(ranges)
+        new_ranges = list(ranges)
+        if self._selection_dim_ranges == new_ranges:
+            return
+        self._selection_dim_ranges = new_ranges
         self.viewport().update()
         for cb in self._v_guide_observers:
             cb()

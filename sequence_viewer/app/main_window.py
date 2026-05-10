@@ -82,45 +82,57 @@ class MainWindow(QMainWindow):
         file_paths, _ = QFileDialog.getOpenFileNames(self, "Aligned FASTA Dosyasi Sec", "", file_filter)
         for path in file_paths:
             self._load_fasta_as_sqx(path, aligned=True)
-
     def _load_fasta_as_sqx(self, path_str: str, aligned: bool = False) -> None:
-        """Start SQX conversion if needed, then load in background."""
+        import time
         fasta_path = Path(path_str)
         sqx_path = fasta_path.with_suffix('.sqx')
 
         if sqx_path.exists():
+            t0 = time.perf_counter()
             self._start_load_worker(sqx_path, aligned)
+            # Load worker async, zamanlamayı on_reader_loaded'da alacağız
+            self._t0 = t0
             return
+
+        t0 = time.perf_counter()
+        self._t0 = t0
 
         from sequence_viewer.app.sqx_conversion_worker import SQXConversionWorker
         worker = SQXConversionWorker(fasta_path, sqx_path)
-        worker.finished.connect(lambda p: self._start_load_worker(Path(p), aligned))
+        worker.finished.connect(lambda p: (
+            print(f"[TIMING] Dönüşüm: {time.perf_counter() - self._t0:.2f}s"),
+            self.__dict__.update({'_t1': time.perf_counter()}),
+            self._start_load_worker(Path(p), aligned)
+        ))
         worker.failed.connect(lambda msg: print(f"SQX donusum hatasi: {msg}"))
         self._register_worker(worker)
         worker.start()
 
     def _start_load_worker(self, sqx_path: Path, aligned: bool) -> None:
-        """Open and read .sqx in a background thread."""
+        """Open .sqx directory in background; records load lazily on first access."""
         from sequence_viewer.app.sqx_conversion_worker import SQXLoadWorker
         worker = SQXLoadWorker(sqx_path)
-        worker.records_ready.connect(
-            lambda reader, records: self._on_records_loaded(reader, records, aligned)
+        worker.reader_ready.connect(
+            lambda reader: self._on_reader_loaded(reader, aligned)
         )
         worker.failed.connect(lambda msg: print(f"SQX yukleme hatasi: {msg}"))
         self._register_worker(worker)
         worker.start()
 
-    def _on_records_loaded(self, reader, records: list, aligned: bool) -> None:
-        """Called on main thread after SQXLoadWorker finishes."""
+    def _on_reader_loaded(self, reader, aligned: bool) -> None:
+        import time
+        if hasattr(self, '_t1'):
+            print(f"[TIMING] SQX okuma: {time.perf_counter() - self._t1:.2f}s")
+        if hasattr(self, '_t0'):
+            print(f"[TIMING] Toplam: {time.perf_counter() - self._t0:.2f}s")
         self._sqx_readers.append(reader)
         alignment_metadata = None
-        if aligned and records:
+        if aligned and reader.sequence_count() > 0:
             from sequence_viewer.model.alignment_metadata import AlignmentMetadata
-
             alignment_metadata = AlignmentMetadata(
                 algorithm="imported", source="aligned FASTA file"
             )
-        self.workspace.append_records(records, alignment_metadata=alignment_metadata)
+        self.workspace.attach_reader(reader, alignment_metadata=alignment_metadata)
 
     def _register_worker(self, worker) -> None:
         self._workers.append(worker)

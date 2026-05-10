@@ -70,6 +70,7 @@ class SequenceViewerMouseController:
         self._state.press_scene_row = row
         self._state.press_scene_col = col
         self._state.drag_started = False
+        self._state.last_drag_sel_range = None
         return True
 
     def handle_mouse_move(self, event) -> bool:
@@ -128,6 +129,9 @@ class SequenceViewerMouseController:
         row, col = self._view.scene_pos_to_row_col(scene_pos)
         self._state.drag_end_row = row
         sel_range = self._model.update_selection(row, col)
+        if sel_range == self._state.last_drag_sel_range:
+            return True
+        self._state.last_drag_sel_range = sel_range
         if sel_range:
             self._view.set_visual_selection(*sel_range)
             col_start, col_end = sel_range[2], sel_range[3]
@@ -153,6 +157,7 @@ class SequenceViewerMouseController:
         row_end = self._state.drag_end_row if self._state.drag_end_row is not None else row_start
         self._state.drag_end_row = None
         self._state.last_notified_row_range = None
+        self._state.last_drag_sel_range = None
         self._state.press_pos = None
 
         self._tooltip_controller.restore_last_panel_or_clear()

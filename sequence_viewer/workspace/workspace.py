@@ -124,6 +124,11 @@ class SequenceWorkspaceWidget(QWidget):
         if alignment_metadata is not None and payload:
             self._ctx.model.set_aligned(alignment_metadata)
 
+    def attach_reader(self, reader, *, alignment_metadata: Optional[AlignmentMetadata] = None) -> None:
+        self._ctx.model.attach_reader(reader)
+        if alignment_metadata is not None and reader.sequence_count() > 0:
+            self._ctx.model.set_aligned(alignment_metadata)
+
     def append_records(
         self,
         records: Iterable[SequenceRecord],

@@ -83,6 +83,20 @@ std::string stem_of(const std::string& path) {
     return dot == std::string::npos ? name : name.substr(0, dot);
 }
 
+std::string latin1_to_utf8(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() * 2);
+    for (unsigned char c : s) {
+        if (c < 0x80) {
+            out += static_cast<char>(c);
+        } else {
+            out += static_cast<char>(0xC0 | (c >> 6));
+            out += static_cast<char>(0x80 | (c & 0x3F));
+        }
+    }
+    return out;
+}
+
 std::array<std::uint8_t, 16> make_uuid(std::uint64_t index) {
     static std::mt19937_64 rng(
         static_cast<std::uint64_t>(
@@ -113,6 +127,7 @@ std::uint8_t iupac4(unsigned char ch) {
         case 'C': return 0x2;
         case 'G': return 0x3;
         case 'T': return 0x4;
+        case 'U': return 0x4;  // RNA: U == T (uracil → thymine nibble)
         case 'R': return 0x5;
         case 'Y': return 0x6;
         case 'M': return 0x7;
@@ -124,7 +139,7 @@ std::uint8_t iupac4(unsigned char ch) {
         case 'V': return 0xD;
         case 'D': return 0xE;
         case 'N': return 0xF;
-        default: return 0xF;
+        default:  return 0xF;
     }
 }
 
@@ -158,7 +173,7 @@ std::vector<RecordInfo> scan_fasta(const std::string& input_path,
         if (!line.empty() && line[0] == '>') {
             RecordInfo info;
             info.uuid = make_uuid(records.size());
-            info.header = trim_ascii(line.substr(1));
+            info.header = latin1_to_utf8(trim_ascii(line.substr(1)));
             require_u16_size(info.header, "header");
             records.push_back(std::move(info));
             current = static_cast<std::int64_t>(records.size()) - 1;
@@ -189,7 +204,8 @@ std::vector<RecordInfo> scan_fasta(const std::string& input_path,
     return records;
 }
 
-std::vector<std::uint8_t> build_project_meta(const std::string& project_name) {
+std::vector<std::uint8_t> build_project_meta(const std::string& project_name_raw) {
+    std::string project_name = latin1_to_utf8(project_name_raw);
     require_u16_size(project_name, "project_name");
     std::vector<std::uint8_t> data;
     std::int64_t now = static_cast<std::int64_t>(std::time(nullptr));
@@ -275,7 +291,8 @@ void write_sequences_block(std::ostream& out,
             if (index >= records.size()) {
                 throw std::runtime_error("record count changed between FASTA passes");
             }
-            std::string header = trim_ascii(line.substr(1));
+            std::string header = latin1_to_utf8(trim_ascii(line.substr(1)));
+
             if (header != records[index].header) {
                 throw std::runtime_error("record order changed between FASTA passes");
             }

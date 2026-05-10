@@ -141,9 +141,12 @@ class WorkspaceActionDialogCoordinator:
         ctx.annotation_presentation.remove_all_ann_items()
         ctx.header_viewer.clear()
         ctx.sequence_viewer.clear()
-        for record in ctx.model.all_records():
-            ctx.header_viewer.add_header(record.header)
-            ctx.sequence_viewer.add_sequence(record.sequence)
+        ctx.header_viewer.set_headers(ctx.model.iter_headers())
+        ctx.sequence_viewer.set_sequence_source(
+            ctx.model.row_count(),
+            ctx.model.max_sequence_length,
+            ctx.model.get_sequence_object,
+        )
         layout = ctx.layout_sync.compute_row_layout()
         ctx.layout_sync.apply_layout(layout)
         ctx.ruler.update()

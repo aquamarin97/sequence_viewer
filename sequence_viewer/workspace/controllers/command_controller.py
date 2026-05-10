@@ -3,11 +3,33 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sequence_viewer.model.undo_stack import ModelSnapshotCommand
+from sequence_viewer.model.undo_stack import ModelSnapshotCommand, UndoCommand
 from sequence_viewer.workspace.controllers.state_cleaner import WorkspaceStateCleaner
 
 if TYPE_CHECKING:
     from sequence_viewer.workspace.context import WorkspaceContext
+
+
+class DeleteRowsCommand(UndoCommand):
+    def __init__(self, ctx: "WorkspaceContext", rows) -> None:
+        super().__init__(text="Delete rows")
+        self._ctx = ctx
+        self._rows = sorted(set(rows))
+        self._deleted = None
+
+    def execute(self):
+        self._deleted = self._ctx.model.remove_rows(self._rows)
+        self._ctx.command_controller._state_cleaner.clear_all_interaction_state()
+
+    def undo(self):
+        if not self._deleted:
+            return
+        self._ctx.model.insert_records_at(self._deleted)
+        self._ctx.command_controller._state_cleaner.clear_all_interaction_state()
+
+    def redo(self):
+        self._deleted = self._ctx.model.remove_rows(self._rows)
+        self._ctx.command_controller._state_cleaner.clear_all_interaction_state()
 
 
 class WorkspaceCommandController:
@@ -35,7 +57,7 @@ class WorkspaceCommandController:
         rows = sorted(set(rows), reverse=True)
         if not rows:
             return
-        self.push_delete_command("Delete rows", lambda: self._mutate_delete_rows(rows))
+        self._ctx.undo_stack.push(DeleteRowsCommand(self._ctx, rows))
 
     def _mutate_delete_rows(self, rows) -> None:
         for row in rows:

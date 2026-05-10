@@ -5,18 +5,48 @@ from typing import List, Optional, Tuple
 class SequenceViewerModel:
     def __init__(self):
         self._sequences = []
+        self._sequence_provider = None
+        self._provider_row_count = 0
         self.max_sequence_length = 0
         self.selection_start_row = None
         self.selection_start_col = None
         self.current_selection_cols = None
 
+    def _using_provider(self):
+        return self._sequence_provider is not None
+
     def add_sequence(self, sequence):
+        if self._using_provider():
+            self._provider_row_count += 1
+            if len(sequence) > self.max_sequence_length:
+                self.max_sequence_length = len(sequence)
+            return self._provider_row_count - 1
         self._sequences.append(sequence)
         if len(sequence) > self.max_sequence_length:
             self.max_sequence_length = len(sequence)
         return len(self._sequences) - 1
 
+    def set_sequences(self, sequences):
+        self._sequence_provider = None
+        self._provider_row_count = 0
+        self._sequences = list(sequences)
+        self.recalc_max_sequence_length()
+        self.clear_selection()
+
+    def set_sequence_source(self, row_count, max_sequence_length, sequence_provider):
+        self._sequences.clear()
+        self._sequence_provider = sequence_provider
+        self._provider_row_count = int(row_count)
+        self.max_sequence_length = int(max_sequence_length)
+        self.clear_selection()
+
     def remove_sequence(self, index):
+        if self._using_provider():
+            if index < 0 or index >= self._provider_row_count:
+                raise IndexError(f"Sequence index {index} out of range")
+            self._provider_row_count -= 1
+            self.clear_selection()
+            return
         if index < 0 or index >= len(self._sequences):
             raise IndexError(f"Sequence index {index} out of range")
         del self._sequences[index]
@@ -24,25 +54,36 @@ class SequenceViewerModel:
         self.clear_selection()
 
     def move_sequence(self, from_index, to_index):
-        n = len(self._sequences)
+        n = self.get_row_count()
         if not (0 <= from_index < n and 0 <= to_index < n):
             raise IndexError("move_sequence out of range")
         if from_index == to_index:
+            return
+        if self._using_provider():
+            self.clear_selection()
             return
         sequence = self._sequences.pop(from_index)
         self._sequences.insert(to_index, sequence)
         self.clear_selection()
 
     def clear_sequences(self):
-        self._sequences.clear(); self.max_sequence_length = 0; self.clear_selection()
+        self._sequences.clear(); self._sequence_provider = None; self._provider_row_count = 0; self.max_sequence_length = 0; self.clear_selection()
 
     def recalc_max_sequence_length(self):
+        if self._using_provider():
+            return self.max_sequence_length
         self.max_sequence_length = max((len(s) for s in self._sequences), default=0)
         return self.max_sequence_length
 
-    def get_sequences(self): return list(self._sequences)
-    def get_row_count(self): return len(self._sequences)
-    def get_sequence(self, row_index): return self._sequences[row_index]
+    def get_sequences(self):
+        if self._using_provider():
+            return [self._sequence_provider(i) for i in range(self._provider_row_count)]
+        return list(self._sequences)
+    def get_row_count(self): return self._provider_row_count if self._using_provider() else len(self._sequences)
+    def get_sequence(self, row_index):
+        if self._using_provider():
+            return self._sequence_provider(row_index)
+        return self._sequences[row_index]
 
     def clear_selection(self):
         self.selection_start_row = None; self.selection_start_col = None; self.current_selection_cols = None
@@ -79,4 +120,3 @@ class SequenceViewerModel:
     def _clamp_column_index(self, col):
         if self.max_sequence_length <= 0: return None
         return max(0, min(col, self.max_sequence_length - 1))
-

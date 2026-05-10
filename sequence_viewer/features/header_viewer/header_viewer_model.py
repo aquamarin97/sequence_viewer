@@ -5,6 +5,12 @@ class HeaderViewerModel:
     def __init__(self): self._headers: List[str] = []
     def add_header(self, text):
         self._headers.append(text); return len(self._headers) - 1
+    def set_headers(self, headers):
+        self._headers = list(headers)
+    def set_header(self, index, text):
+        if index < 0 or index >= len(self._headers):
+            raise IndexError(f"Header index {index} out of range")
+        self._headers[index] = text
     def remove_header(self, index):
         if index < 0 or index >= len(self._headers):
             raise IndexError(f"Header index {index} out of range")
