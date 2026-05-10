@@ -1,4 +1,4 @@
-﻿# io/sqx/block_types/analyses.py
+# io/sqx/block_types/analyses.py
 from __future__ import annotations
 
 import hashlib

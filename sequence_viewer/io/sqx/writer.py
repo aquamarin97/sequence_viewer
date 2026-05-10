@@ -1,4 +1,4 @@
-﻿# io/sqx/writer.py
+# io/sqx/writer.py
 from __future__ import annotations
 
 import struct

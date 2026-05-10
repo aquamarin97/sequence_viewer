@@ -1,4 +1,4 @@
-﻿# io/export/fasta_exporter.py
+# io/export/fasta_exporter.py
 from __future__ import annotations
 
 from pathlib import Path

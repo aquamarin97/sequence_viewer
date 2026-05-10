@@ -1,4 +1,4 @@
-﻿# io/sqx/reader.py
+# io/sqx/reader.py
 from __future__ import annotations
 
 import mmap

@@ -1,4 +1,4 @@
-﻿# io/sqx/spec.py
+# io/sqx/spec.py
 from __future__ import annotations
 
 MAGIC: bytes = b'SQX\x00\x01\x00\x00\x00'

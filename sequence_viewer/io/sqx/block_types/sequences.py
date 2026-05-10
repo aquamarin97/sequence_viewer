@@ -1,4 +1,4 @@
-﻿# io/sqx/block_types/sequences.py
+# io/sqx/block_types/sequences.py
 from __future__ import annotations
 
 import struct

@@ -1,4 +1,4 @@
-﻿# io/parsers/fasta_parser.py
+# io/parsers/fasta_parser.py
 from __future__ import annotations
 
 from pathlib import Path

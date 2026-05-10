@@ -1,1 +1,1 @@
-﻿# io/sqx/block_types/__init__.py
+# io/sqx/block_types/__init__.py

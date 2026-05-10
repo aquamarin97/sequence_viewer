@@ -1,1 +1,1 @@
-﻿# io/sqx/__init__.py
+# io/sqx/__init__.py

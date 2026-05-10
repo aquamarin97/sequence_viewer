@@ -113,12 +113,14 @@ class MainWindow(QMainWindow):
     def _on_records_loaded(self, reader, records: list, aligned: bool) -> None:
         """Called on main thread after SQXLoadWorker finishes."""
         self._sqx_readers.append(reader)
-        self.workspace.model.append_records_bulk(records)
+        alignment_metadata = None
         if aligned and records:
             from sequence_viewer.model.alignment_metadata import AlignmentMetadata
-            self.workspace.model.set_aligned(
-                AlignmentMetadata(algorithm="imported", source="aligned FASTA file")
+
+            alignment_metadata = AlignmentMetadata(
+                algorithm="imported", source="aligned FASTA file"
             )
+        self.workspace.append_records(records, alignment_metadata=alignment_metadata)
 
     def _register_worker(self, worker) -> None:
         self._workers.append(worker)
@@ -182,5 +184,4 @@ class MainWindow(QMainWindow):
         self._annotation_dev_dialog.show()
         self._annotation_dev_dialog.raise_()
         self._annotation_dev_dialog.activateWindow()
-
 

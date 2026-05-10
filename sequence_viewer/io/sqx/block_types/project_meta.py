@@ -1,4 +1,4 @@
-﻿# io/sqx/block_types/project_meta.py
+# io/sqx/block_types/project_meta.py
 from __future__ import annotations
 
 import struct
