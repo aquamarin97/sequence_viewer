@@ -1,0 +1,18 @@
+{
+  "protocol_version": 1,
+  "job_id": "motif_search_20260512_000639_16807e69",
+  "command": "motif-search",
+  "created_at": "2026-05-11T21:06:39Z",
+  "threads": 1,
+  "inputs": {},
+  "parameters": {
+    "query": "ATGC",
+    "max_mismatches": 1,
+    "search_forward": true,
+    "search_reverse": false
+  },
+  "outputs": {
+    "result": "result.json",
+    "artifacts": "artifacts"
+  }
+}

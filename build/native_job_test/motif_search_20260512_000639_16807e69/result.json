@@ -1,0 +1,10 @@
+{
+  "protocol_version": 1,
+  "job_type": "motif-search",
+  "job_id": "motif_search_20260512_000639_16807e69",
+  "status": "skeleton",
+  "manifest": "build\\native_job_test\\motif_search_20260512_000639_16807e69\\manifest.json",
+  "message": "Native motif-search skeleton completed. Algorithm is not implemented yet.",
+  "hits": [],
+  "annotations": []
+}

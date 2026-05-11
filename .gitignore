@@ -27,7 +27,4 @@ Thumbs.db
 *.db
 *.sqlite3
 
-# PyInstaller
-build/
-dist/
-*.egg-info/
+

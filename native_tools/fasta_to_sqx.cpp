@@ -1,15 +1,22 @@
 #include <array>
 #include <chrono>
+#include <cstdio>
 #include <cstdint>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <optional>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace {
+
+namespace fs = std::filesystem;
 
 constexpr std::uint8_t MAGIC[8] = {'S', 'Q', 'X', 0x00, 0x01, 0x00, 0x00, 0x00};
 constexpr std::uint16_t FORMAT_VERSION = 1;
@@ -117,31 +124,47 @@ bool is_base_byte(unsigned char ch) {
     return !(ch == '\n' || ch == '\r' || ch == ' ' || ch == '\t');
 }
 
-std::uint8_t iupac4(unsigned char ch) {
-    if (ch >= 'a' && ch <= 'z') {
-        ch = static_cast<unsigned char>(ch - ('a' - 'A'));
+/* =========================================================
+   LUT-BASED IUPAC4 ENCODER
+   ========================================================= */
+
+static const std::array<std::uint8_t, 256> IUPAC4_TABLE = []() {
+    std::array<std::uint8_t, 256> table{};
+
+    for (std::size_t i = 0; i < table.size(); ++i) {
+        table[i] = 0xF;
     }
-    switch (ch) {
-        case '-': return 0x0;
-        case 'A': return 0x1;
-        case 'C': return 0x2;
-        case 'G': return 0x3;
-        case 'T': return 0x4;
-        case 'U': return 0x4;  // RNA: U == T (uracil → thymine nibble)
-        case 'R': return 0x5;
-        case 'Y': return 0x6;
-        case 'M': return 0x7;
-        case 'K': return 0x8;
-        case 'S': return 0x9;
-        case 'W': return 0xA;
-        case 'H': return 0xB;
-        case 'B': return 0xC;
-        case 'V': return 0xD;
-        case 'D': return 0xE;
-        case 'N': return 0xF;
-        default:  return 0xF;
-    }
+
+    table['-'] = 0x0;
+
+    table['A'] = table['a'] = 0x1;
+    table['C'] = table['c'] = 0x2;
+    table['G'] = table['g'] = 0x3;
+
+    table['T'] = table['t'] = 0x4;
+    table['U'] = table['u'] = 0x4;
+
+    table['R'] = table['r'] = 0x5;
+    table['Y'] = table['y'] = 0x6;
+    table['M'] = table['m'] = 0x7;
+    table['K'] = table['k'] = 0x8;
+    table['S'] = table['s'] = 0x9;
+    table['W'] = table['w'] = 0xA;
+    table['H'] = table['h'] = 0xB;
+    table['B'] = table['b'] = 0xC;
+    table['V'] = table['v'] = 0xD;
+    table['D'] = table['d'] = 0xE;
+
+    table['N'] = table['n'] = 0xF;
+
+    return table;
+}();
+
+inline std::uint8_t iupac4(unsigned char ch) {
+    return IUPAC4_TABLE[ch];
 }
+
+/* ========================================================= */
 
 void require_u16_size(const std::string& value, const char* field_name) {
     if (value.size() > 65535) {
@@ -240,7 +263,7 @@ void write_record_meta(std::ostream& out,
     out.write(source_file.data(), static_cast<std::streamsize>(source_file.size()));
     write_u8(out, SEQ_TYPE_NUCLEOTIDE);
     write_u8(out, ENCODING_IUPAC4);
-    write_u32(out, 0);  // annotation count
+    write_u32(out, 0);
 }
 
 void finish_record_byte(std::ostream& out,
@@ -368,7 +391,9 @@ void write_sqx(const std::string& input_path,
 
     out.write(reinterpret_cast<const char*>(project_meta.data()),
               static_cast<std::streamsize>(project_meta.size()));
+
     write_sequences_block(out, input_path, source_file, records);
+
     out.flush();
     if (!out) {
         throw std::runtime_error("failed while writing SQX output");
@@ -379,24 +404,328 @@ void write_sqx(const std::string& input_path,
               << " output=" << output_path << "\n";
 }
 
-}  // namespace
+std::string read_text_file(const fs::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        throw std::runtime_error("cannot open manifest: " + path.string());
+    }
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return buffer.str();
+}
 
-int main(int argc, char** argv) {
-    if (argc < 3 || argc > 4) {
-        std::cerr << "usage: fasta_to_sqx <input.fasta> <output.sqx> [project_name]\n";
-        return 2;
+std::string json_escape(const std::string& value) {
+    std::ostringstream out;
+    for (unsigned char ch : value) {
+        switch (ch) {
+            case '\\': out << "\\\\"; break;
+            case '"': out << "\\\""; break;
+            case '\b': out << "\\b"; break;
+            case '\f': out << "\\f"; break;
+            case '\n': out << "\\n"; break;
+            case '\r': out << "\\r"; break;
+            case '\t': out << "\\t"; break;
+            default:
+                if (ch < 0x20) {
+                    out << "\\u"
+                        << std::hex << std::setw(4) << std::setfill('0')
+                        << static_cast<int>(ch)
+                        << std::dec << std::setfill(' ');
+                } else {
+                    out << static_cast<char>(ch);
+                }
+                break;
+        }
+    }
+    return out.str();
+}
+
+std::optional<std::string> json_string_field(const std::string& text,
+                                             const std::string& key) {
+    const std::string needle = "\"" + key + "\"";
+    std::size_t pos = text.find(needle);
+    if (pos == std::string::npos) {
+        return std::nullopt;
+    }
+    pos = text.find(':', pos + needle.size());
+    if (pos == std::string::npos) {
+        return std::nullopt;
+    }
+    ++pos;
+    while (pos < text.size() &&
+           (text[pos] == ' ' || text[pos] == '\n' || text[pos] == '\r' || text[pos] == '\t')) {
+        ++pos;
+    }
+    if (pos >= text.size() || text[pos] != '"') {
+        return std::nullopt;
+    }
+    ++pos;
+
+    std::string value;
+    bool escaping = false;
+    for (; pos < text.size(); ++pos) {
+        char ch = text[pos];
+        if (escaping) {
+            switch (ch) {
+                case '"': value.push_back('"'); break;
+                case '\\': value.push_back('\\'); break;
+                case '/': value.push_back('/'); break;
+                case 'b': value.push_back('\b'); break;
+                case 'f': value.push_back('\f'); break;
+                case 'n': value.push_back('\n'); break;
+                case 'r': value.push_back('\r'); break;
+                case 't': value.push_back('\t'); break;
+                default: value.push_back(ch); break;
+            }
+            escaping = false;
+            continue;
+        }
+        if (ch == '\\') {
+            escaping = true;
+            continue;
+        }
+        if (ch == '"') {
+            return value;
+        }
+        value.push_back(ch);
+    }
+    return std::nullopt;
+}
+
+void write_text_file_atomic(const fs::path& path, const std::string& content) {
+    if (!path.parent_path().empty()) {
+        fs::create_directories(path.parent_path());
+    }
+
+    fs::path temp_path = path;
+    temp_path += ".tmp";
+    {
+        std::ofstream output(temp_path, std::ios::binary | std::ios::trunc);
+        if (!output) {
+            throw std::runtime_error("cannot open output: " + temp_path.string());
+        }
+        output << content;
+        output.flush();
+        if (!output) {
+            throw std::runtime_error("failed while writing output: " + temp_path.string());
+        }
+    }
+
+    std::error_code ec;
+    fs::remove(path, ec);
+    ec.clear();
+    fs::rename(temp_path, path, ec);
+    if (ec) {
+        throw std::runtime_error("cannot finalize output: " + path.string() + ": " + ec.message());
+    }
+}
+
+fs::path resolve_job_path(const fs::path& job_dir,
+                          const std::string& manifest,
+                          const std::string& key,
+                          const std::string& default_name) {
+    fs::path path = json_string_field(manifest, key).value_or(default_name);
+    if (path.is_relative()) {
+        path = job_dir / path;
+    }
+    return path;
+}
+
+void write_status(const fs::path& job_dir,
+                  const std::string& state,
+                  const std::string& step,
+                  double progress,
+                  const std::string& message) {
+    std::ostringstream json;
+    json << "{\n"
+         << "  \"state\": \"" << json_escape(state) << "\",\n"
+         << "  \"step\": \"" << json_escape(step) << "\",\n"
+         << "  \"progress\": " << std::fixed << std::setprecision(1) << progress << ",\n"
+         << "  \"message\": \"" << json_escape(message) << "\"\n"
+         << "}\n";
+    write_text_file_atomic(job_dir / "status.json", json.str());
+}
+
+void append_event(const fs::path& job_dir,
+                  const std::string& level,
+                  const std::string& step,
+                  double progress,
+                  const std::string& message) {
+    std::ofstream output(job_dir / "events.ndjson", std::ios::binary | std::ios::app);
+    if (!output) {
+        throw std::runtime_error("cannot open events log");
+    }
+    output << "{\"level\":\"" << json_escape(level)
+           << "\",\"step\":\"" << json_escape(step)
+           << "\",\"progress\":" << std::fixed << std::setprecision(1) << progress
+           << ",\"message\":\"" << json_escape(message) << "\"}\n";
+}
+
+void write_motif_search_result(const fs::path& result_path,
+                               const std::string& job_id,
+                               const std::string& manifest_path) {
+    std::ostringstream json;
+    json << "{\n"
+         << "  \"protocol_version\": 1,\n"
+         << "  \"job_type\": \"motif-search\",\n"
+         << "  \"job_id\": \"" << json_escape(job_id) << "\",\n"
+         << "  \"status\": \"skeleton\",\n"
+         << "  \"manifest\": \"" << json_escape(manifest_path) << "\",\n"
+         << "  \"message\": \"Native motif-search skeleton completed. Algorithm is not implemented yet.\",\n"
+         << "  \"hits\": [],\n"
+         << "  \"annotations\": []\n"
+         << "}\n";
+    write_text_file_atomic(result_path, json.str());
+}
+
+int run_motif_search_command(const std::string& manifest_path_raw) {
+    fs::path manifest_path(manifest_path_raw);
+    fs::path job_dir = manifest_path.parent_path();
+    if (job_dir.empty()) {
+        job_dir = ".";
     }
 
     try {
-        std::string project_name = argc == 4 ? argv[3] : stem_of(argv[1]);
+        fs::create_directories(job_dir);
+        std::string manifest = read_text_file(manifest_path);
+        std::string command = json_string_field(manifest, "command").value_or("motif-search");
+        if (command != "motif-search") {
+            throw std::runtime_error("manifest command must be motif-search");
+        }
+
+        std::string job_id = json_string_field(manifest, "job_id").value_or(manifest_path.stem().string());
+        fs::path artifacts_dir = resolve_job_path(job_dir, manifest, "artifacts", "artifacts");
+        fs::create_directories(artifacts_dir);
+
+        std::cerr << "[NATIVE:MOTIF-SEARCH] manifest=" << manifest_path.string()
+                  << " job_id=" << job_id << "\n";
+        append_event(job_dir, "info", "startup", 0.0, "Native motif-search job started");
+        write_status(job_dir, "running", "manifest", 10.0, "Manifest loaded");
+
+        append_event(job_dir, "info", "skeleton", 50.0, "Motif-search skeleton is ready");
+        write_status(job_dir, "running", "skeleton", 50.0, "Native skeleton running");
+
+        fs::path result_path = resolve_job_path(job_dir, manifest, "result", "result.json");
+        write_motif_search_result(result_path, job_id, manifest_path.string());
+
+        write_status(job_dir, "succeeded", "complete", 100.0, "Motif-search skeleton completed");
+        append_event(job_dir, "info", "complete", 100.0, "Native motif-search job completed");
+        std::cerr << "[NATIVE:MOTIF-SEARCH] result=" << result_path.string() << "\n";
+        return 0;
+
+    } catch (const std::exception& exc) {
+        try {
+            write_status(job_dir, "failed", "error", 0.0, exc.what());
+            append_event(job_dir, "error", "error", 0.0, exc.what());
+        } catch (...) {
+        }
+        std::cerr << "error: " << exc.what() << "\n";
+        return 1;
+    }
+}
+
+void print_usage(const char* executable) {
+    std::cerr
+        << "usage:\n"
+        << "  " << executable << " fasta-to-sqx <input.fasta> <output.sqx> [project_name]\n"
+        << "  " << executable << " motif-search <manifest.json>\n"
+        << "  " << executable << " capabilities\n"
+        << "  " << executable << " --version\n"
+        << "\n"
+        << "legacy:\n"
+        << "  " << executable << " <input.fasta> <output.sqx> [project_name]\n";
+}
+
+void print_capabilities() {
+    std::cout
+        << "{\n"
+        << "  \"app\": \"sequence_viewer_native\",\n"
+        << "  \"version\": \"" << APP_VERSION << "\",\n"
+        << "  \"protocol_version\": 1,\n"
+        << "  \"commands\": [\n"
+        << "    {\n"
+        << "      \"name\": \"fasta-to-sqx\",\n"
+        << "      \"status\": \"stable\",\n"
+        << "      \"description\": \"Convert FASTA nucleotide records to SQX project data\"\n"
+        << "    },\n"
+        << "    {\n"
+        << "      \"name\": \"motif-search\",\n"
+        << "      \"status\": \"skeleton\",\n"
+        << "      \"description\": \"Run a manifest-based native motif search job\"\n"
+        << "    }\n"
+        << "  ]\n"
+        << "}\n";
+}
+
+int run_fasta_to_sqx_command(const std::string& input_path,
+                             const std::string& output_path,
+                             const std::string& project_name) {
+    try {
         auto start = std::chrono::steady_clock::now();
-        write_sqx(argv[1], argv[2], project_name);
+
+        write_sqx(input_path, output_path, project_name);
+
         auto end = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed = end - start;
+
         std::cerr << "seconds=" << elapsed.count() << "\n";
+
         return 0;
+
     } catch (const std::exception& exc) {
         std::cerr << "error: " << exc.what() << "\n";
         return 1;
     }
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        print_usage(argv[0]);
+        return 2;
+    }
+
+    const std::string command = argv[1];
+
+    if (command == "--help" || command == "help") {
+        print_usage(argv[0]);
+        return 0;
+    }
+
+    if (command == "--version" || command == "version") {
+        std::cout << APP_VERSION << "\n";
+        return 0;
+    }
+
+    if (command == "capabilities") {
+        print_capabilities();
+        return 0;
+    }
+
+    if (command == "fasta-to-sqx") {
+        if (argc < 4 || argc > 5) {
+            print_usage(argv[0]);
+            return 2;
+        }
+        std::string project_name = argc == 5 ? argv[4] : stem_of(argv[2]);
+        return run_fasta_to_sqx_command(argv[2], argv[3], project_name);
+    }
+
+    if (command == "motif-search") {
+        if (argc != 3) {
+            print_usage(argv[0]);
+            return 2;
+        }
+        return run_motif_search_command(argv[2]);
+    }
+
+    if (argc == 3 || argc == 4) {
+        std::string project_name = argc == 4 ? argv[3] : stem_of(argv[1]);
+        return run_fasta_to_sqx_command(argv[1], argv[2], project_name);
+    }
+
+    std::cerr << "error: unknown command: " << command << "\n";
+    print_usage(argv[0]);
+    return 2;
 }
