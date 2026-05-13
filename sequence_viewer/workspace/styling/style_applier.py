@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from PyQt5.QtGui import QBrush, QPalette
 
-from sequence_viewer.settings.scrollbar_style import apply_scrollbar_style
+from sequence_viewer.settings.scrollbar_style import ScrollbarStyle
+
 
 
 class WorkspaceStyleApplier:
@@ -28,6 +29,6 @@ class WorkspaceStyleApplier:
 
         color_style_manager.apply_theme(theme.name)
         annotation_style_manager.apply_theme(theme.name)
-        apply_scrollbar_style(self._sequence_viewer)
+        ScrollbarStyle.attach(self._sequence_viewer)
         self._root_widget.update()
 
