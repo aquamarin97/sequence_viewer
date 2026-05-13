@@ -63,8 +63,6 @@ class _ScrollbarTokens:
         "handle",
         "handle_hover",
         "handle_press",
-        "arrow_bg",
-        "arrow_fg",
         "border",
     )
 
@@ -74,16 +72,12 @@ class _ScrollbarTokens:
         handle: str,
         handle_hover: str,
         handle_press: str,
-        arrow_bg: str,
-        arrow_fg: str,
         border: str,
     ) -> None:
         self.track = track
         self.handle = handle
         self.handle_hover = handle_hover
         self.handle_press = handle_press
-        self.arrow_bg = arrow_bg
-        self.arrow_fg = arrow_fg
         self.border = border
 
     @classmethod
@@ -95,8 +89,6 @@ class _ScrollbarTokens:
                 handle=_to_hex(theme.border_drag),
                 handle_hover=_to_hex(theme.drop_indicator),
                 handle_press=_to_hex(theme.row_bg_selected_hover),
-                arrow_bg=_to_hex(theme.row_bg_odd),
-                arrow_fg=_to_hex(theme.text_primary),
                 border=_to_hex(theme.border_normal),
             )
         # light (default)
@@ -105,8 +97,6 @@ class _ScrollbarTokens:
             handle=_to_hex(theme.border_normal.darker(130)),
             handle_hover=_to_hex(theme.border_drag),
             handle_press=_to_hex(theme.drop_indicator),
-            arrow_bg=_to_hex(theme.row_bg_even),
-            arrow_fg=_to_hex(theme.text_primary),
             border=_to_hex(theme.border_normal),
         )
 
@@ -116,10 +106,9 @@ class _ScrollbarTokens:
 # ---------------------------------------------------------------------------
 
 _SCROLLBAR_SIZE = 12          # px — total width/height of the scrollbar track
-_ARROW_SIZE = 12              # px — height/width of the arrow buttons
 _HANDLE_MIN = 24              # px — minimum draggable handle length
-_HANDLE_RADIUS = 2            # px — border-radius on the handle
-_TRACK_RADIUS = 2             # px — border-radius on the track
+_HANDLE_RADIUS = 3            # px — border-radius on the handle
+_TRACK_RADIUS = 3             # px — border-radius on the track
 
 
 def _build_qss(tokens: _ScrollbarTokens) -> str:
@@ -131,7 +120,7 @@ def _build_qss(tokens: _ScrollbarTokens) -> str:
 QScrollBar:vertical {{
     background:     {t.track};
     width:          {_SCROLLBAR_SIZE}px;
-    margin:         {_ARROW_SIZE}px 0;
+    margin:         0;
     border:         1px solid {t.border};
     border-radius:  {_TRACK_RADIUS}px;
 }}
@@ -146,14 +135,7 @@ QScrollBar::handle:vertical:hover   {{ background: {t.handle_hover};  }}
 QScrollBar::handle:vertical:pressed {{ background: {t.handle_press}; }}
 
 QScrollBar::add-line:vertical,
-QScrollBar::sub-line:vertical {{
-    background:          {t.arrow_bg};
-    height:              {_ARROW_SIZE}px;
-    subcontrol-origin:   margin;
-    border:              1px solid {t.border};
-}}
-QScrollBar::sub-line:vertical {{ subcontrol-position: top;    }}
-QScrollBar::add-line:vertical {{ subcontrol-position: bottom; }}
+QScrollBar::sub-line:vertical {{ height: 0; border: none; background: none; }}
 
 QScrollBar::add-page:vertical,
 QScrollBar::sub-page:vertical {{ background: none; }}
@@ -163,7 +145,7 @@ QScrollBar::sub-page:vertical {{ background: none; }}
 QScrollBar:horizontal {{
     background:     {t.track};
     height:         {_SCROLLBAR_SIZE}px;
-    margin:         0 {_ARROW_SIZE}px;
+    margin:         0;
     border:         1px solid {t.border};
     border-radius:  {_TRACK_RADIUS}px;
 }}
@@ -178,14 +160,7 @@ QScrollBar::handle:horizontal:hover   {{ background: {t.handle_hover};  }}
 QScrollBar::handle:horizontal:pressed {{ background: {t.handle_press}; }}
 
 QScrollBar::add-line:horizontal,
-QScrollBar::sub-line:horizontal {{
-    background:          {t.arrow_bg};
-    width:               {_ARROW_SIZE}px;
-    subcontrol-origin:   margin;
-    border:              1px solid {t.border};
-}}
-QScrollBar::sub-line:horizontal {{ subcontrol-position: left;  }}
-QScrollBar::add-line:horizontal {{ subcontrol-position: right; }}
+QScrollBar::sub-line:horizontal {{ width: 0; border: none; background: none; }}
 
 QScrollBar::add-page:horizontal,
 QScrollBar::sub-page:horizontal {{ background: none; }}
