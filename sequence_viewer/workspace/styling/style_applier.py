@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PyQt5.QtGui import QBrush, QPalette
 
-from sequence_viewer.settings.scrollbar_style import ScrollbarStyle
+from settings.sequence_viewer.scrollbar_style import ScrollbarStyle
 
 
 
@@ -17,8 +17,8 @@ class WorkspaceStyleApplier:
         self._sequence_viewer = sequence_viewer
 
     def on_theme_changed(self, theme) -> None:
-        from sequence_viewer.settings.annotation_styles import annotation_style_manager
-        from sequence_viewer.settings.color_styles import color_style_manager
+        from settings.sequence_viewer.annotation_styles import annotation_style_manager
+        from settings.sequence_viewer.color_styles import color_style_manager
 
         target_bg = theme.seq_bg
         for widget in (self._root_widget, self._left_panel, self._splitter):

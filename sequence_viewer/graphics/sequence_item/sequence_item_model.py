@@ -3,7 +3,7 @@
 from typing import Optional, Tuple, Dict
 from PyQt5.QtGui import QColor
 from sequence_viewer.graphics.sequence_item.sequence_glyph_cache import default_nucleotide_color_map
-from sequence_viewer.settings.display_settings_manager import display_settings_manager
+from settings.sequence_viewer.display_settings_manager import display_settings_manager
 
 class SequenceItemModel:
     TEXT_MODE = "text"

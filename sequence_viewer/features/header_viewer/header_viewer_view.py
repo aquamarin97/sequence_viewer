@@ -15,8 +15,8 @@ from sequence_viewer.features.header_viewer.header_selection_handler import (
 )
 from sequence_viewer.graphics.header_item.header_item import HeaderRowItem
 from sequence_viewer.model.row_selection_model import RowSelectionModel
-from sequence_viewer.settings.mouse_binding_manager import MouseAction, mouse_binding_manager
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.sequence_viewer.theme import theme_manager
 
 if TYPE_CHECKING:
     from sequence_viewer.workspace.row_layout import RowLayout
@@ -53,7 +53,7 @@ class HeaderViewerView(QGraphicsView):
         self._drag = HeaderDragController(self, self._layout_calc)
 
         theme_manager.themeChanged.connect(self._on_theme_changed)
-        from sequence_viewer.settings.display_settings_manager import display_settings_manager
+        from settings.sequence_viewer.display_settings_manager import display_settings_manager
         display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
         self._apply_scene_background()
 
@@ -278,7 +278,7 @@ class HeaderViewerView(QGraphicsView):
         self.viewport().update()
 
     def _on_display_settings_changed(self):
-        from sequence_viewer.settings.display_settings_manager import display_settings_manager
+        from settings.sequence_viewer.display_settings_manager import display_settings_manager
         new_char_height = display_settings_manager.sequence_char_height
         if self._char_height == new_char_height:
             return

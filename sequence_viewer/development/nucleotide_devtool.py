@@ -19,8 +19,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from sequence_viewer.settings.color_styles import NUCLEOTIDE_BASE_ORDER, color_style_manager
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.color_styles import NUCLEOTIDE_BASE_ORDER, color_style_manager
+from settings.sequence_viewer.theme import theme_manager
 
 
 def _color_to_text(color: QColor) -> str:

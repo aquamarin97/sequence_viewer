@@ -1,14 +1,13 @@
-# sequence_viewer/utils/tm_settings_manager.py
-# utils/tm_settings_manager.py
+# settings/sequence_viewer/tm_settings_manager.py
 """
 Tm Hesaplama Parametreleri Yöneticisi
 =====================================
-data/tm_settings.json dosyasından Tm hesaplama parametrelerini yükler.
+config/defaults/sequence_viewer/tm_settings.json dosyasından Tm hesaplama parametrelerini yükler.
 Dosya yoksa veya bozuksa yerleşik varsayılanlar devreye girer — uygulama
 hiçbir zaman çökmez.
 
 Kullanım:
-    from sequence_viewer.utils.tm_settings_manager import tm_settings_manager
+    from settings.sequence_viewer.tm_settings_manager import tm_settings_manager
 
     method = tm_settings_manager.method          # "NN" | "GC" | "Wallace"
     na     = tm_settings_manager.na              # mM
@@ -30,6 +29,7 @@ import os
 from typing import Any
 
 from PyQt5.QtCore import QObject, pyqtSignal
+from settings.sequence_viewer.paths import DEFAULT_CONFIG_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -49,9 +49,7 @@ _DEFAULTS: dict[str, Any] = {
 
 _VALID_METHODS = {"Wallace", "GC", "NN"}
 
-_CONFIG_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "data", "tm_settings.json")
-)
+_CONFIG_PATH = os.path.normpath(DEFAULT_CONFIG_DIR / "tm_settings.json")
 
 
 # ---------------------------------------------------------------------------

@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def _toggle_dark_mode(self):
-        from sequence_viewer.settings.theme import theme_manager
+        from settings.sequence_viewer.theme import theme_manager
 
         theme_manager.toggle()
 

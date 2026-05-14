@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PyQt5.QtWidgets import QLineEdit
 
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.theme import theme_manager
 
 
 class ConsensusSpacerEditor:

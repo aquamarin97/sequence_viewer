@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QToolTip
 
 from sequence_viewer.model.annotation import AnnotationType
-from sequence_viewer.settings.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
 
 if TYPE_CHECKING:
     from sequence_viewer.features.consensus_row.consensus_annotation_handler import (

@@ -6,9 +6,9 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox, QVBoxLayout, QGroupBox,
 )
 from sequence_viewer.model.annotation import AnnotationType
-from sequence_viewer.settings.annotation_styles import annotation_style_manager
-from sequence_viewer.settings.display_settings_manager import display_settings_manager
-from sequence_viewer.settings.font_families import get_monospace_fonts
+from settings.sequence_viewer.annotation_styles import annotation_style_manager
+from settings.sequence_viewer.display_settings_manager import display_settings_manager
+from settings.sequence_viewer.font_families import get_monospace_fonts
 
 
 # â”€â”€ Annotation tipleri ve etiketleri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

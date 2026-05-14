@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sequence_viewer.settings.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
 
 if TYPE_CHECKING:
     from sequence_viewer.workspace.context import WorkspaceContext

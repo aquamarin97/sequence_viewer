@@ -12,7 +12,7 @@ from typing import Optional
 from Bio.Seq import Seq
 from Bio.SeqUtils import MeltingTemp as mt
 
-from sequence_viewer.utils.tm_settings_manager import tm_settings_manager
+from settings.sequence_viewer.tm_settings_manager import tm_settings_manager
 
 
 # ---------------------------------------------------------------------------

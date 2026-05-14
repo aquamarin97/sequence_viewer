@@ -10,15 +10,15 @@ from sequence_viewer.features.annotation_layer.annotation_viewport_calculator im
     AnnotationViewportCalculator,
 )
 from sequence_viewer.model.annotation import AnnotationType
-from sequence_viewer.settings.mouse_binding_manager import MouseAction, mouse_binding_manager
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.sequence_viewer.theme import theme_manager
 
 _LANE_PADDING = 6
 _MIN_HEIGHT = 24
 
 
 def _lane_height() -> int:
-    from sequence_viewer.settings.annotation_styles import annotation_style_manager
+    from settings.sequence_viewer.annotation_styles import annotation_style_manager
 
     return annotation_style_manager.get_lane_height()
 
@@ -60,7 +60,7 @@ class AnnotationLayerWidget(QWidget):
             sequence_viewer.add_v_guide_observer(self.update)
         theme_manager.themeChanged.connect(lambda _: self.update())
         try:
-            from sequence_viewer.settings.annotation_styles import (
+            from settings.sequence_viewer.annotation_styles import (
                 annotation_style_manager as _asm,
             )
 

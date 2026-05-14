@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import QGraphicsItem
 import math
 from sequence_viewer.graphics.sequence_item.sequence_glyph_cache import default_nucleotide_color_map, GLYPH_CACHE
 from sequence_viewer.graphics.sequence_item.sequence_item_model import SequenceItemModel
-from sequence_viewer.settings.theme import theme_manager
-from sequence_viewer.settings.display_settings_manager import display_settings_manager
+from settings.sequence_viewer.theme import theme_manager
+from settings.sequence_viewer.display_settings_manager import display_settings_manager
 
 class SequenceGraphicsItem(QGraphicsItem):
     TEXT_MODE = SequenceItemModel.TEXT_MODE
@@ -30,7 +30,7 @@ class SequenceGraphicsItem(QGraphicsItem):
         _ref = weakref.ref(self)
         theme_manager.themeChanged.connect(lambda _, r=_ref: (s := r()) and s.update())
         try:
-            from sequence_viewer.settings.color_styles import color_style_manager as _csm
+            from settings.sequence_viewer.color_styles import color_style_manager as _csm
             _csm.stylesChanged.connect(lambda r=_ref: (s := r()) and s._on_color_styles_changed())
         except: pass
 

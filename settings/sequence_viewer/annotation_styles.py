@@ -1,5 +1,4 @@
-# sequence_viewer/settings/annotation_styles.py
-# settings/annotation_styles.py
+# settings/sequence_viewer/annotation_styles.py
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict
@@ -110,5 +109,4 @@ class _AnnotationStyleManager(QObject):
         self.apply_theme(theme_name)
 
 annotation_style_manager = _AnnotationStyleManager()
-
 

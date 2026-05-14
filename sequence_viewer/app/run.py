@@ -10,7 +10,7 @@ from sequence_viewer.workspace.workspace import SequenceWorkspaceWidget
 def run():
     app = QApplication(sys.argv)
 
-    from sequence_viewer.settings.font_families import load_embedded_fonts
+    from settings.sequence_viewer.font_families import load_embedded_fonts
 
     load_embedded_fonts()
 

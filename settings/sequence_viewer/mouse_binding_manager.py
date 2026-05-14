@@ -1,4 +1,4 @@
-# sequence_viewer/settings/mouse_binding_manager.py
+# settings/sequence_viewer/mouse_binding_manager.py
 from __future__ import annotations
 
 import json
@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Optional
 
 from PyQt5.QtCore import QObject, Qt, pyqtSignal
+from settings.sequence_viewer.paths import DEFAULT_CONFIG_DIR
 
 
 class MouseAction(Enum):
@@ -88,9 +89,7 @@ _DEFAULT_ZOOM = {
     "max_char_width": 90.0,
 }
 
-_CONFIG_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "data", "mouse_bindings.json")
-)
+_CONFIG_PATH = os.path.normpath(DEFAULT_CONFIG_DIR / "mouse_bindings.json")
 
 
 class MouseBindingManager(QObject):
@@ -273,5 +272,3 @@ class MouseBindingManager(QObject):
 
 
 mouse_binding_manager = MouseBindingManager()
-
-

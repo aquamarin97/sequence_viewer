@@ -5,8 +5,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene
 from sequence_viewer.graphics.sequence_item.sequence_item import SequenceGraphicsItem
-from sequence_viewer.settings.theme import theme_manager
-from sequence_viewer.settings.display_settings_manager import display_settings_manager
+from settings.sequence_viewer.theme import theme_manager
+from settings.sequence_viewer.display_settings_manager import display_settings_manager
 from .sequence_viewer_zoom import ZoomMixin
 from .sequence_viewer_overlay import OverlayMixin
 from .sequence_viewer_interaction import InteractionMixin

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from math import pow
 
-from sequence_viewer.settings.mouse_binding_manager import mouse_binding_manager
+from settings.sequence_viewer.mouse_binding_manager import mouse_binding_manager
 
 from .sequence_viewer_controller_state import ZoomState
 

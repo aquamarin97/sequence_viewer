@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from sequence_viewer.settings.theme import AppTheme, THEME_COLOR_FIELDS, clone_theme, theme_manager
+from settings.sequence_viewer.theme import AppTheme, THEME_COLOR_FIELDS, clone_theme, theme_manager
 
 
 def _color_to_text(color: QColor) -> str:
@@ -54,7 +54,7 @@ def export_theme_code(light_theme: AppTheme, dark_theme: AppTheme) -> str:
     return "\n".join(
         [
             "from PyQt5.QtGui import QColor",
-            "from settings.theme import AppTheme",
+            "from settings.sequence_viewer.theme import AppTheme",
             "",
             render(light_theme, "LIGHT_THEME"),
             "",

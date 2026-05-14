@@ -1,5 +1,4 @@
-# sequence_viewer/settings/theme.py
-# settings/theme.py
+# settings/sequence_viewer/theme.py
 """
 Uygulama tema sistemi.
 
@@ -192,5 +191,4 @@ class _ThemeManager(QObject):
         else: self.set_light()
 
 theme_manager = _ThemeManager()
-
 

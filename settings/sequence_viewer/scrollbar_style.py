@@ -31,7 +31,7 @@ from PyQt5.QtWidgets import QWidget
 # ---------------------------------------------------------------------------
 # Theme import — adjust the import path to match your actual package layout.
 # ---------------------------------------------------------------------------
-from sequence_viewer.settings.theme import AppTheme, theme_manager
+from settings.sequence_viewer.theme import AppTheme, theme_manager
 
 if TYPE_CHECKING:
     pass

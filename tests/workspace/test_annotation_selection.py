@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sequence_viewer.model.annotation import Annotation, AnnotationType
-from sequence_viewer.settings.mouse_binding_manager import MouseAction
+from settings.sequence_viewer.mouse_binding_manager import MouseAction
 from sequence_viewer.workspace.coordinators.selection import annotation_selection_coordinator
 from sequence_viewer.workspace.coordinators.selection.annotation_selection_coordinator import (
     WorkspaceAnnotationSelectionCoordinator,

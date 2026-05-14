@@ -1,12 +1,12 @@
-# sequence_viewer/settings/config.py
-# settings/config.py
+# settings/sequence_viewer/config.py
 from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Dict
 from pydantic import BaseModel, BaseSettings, Field, validator
+from settings.sequence_viewer.paths import DEFAULT_CONFIG_DIR
 
-DEFAULT_SETTINGS_PATH = Path(__file__).resolve().parent.parent / "data" / "default_settings.json"
+DEFAULT_SETTINGS_PATH = DEFAULT_CONFIG_DIR / "default_settings.json"
 DEFAULT_USER_CONFIG_PATH = Path.home() / ".sequence_viewer" / "config.json"
 
 class ModeSettings(BaseModel):
@@ -45,5 +45,3 @@ def _load_json_settings(path):
 def _write_json_settings(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f: json.dump(data, f, indent=2)
-
-

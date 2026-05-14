@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import QWidget
 from sequence_viewer.features.consensus_row.consensus_spacer_editor import (
     ConsensusSpacerEditor,
 )
-from sequence_viewer.settings.mouse_binding_manager import MouseAction, mouse_binding_manager
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.sequence_viewer.theme import theme_manager
 
 
 class ConsensusSpacerWidget(QWidget):

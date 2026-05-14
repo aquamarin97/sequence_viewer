@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QFont, QColor, QPen, QPixmap, QFontMetrics
 
 def default_nucleotide_color_map():
-    from sequence_viewer.settings.color_styles import color_style_manager
+    from settings.sequence_viewer.color_styles import color_style_manager
     return color_style_manager.nucleotide_color_map()
 
 class GlyphCache:
@@ -33,7 +33,7 @@ GLYPH_CACHE = GlyphCache()
 
 def _on_styles_changed(): GLYPH_CACHE.invalidate()
 try:
-    from sequence_viewer.settings.color_styles import color_style_manager
+    from settings.sequence_viewer.color_styles import color_style_manager
     color_style_manager.stylesChanged.connect(_on_styles_changed)
 except: pass
 

@@ -11,7 +11,7 @@ from sequence_viewer.features.annotation_layer.annotation_layout_engine import (
     partition_annotations_by_side,
 )
 from sequence_viewer.model.annotation import AnnotationType
-from sequence_viewer.settings.annotation_styles import annotation_style_manager
+from settings.sequence_viewer.annotation_styles import annotation_style_manager
 from sequence_viewer.workspace.row_layout import RowLayout
 
 if TYPE_CHECKING:

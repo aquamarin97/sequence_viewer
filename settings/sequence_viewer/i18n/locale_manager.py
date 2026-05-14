@@ -1,5 +1,4 @@
-# sequence_viewer/settings/i18n/locale_manager.py
-# settings/i18n/locale_manager.py
+# settings/sequence_viewer/i18n/locale_manager.py
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -52,5 +51,4 @@ class _LocaleManager(QObject):
         else: self._fallback = {}
 
 locale_manager = _LocaleManager()
-
 

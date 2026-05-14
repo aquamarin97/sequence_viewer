@@ -1,5 +1,4 @@
-# sequence_viewer/settings/color_styles.py
-# settings/color_styles.py
+# settings/sequence_viewer/color_styles.py
 from __future__ import annotations
 from typing import Dict, Optional
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -104,7 +103,7 @@ class _ColorStyleManager(QObject):
     def consensus_nucleotide_color_map(self):
         base = {k:QColor(v) for k,v in self._nucleotide.items()}
         try:
-            from sequence_viewer.settings.theme import theme_manager
+            from settings.sequence_viewer.theme import theme_manager
             overrides = self._consensus_palettes.get(theme_manager.current.name, {})
         except: overrides = {}
         base.update({k:QColor(v) for k,v in overrides.items()})
@@ -132,7 +131,7 @@ class _ColorStyleManager(QObject):
             self._colorblind_mode = mode
             # Mevcut temayı yeniden uygula
             try:
-                from sequence_viewer.settings.theme import theme_manager
+                from settings.sequence_viewer.theme import theme_manager
                 self.apply_theme(theme_manager.current.name)
             except:
                 self.reset_nucleotide_colors()
@@ -150,7 +149,7 @@ class _ColorStyleManager(QObject):
             palette[key] = new_color
             if self._colorblind_mode is None:
                 try:
-                    from sequence_viewer.settings.theme import theme_manager
+                    from settings.sequence_viewer.theme import theme_manager
                     active_theme = theme_manager.current.name
                 except:
                     active_theme = "light"
@@ -166,7 +165,7 @@ class _ColorStyleManager(QObject):
         if palette[key] != new_color:
             palette[key] = new_color
             try:
-                from sequence_viewer.settings.theme import theme_manager
+                from settings.sequence_viewer.theme import theme_manager
                 if theme_manager.current.name == theme_name:
                     self.stylesChanged.emit()
             except:
@@ -191,7 +190,7 @@ class _ColorStyleManager(QObject):
 
     def reset_nucleotide_colors(self):
         try:
-            from sequence_viewer.settings.theme import theme_manager
+            from settings.sequence_viewer.theme import theme_manager
             palette = self._theme_palettes["dark"] if theme_manager.current.name == "dark" else self._theme_palettes["light"]
         except: palette = self._theme_palettes["light"]
         self._nucleotide = _clone_color_map(palette)
@@ -263,7 +262,7 @@ class _ColorStyleManager(QObject):
             self._theme_palettes["light"] = _clone_color_map(_NUCLEOTIDE_COLORS_LIGHT)
         if self._colorblind_mode is None:
             try:
-                from sequence_viewer.settings.theme import theme_manager
+                from settings.sequence_viewer.theme import theme_manager
                 if theme_manager.current.name == theme_name:
                     self.apply_theme(theme_name)
             except:
@@ -280,7 +279,7 @@ class _ColorStyleManager(QObject):
         self._colorblind_palettes[mode] = _clone_color_map(_COLORBLIND_MODES[mode])
         if self._colorblind_mode == mode:
             try:
-                from sequence_viewer.settings.theme import theme_manager
+                from settings.sequence_viewer.theme import theme_manager
                 self.apply_theme(theme_manager.current.name)
             except:
                 self.stylesChanged.emit()

@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (
 )
 
 from sequence_viewer.model.annotation import AnnotationType
-from sequence_viewer.settings.color_styles import color_style_manager
+from settings.sequence_viewer.color_styles import color_style_manager
 
 
 ANNOTATION_ORDER = (

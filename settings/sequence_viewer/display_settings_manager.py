@@ -1,14 +1,13 @@
-# sequence_viewer/settings/display_settings_manager.py
-# settings/display_settings_manager.py
+# settings/sequence_viewer/display_settings_manager.py
 """
 Merkezi Görüntüleme Ayarları Yöneticisi
 ========================================
 Font ve (ileride) layout / renk görüntüleme ayarlarını tek yerden yönetir.
-Yapılandırma data/display_settings.json dosyasından yüklenir; dosya bulunamazsa
+Yapılandırma config/defaults/sequence_viewer/display_settings.json dosyasından yüklenir; dosya bulunamazsa
 ya da hatalıysa yerleşik varsayılanlar devreye girer â€” uygulama asla çökmez.
 
 Kullanım:
-    from sequence_viewer.settings.display_settings_manager import display_settings_manager
+    from settings.sequence_viewer.display_settings_manager import display_settings_manager
 
     family  = display_settings_manager.sequence_font_family
     base_fs = display_settings_manager.sequence_font_size_base
@@ -27,6 +26,7 @@ import os
 from typing import Optional
 
 from PyQt5.QtCore import QObject, pyqtSignal
+from settings.sequence_viewer.paths import DEFAULT_CONFIG_DIR
 
 # ---------------------------------------------------------------------------
 # Yerleşik varsayılanlar
@@ -40,9 +40,7 @@ _BUILT_IN_DEFAULTS: dict = {
     }
 }
 
-_CONFIG_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "data", "display_settings.json")
-)
+_CONFIG_PATH = os.path.normpath(DEFAULT_CONFIG_DIR / "display_settings.json")
 
 
 # ---------------------------------------------------------------------------
@@ -180,5 +178,3 @@ class DisplaySettingsManager(QObject):
 # ---------------------------------------------------------------------------
 
 display_settings_manager = DisplaySettingsManager()
-
-

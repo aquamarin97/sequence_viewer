@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sequence_viewer.settings.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
 
 
 class HeaderSelectionHandler:

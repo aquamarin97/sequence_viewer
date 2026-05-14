@@ -1,4 +1,4 @@
-# sequence_viewer/settings/font_families.py
+# settings/sequence_viewer/font_families.py
 """
 Gömülü ve sistem monospace font ailesi yönetimi.
 
@@ -7,7 +7,7 @@ kullanılabilir. Ek olarak, kullanıcının sisteminde yüklü olan belirli mono
 fontlar (Consolas, Lucida Console gibi) da listeye eklenir.
 
 Kullanım:
-    from sequence_viewer.settings.font_families import load_embedded_fonts, get_monospace_fonts
+    from settings.sequence_viewer.font_families import load_embedded_fonts, get_monospace_fonts
     
     # Uygulama başlangıcında
     load_embedded_fonts()
@@ -19,19 +19,18 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Optional
+from settings.sequence_viewer.paths import ASSETS_DIR
 
 # ---------------------------------------------------------------------------
 # Gömülü Fontlar (Uygulamayla birlikte daĞŸıtılan)
 # ---------------------------------------------------------------------------
 
-_PACKAGE_ROOT = Path(__file__).resolve().parent.parent
-
 EMBEDDED_MONOSPACE_FONTS: list[tuple[str, Path]] = [
-    ("JetBrains Mono", _PACKAGE_ROOT / "assets" / "fonts" / "monospace" / "JetBrainsMono-Regular.ttf"),
-    ("Source Code Pro", _PACKAGE_ROOT / "assets" / "fonts" / "monospace" / "SourceCodePro-Regular.ttf"),
-    ("Cascadia Code", _PACKAGE_ROOT / "assets" / "fonts" / "monospace" / "CascadiaCode-Regular.ttf"),
-    ("IBM Plex Mono", _PACKAGE_ROOT / "assets" / "fonts" / "monospace" / "IBMPlexMono-Regular.ttf"),
-    ("Fira Code", _PACKAGE_ROOT / "assets" / "fonts" / "monospace" / "FiraCode-Regular.ttf"),
+    ("JetBrains Mono", ASSETS_DIR / "fonts" / "monospace" / "JetBrainsMono-Regular.ttf"),
+    ("Source Code Pro", ASSETS_DIR / "fonts" / "monospace" / "SourceCodePro-Regular.ttf"),
+    ("Cascadia Code", ASSETS_DIR / "fonts" / "monospace" / "CascadiaCode-Regular.ttf"),
+    ("IBM Plex Mono", ASSETS_DIR / "fonts" / "monospace" / "IBMPlexMono-Regular.ttf"),
+    ("Fira Code", ASSETS_DIR / "fonts" / "monospace" / "FiraCode-Regular.ttf"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -65,7 +64,7 @@ def load_embedded_fonts() -> None:
     
     Örnek:
         from PyQt5.QtWidgets import QApplication
-        from sequence_viewer.settings.font_families import load_embedded_fonts
+        from settings.sequence_viewer.font_families import load_embedded_fonts
         
         app = QApplication(sys.argv)
         load_embedded_fonts()
@@ -148,7 +147,7 @@ def get_monospace_fonts() -> list[str]:
         Kullanılabilir tüm monospace font isimleri
         
     Örnek:
-        from sequence_viewer.settings.font_families import get_monospace_fonts
+        from settings.sequence_viewer.font_families import get_monospace_fonts
         
         combo = QComboBox()
         combo.addItems(get_monospace_fonts())
@@ -196,4 +195,3 @@ def get_default_monospace_font() -> str:
     
     # Fallback (hiçbir font yüklenemezse)
     return "Courier New"
-

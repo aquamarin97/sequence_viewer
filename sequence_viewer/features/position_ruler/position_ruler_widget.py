@@ -7,7 +7,7 @@ from PyQt5.QtGui import QPainter, QPen, QBrush, QColor, QFont, QFontMetrics
 from PyQt5.QtWidgets import QWidget, QScrollBar
 from sequence_viewer.features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 from sequence_viewer.features.position_ruler.position_ruler_model import PositionRulerModel, PositionRulerLayout
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.theme import theme_manager
 
 class SequencePositionRulerWidget(QWidget):
     def __init__(self, viewer, parent=None):

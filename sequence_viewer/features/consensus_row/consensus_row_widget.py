@@ -31,8 +31,8 @@ from sequence_viewer.features.consensus_row.consensus_mouse_controller import Co
 from sequence_viewer.features.consensus_row.consensus_renderer import ConsensusRenderer
 from sequence_viewer.features.consensus_row.consensus_row_model import ConsensusRowModel
 from sequence_viewer.model.consensus_calculator import ConsensusMethod
-from sequence_viewer.settings.display_settings_manager import display_settings_manager
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.display_settings_manager import display_settings_manager
+from settings.sequence_viewer.theme import theme_manager
 from sequence_viewer.utils.drag_tooltip import DragTooltip
 from sequence_viewer.utils.sequence_utils import calculate_tm, selection_bp
 
@@ -60,7 +60,7 @@ class ConsensusRowWidget(QWidget):
         self._font = QFont(display_settings_manager.consensus_font_family)
         self._font.setStyleHint(QFont.Monospace)
         self._font.setFixedPitch(True)
-        from sequence_viewer.settings.color_styles import color_style_manager as _csm
+        from settings.sequence_viewer.color_styles import color_style_manager as _csm
         self._color_map = _csm.consensus_nucleotide_color_map()
         self._renderer = ConsensusRenderer()
         self._hit_rects: list = []
@@ -135,12 +135,12 @@ class ConsensusRowWidget(QWidget):
         theme_manager.themeChanged.connect(lambda _: self._on_theme_changed())
         display_settings_manager.displaySettingsChanged.connect(self._on_display_settings_changed)
         try:
-            from sequence_viewer.settings.color_styles import color_style_manager as _csm2
+            from settings.sequence_viewer.color_styles import color_style_manager as _csm2
             _csm2.stylesChanged.connect(self._on_color_styles_changed)
         except Exception:
             pass
         try:
-            from sequence_viewer.settings.annotation_styles import annotation_style_manager as _asm2
+            from settings.sequence_viewer.annotation_styles import annotation_style_manager as _asm2
             _asm2.stylesChanged.connect(self.update_visibility)
         except Exception:
             pass
@@ -408,7 +408,7 @@ class ConsensusRowWidget(QWidget):
     # ── Settings / tema callback'leri ────────────────────────────────────
 
     def _on_color_styles_changed(self):
-        from sequence_viewer.settings.color_styles import color_style_manager as _csm
+        from settings.sequence_viewer.color_styles import color_style_manager as _csm
         self._color_map = _csm.consensus_nucleotide_color_map()
         self.update()
 

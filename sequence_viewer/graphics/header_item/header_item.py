@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter, QFont, QPen, QBrush, QFontMetrics, QColor
 from PyQt5.QtWidgets import QGraphicsItem, QStyleOptionGraphicsItem
 from sequence_viewer.graphics.header_item.header_item_model import HeaderRowModel
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.theme import theme_manager
 
 class HeaderRowItem(QGraphicsItem):
     def __init__(self, text, width, row_height, annot_height=0, row_index=0, parent=None):

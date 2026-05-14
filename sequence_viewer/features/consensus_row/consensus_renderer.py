@@ -16,8 +16,8 @@ from sequence_viewer.features.annotation_layer.annotation_painter import (
 )
 from sequence_viewer.graphics.sequence_item.sequence_glyph_cache import GLYPH_CACHE
 from sequence_viewer.model.annotation import AnnotationType
-from sequence_viewer.settings.display_settings_manager import display_settings_manager
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.display_settings_manager import display_settings_manager
+from settings.sequence_viewer.theme import theme_manager
 
 
 class ConsensusRenderer:
@@ -160,7 +160,7 @@ class ConsensusRenderer:
         hit_rects = []
         if not annotations:
             return hit_rects
-        from sequence_viewer.settings.annotation_styles import annotation_style_manager
+        from settings.sequence_viewer.annotation_styles import annotation_style_manager
 
         lane_h = annotation_style_manager.get_lane_height()
         above_geometry, below_geometry = widget._ann_geometry

@@ -15,8 +15,8 @@ from sequence_viewer.features.annotation_layer.annotation_painter import (
     draw_selection_outline, draw_hover_overlay,
 )
 from sequence_viewer.model.annotation import Annotation, AnnotationType
-from sequence_viewer.settings.mouse_binding_manager import mouse_binding_manager, MouseAction
-from sequence_viewer.settings.theme import theme_manager
+from settings.sequence_viewer.mouse_binding_manager import mouse_binding_manager, MouseAction
+from settings.sequence_viewer.theme import theme_manager
 
 ClickCallback = Callable[[Annotation, int], None]
 
@@ -38,7 +38,7 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self._anim_timer.timeout.connect(lambda r=_ref: (s := r()) and s._anim_step())
         theme_manager.themeChanged.connect(lambda _, r=_ref: (s := r()) and s.update())
         try:
-            from sequence_viewer.settings.annotation_styles import annotation_style_manager as _asm
+            from settings.sequence_viewer.annotation_styles import annotation_style_manager as _asm
             _asm.stylesChanged.connect(lambda r=_ref: (s := r()) and s.update())
         except: pass
 
@@ -97,7 +97,7 @@ class AnnotationGraphicsItem(QGraphicsItem):
             draw_probe(painter, 0, 0, self._w, self._h, color, ann.label,
                        strand=strand, char_width=char_width)
         elif ann.type == AnnotationType.MISMATCH_MARKER:
-            from sequence_viewer.settings.display_settings_manager import display_settings_manager as _dsm
+            from settings.sequence_viewer.display_settings_manager import display_settings_manager as _dsm
             draw_mismatch_marker(
                 painter, 0, 0, self._w, self._h, color,
                 ann.expected_base or ann.mismatch_base or ann.label,

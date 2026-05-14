@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
-from sequence_viewer.settings.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
 
 
 @dataclass

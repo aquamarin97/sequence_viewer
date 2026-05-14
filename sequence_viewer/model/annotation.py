@@ -22,7 +22,7 @@ class AnnotationType(Enum):
         }[self]
 
     def default_color(self) -> QColor:
-        from sequence_viewer.settings.color_styles import color_style_manager
+        from settings.sequence_viewer.color_styles import color_style_manager
         return color_style_manager.annotation_color(self)
 
     def is_above_sequence(self) -> bool:

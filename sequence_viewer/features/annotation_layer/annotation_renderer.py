@@ -11,7 +11,7 @@ from sequence_viewer.features.annotation_layer.annotation_painter import (
     draw_selection_outline,
 )
 from sequence_viewer.model.annotation import AnnotationType
-from sequence_viewer.settings.display_settings_manager import display_settings_manager
+from settings.sequence_viewer.display_settings_manager import display_settings_manager
 
 
 class AnnotationRenderer:
