@@ -21,11 +21,15 @@ sequence-viewer = "sequence_viewer.app.run:run"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["sequence_viewer*"]
+include = ["sequence_viewer*", "file_io*"]
 
 [tool.setuptools.package-data]
 sequence_viewer = [
     "assets/fonts/monospace/*.ttf",
     "data/*.json",
     "settings/i18n/strings/*.json",
+]
+file_io = [
+    "native/bin/*",
+    "native/src/*.cpp",
 ]

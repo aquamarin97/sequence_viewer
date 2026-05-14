@@ -31,7 +31,7 @@ class SQXConversionWorker(QThread):
             self.failed.emit(str(exc))
 
     def _try_native_conversion(self) -> bool:
-        from sequence_viewer.io.native_backend import (
+        from file_io.native.backend import (
             convert_fasta_to_sqx,
             find_fasta_to_sqx,
             native_backend_name,
@@ -71,9 +71,9 @@ class SQXConversionWorker(QThread):
         return True
 
     def _run_python_conversion(self) -> None:
-        from sequence_viewer.io.parsers.fasta_parser import FASTAParser
-        from sequence_viewer.io.sqx.block_types.project_meta import ProjectMeta
-        from sequence_viewer.io.sqx.writer import SQXWriter
+        from file_io.parsers.fasta_parser import FASTAParser
+        from file_io.sqx.block_types.project_meta import ProjectMeta
+        from file_io.sqx.writer import SQXWriter
         from sequence_viewer.model.sequence_record import SequenceRecord
 
         records = [
@@ -105,7 +105,7 @@ class SQXLoadWorker(QThread):
 
     def run(self) -> None:
         try:
-            from sequence_viewer.io.sqx.reader import SQXReader
+            from file_io.sqx.reader import SQXReader
 
             print(f"[LOADER] SQX dosyasi okunuyor: {self._sqx_path.name}")
             reader = SQXReader(self._sqx_path)

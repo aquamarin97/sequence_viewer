@@ -6,9 +6,9 @@ stateless compute-heavy jobs.
 
 ## Current Tools
 
-- `native_tools/fasta_to_sqx.cpp`: current C++ source for FASTA to SQX
+- `file_io/native/src/fasta_to_sqx.cpp`: current C++ source for FASTA to SQX
   conversion and the first central native CLI commands.
-- `sequence_viewer/io/native_backend.py`: Python wrapper that finds and runs
+- `file_io/native/backend.py`: Python wrapper that finds and runs
   native executables.
 - `sequence_viewer/app/sqx_conversion_worker.py`: background worker that tries
   native conversion first and falls back to the Python SQX writer if needed.
@@ -42,14 +42,14 @@ fasta_to_sqx.exe input.fasta output.sqx ProjectName
 On Windows with `g++` available:
 
 ```powershell
-New-Item -ItemType Directory -Force build/native | Out-Null
-g++ -O3 -std=c++17 native_tools/fasta_to_sqx.cpp -o build/native/sequence_viewer_native.exe
+New-Item -ItemType Directory -Force file_io/native/bin | Out-Null
+g++ -O3 -std=c++17 file_io/native/src/fasta_to_sqx.cpp -o file_io/native/bin/sequence_viewer_native.exe
 ```
 
 Legacy build remains possible:
 
 ```powershell
-g++ -O3 -std=c++17 native_tools/fasta_to_sqx.cpp -o build/native/fasta_to_sqx.exe
+g++ -O3 -std=c++17 file_io/native/src/fasta_to_sqx.cpp -o file_io/native/bin/fasta_to_sqx.exe
 ```
 
 ## Lookup Order
@@ -57,17 +57,15 @@ g++ -O3 -std=c++17 native_tools/fasta_to_sqx.cpp -o build/native/fasta_to_sqx.ex
 `find_sequence_viewer_native()` checks:
 
 1. `SEQUENCE_VIEWER_NATIVE`
-2. `build/native/sequence_viewer_native.exe`
-3. `native_tools/sequence_viewer_native.exe`
-4. `PATH`
+2. `file_io/native/bin/sequence_viewer_native.exe`
+3. `PATH`
 
 `find_fasta_to_sqx()` checks:
 
 1. `SEQUENCE_VIEWER_FASTA_TO_SQX`
 2. the central native executable above
-3. `build/native/fasta_to_sqx.exe`
-4. `native_tools/fasta_to_sqx.exe`
-5. `PATH`
+3. `file_io/native/bin/fasta_to_sqx.exe`
+4. `PATH`
 
 If no native converter is found, the application keeps using the existing
 Python conversion path.

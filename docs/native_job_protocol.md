@@ -58,7 +58,7 @@ jobs/
 Python can create and run the first motif-search skeleton through:
 
 ```python
-from sequence_viewer.io.native_jobs import (
+from file_io.native.jobs import (
     create_motif_search_manifest,
     run_motif_search_manifest,
 )
