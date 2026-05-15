@@ -35,6 +35,6 @@ class MouseBindingConfig:
                 with open(self.config_path, "r", encoding="utf-8") as fh:
                     data = json.load(fh)
                     return data if isinstance(data, dict) else {}
-        except Exception:
+        except (OSError, json.JSONDecodeError, ValueError):
             pass
         return {}

@@ -31,7 +31,9 @@ class MouseBindingResolver:
         if button is None:
             button = parse_mouse_button(defaults.get(BUTTON)) or MouseButton.LEFT
         if modifier is None:
-            modifier = parse_modifier(defaults.get(MODIFIER)) or int(Qt.NoModifier)
+            modifier = parse_modifier(defaults.get(MODIFIER))
+            if modifier is None:
+                modifier = int(Qt.NoModifier)
 
         return MouseBinding(
             button=button,

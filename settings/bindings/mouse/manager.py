@@ -7,41 +7,17 @@ from PyQt5.QtCore import Qt
 from settings.bindings.base import BindingManager
 from settings.bindings.mouse.config import DEFAULT_THRESHOLDS, DEFAULT_ZOOM, MouseBindingConfig
 from settings.bindings.mouse.resolver import MouseBindingResolver
-from settings.bindings.mouse.types import MouseAction, MouseContext
+from settings.bindings.mouse.types import (
+    AnnotationActions,
+    ConsensusSpacerActions,
+    HeaderActions,
+    MouseAction,
+    MouseContext,
+    NavigationRulerActions,
+    SequenceActions,
+)
 from settings.bindings.registry import register_binding_manager
 
-
-class SequenceActions:
-    DRAG_SELECT = "drag_select"
-    DRAG_SELECT_ADDITIVE = "drag_select_additive"
-    GUIDE_SET = "guide_set"
-    GUIDE_TOGGLE = "guide_toggle"
-    ZOOM = "zoom"
-    H_SCROLL = "h_scroll"
-
-
-class HeaderActions:
-    ROW_SELECT = "row_select"
-    ROW_MULTI_SELECT = "row_multi_select"
-    ROW_RANGE_SELECT = "row_range_select"
-    ROW_REORDER = "row_reorder"
-
-
-class NavigationRulerActions:
-    ZOOM_TO_RANGE = "zoom_to_range"
-    SCROLL_TO = "scroll_to"
-
-
-class AnnotationActions:
-    SELECT = "select"
-    MULTI_SELECT = "multi_select"
-    EDIT = "edit"
-
-
-class ConsensusSpacerActions:
-    SELECT_ALL = "select_all"
-    SELECT_ALL_ADDITIVE = "select_all_additive"
-    EDIT_LABEL = "edit_label"
 
 
 class MouseBindingManager(BindingManager):
