@@ -9,7 +9,7 @@ from PyQt5.QtGui import (
     QPainterPath, QLinearGradient,
 )
 from sequence_viewer.model.annotation import AnnotationType
-from settings.sequence_viewer.annotation_styles import annotation_style_manager
+from sequence_viewer.features.annotation_layer.annotation_styles import annotation_style_manager
 from settings.sequence_viewer.theme import theme_manager
 
 _IS_DARK: bool = theme_manager.current.name == "dark"

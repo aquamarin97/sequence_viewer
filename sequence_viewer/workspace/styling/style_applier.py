@@ -17,7 +17,7 @@ class WorkspaceStyleApplier:
         self._sequence_viewer = sequence_viewer
 
     def on_theme_changed(self, theme) -> None:
-        from settings.sequence_viewer.annotation_styles import annotation_style_manager
+        from sequence_viewer.features.annotation_layer.annotation_styles import annotation_style_manager
         from settings.sequence_viewer.color_styles import color_style_manager
 
         target_bg = theme.seq_bg

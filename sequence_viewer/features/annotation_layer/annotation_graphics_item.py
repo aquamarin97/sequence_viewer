@@ -38,7 +38,7 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self._anim_timer.timeout.connect(lambda r=_ref: (s := r()) and s._anim_step())
         theme_manager.themeChanged.connect(lambda _, r=_ref: (s := r()) and s.update())
         try:
-            from settings.sequence_viewer.annotation_styles import annotation_style_manager as _asm
+            from sequence_viewer.features.annotation_layer.annotation_styles import annotation_style_manager as _asm
             _asm.stylesChanged.connect(lambda r=_ref: (s := r()) and s.update())
         except: pass
 

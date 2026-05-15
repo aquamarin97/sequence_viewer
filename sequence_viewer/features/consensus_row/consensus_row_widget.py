@@ -140,7 +140,7 @@ class ConsensusRowWidget(QWidget):
         except Exception:
             pass
         try:
-            from settings.sequence_viewer.annotation_styles import annotation_style_manager as _asm2
+            from sequence_viewer.features.annotation_layer.annotation_styles import annotation_style_manager as _asm2
             _asm2.stylesChanged.connect(self.update_visibility)
         except Exception:
             pass

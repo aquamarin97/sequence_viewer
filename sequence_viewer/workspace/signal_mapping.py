@@ -104,7 +104,7 @@ class WorkspaceSignalMapper:
         ctx.consensus_row.positionRulerRefreshRequested.connect(ctx.pos_ruler.update)
 
     def _connect_theme_and_settings_signals(self) -> None:
-        from settings.sequence_viewer.annotation_styles import annotation_style_manager
+        from sequence_viewer.features.annotation_layer.annotation_styles import annotation_style_manager
         from settings.sequence_viewer.display_settings_manager import display_settings_manager
         from settings.sequence_viewer.theme import theme_manager
 

@@ -9,7 +9,7 @@ PAD_FAR = 10; PAD_NEAR = 0; LANE_GAP = 3
 def _lane_h(lane_height):
     if lane_height is not None:
         return int(lane_height)
-    from settings.sequence_viewer.annotation_styles import annotation_style_manager
+    from sequence_viewer.features.annotation_layer.annotation_styles import annotation_style_manager
     return annotation_style_manager.get_lane_height()
 
 def strip_height(n_lanes, lane_height=None):

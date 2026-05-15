@@ -18,7 +18,7 @@ _MIN_HEIGHT = 24
 
 
 def _lane_height() -> int:
-    from settings.sequence_viewer.annotation_styles import annotation_style_manager
+    from sequence_viewer.features.annotation_layer.annotation_styles import annotation_style_manager
 
     return annotation_style_manager.get_lane_height()
 
@@ -60,7 +60,7 @@ class AnnotationLayerWidget(QWidget):
             sequence_viewer.add_v_guide_observer(self.update)
         theme_manager.themeChanged.connect(lambda _: self.update())
         try:
-            from settings.sequence_viewer.annotation_styles import (
+            from sequence_viewer.features.annotation_layer.annotation_styles import (
                 annotation_style_manager as _asm,
             )
 

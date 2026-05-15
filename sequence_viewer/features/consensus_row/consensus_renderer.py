@@ -160,7 +160,7 @@ class ConsensusRenderer:
         hit_rects = []
         if not annotations:
             return hit_rects
-        from settings.sequence_viewer.annotation_styles import annotation_style_manager
+        from sequence_viewer.features.annotation_layer.annotation_styles import annotation_style_manager
 
         lane_h = annotation_style_manager.get_lane_height()
         above_geometry, below_geometry = widget._ann_geometry
