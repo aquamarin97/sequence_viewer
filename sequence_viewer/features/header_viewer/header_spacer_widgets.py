@@ -9,7 +9,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt, pyqtSignal, QRectF
 from PyQt5.QtGui import QPainter, QPen, QBrush, QFont, QColor
 from PyQt5.QtWidgets import QWidget, QLineEdit
-from settings.sequence_viewer.mouse_binding_manager import mouse_binding_manager, MouseAction
+from settings.bindings.mouse import mouse_binding_manager, MouseAction
 from settings.sequence_viewer.theme import theme_manager
 
 class HeaderTopWidget(QWidget):
@@ -202,5 +202,4 @@ class ConsensusSpacerWidget(QWidget):
             self._label = new_text
             self.labelChanged.emit(self._label)
             self.update()
-
 

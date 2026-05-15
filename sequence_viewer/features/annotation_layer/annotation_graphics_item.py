@@ -15,7 +15,7 @@ from sequence_viewer.features.annotation_layer.annotation_painter import (
     draw_selection_outline, draw_hover_overlay,
 )
 from sequence_viewer.model.annotation import Annotation, AnnotationType
-from settings.sequence_viewer.mouse_binding_manager import mouse_binding_manager, MouseAction
+from settings.bindings.mouse import mouse_binding_manager, MouseAction
 from settings.sequence_viewer.theme import theme_manager
 
 ClickCallback = Callable[[Annotation, int], None]
@@ -151,5 +151,4 @@ class AnnotationGraphicsItem(QGraphicsItem):
         self.update()
         QToolTip.hideText()
         super().hoverLeaveEvent(event)
-
 

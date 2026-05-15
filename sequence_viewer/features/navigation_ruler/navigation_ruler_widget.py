@@ -6,7 +6,7 @@ from PyQt5.QtGui import QPainter, QPen, QBrush, QFont, QPixmap
 from PyQt5.QtWidgets import QWidget, QScrollBar
 from sequence_viewer.features.sequence_viewer.sequence_viewer_widget import SequenceViewerWidget
 from sequence_viewer.features.navigation_ruler.navigation_ruler_model import NavigationRulerModel
-from settings.sequence_viewer.mouse_binding_manager import mouse_binding_manager
+from settings.bindings.mouse import mouse_binding_manager
 from settings.sequence_viewer.theme import theme_manager
 
 class RulerWidget(QWidget):
@@ -127,5 +127,4 @@ class RulerWidget(QWidget):
                 return
             self._dragging_window = False; self.update(); event.accept()
         else: super().mouseReleaseEvent(event)
-
 

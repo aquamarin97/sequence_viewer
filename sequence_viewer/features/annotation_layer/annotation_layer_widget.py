@@ -10,7 +10,7 @@ from sequence_viewer.features.annotation_layer.annotation_viewport_calculator im
     AnnotationViewportCalculator,
 )
 from sequence_viewer.model.annotation import AnnotationType
-from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.bindings.mouse import MouseAction, mouse_binding_manager
 from settings.sequence_viewer.theme import theme_manager
 
 _LANE_PADDING = 6

@@ -3,7 +3,7 @@ from __future__ import annotations
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QBrush, QPen
 
-from settings.sequence_viewer.mouse_binding_manager import mouse_binding_manager
+from settings.bindings.mouse import mouse_binding_manager
 from settings.sequence_viewer.theme import theme_manager
 
 _DROP_LINE_WIDTH = 2

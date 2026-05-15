@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PyQt5.QtCore import QPoint, Qt
 
-from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.bindings.mouse import MouseAction, mouse_binding_manager
 
 from .sequence_viewer_controller_state import MouseSelectionState
 

@@ -15,7 +15,7 @@ from sequence_viewer.features.header_viewer.header_selection_handler import (
 )
 from sequence_viewer.graphics.header_item.header_item import HeaderRowItem
 from sequence_viewer.model.row_selection_model import RowSelectionModel
-from settings.sequence_viewer.mouse_binding_manager import MouseAction, mouse_binding_manager
+from settings.bindings.mouse import MouseAction, mouse_binding_manager
 from settings.sequence_viewer.theme import theme_manager
 
 if TYPE_CHECKING:
